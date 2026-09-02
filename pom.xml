@@ -19,8 +19,8 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>oficiosYa</name>
 	<description>
-		Plataforma digital que conecta clientes con profesionales de oficios y servicios del hogar (cerrajería, jardinería, aire acondicionado, fontanería, etc.),
-		permitiendo filtrar por zona, precio, valoración y disponibilidad, con una opción de solicitud urgente para atención inmediata.
+		Digital platform that connects customers with tradespeople and home-service professionals (locksmithing, gardening, air conditioning, plumbing, etc.),
+		letting them filter by area, price, rating and availability, with an urgent request option for immediate attention.
 	</description>
 
 	<properties>

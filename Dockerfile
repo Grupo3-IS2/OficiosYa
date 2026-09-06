@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn -B -DskipTests package \
 FROM eclipse-temurin:${JAVA_VERSION}-jre AS runtime
 WORKDIR /app
 
-# User without privilegies
+# Unprivileged user
 RUN useradd --system --uid 1001 --create-home spring
 
 COPY --from=build /build/app.jar /app/app.jar

@@ -2,13 +2,13 @@
 target/
 build/
 
-# Datos locales (H2) y secretos: nunca dentro de la imagen
+# Local data (H2) and secrets: never inside the image
 data/
 keys/
 .env
 *.pem
 
-# Herramientas / IDE
+# Tooling / IDE
 .git/
 .idea/
 .claude/

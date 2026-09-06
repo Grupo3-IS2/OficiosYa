@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      # POSTGRES_* are the names the postgres image requires; the values come
+      # from the same DB_* variables the app uses.
+      POSTGRES_DB: ${DB_NAME:?DB_NAME is missing from .env}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is missing from .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is missing from .env (it cannot be empty)}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      args:
+        JAVA_VERSION: 25
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Fixed: inside Docker we always use Postgres (application-postgres.properties).
+      APP_PROFILE: postgres
+      SERVER_PORT: 8080
+      # Overrides the DB_HOST from .env, which points at a Postgres outside Docker.
+      DB_HOST: db:5432
+      DB_NAME: ${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
+      # Host without scheme; SecurityConfig builds the CORS origins from it.
+      WEB_URL: ${WEB_URL:-localhost}
+      # Keys mounted from ./keys. If they are missing the app generates a
+      # temporary pair on every start and every issued token dies on restart.
+      JWT_PRIVATE_KEY_PATH: /app/keys/private_jwt.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public_jwt.pem
+      JWT_EXPIRATION_TIME: ${JWT_EXPIRATION_TIME:-3600000}
+    volumes:
+      # The .pem files must be readable by uid 1001 (the "spring" user).
+      - ./keys:/app/keys:ro
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8080'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  pgdata:
+
+networks:
+  backend:

@@ -61,20 +61,7 @@
 			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
 
-		<!-- DATABASES -->
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-
-		<!-- H2 web console (/h2-console), only enabled on the local profile -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-h2console</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-
+		<!-- DATABASE -->
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
@@ -205,58 +192,5 @@
 
         </plugins>
 	</build>
-
-	<profiles>
-		<!-- COMPILE FRONTEND AND BACKEND IN ONE PORT (8080 BY DEFAULT).
-		     Only active when a frontend/ project actually exists. -->
-		<profile>
-			<id>frontend</id>
-			<activation>
-				<file>
-					<exists>${basedir}/frontend/package.json</exists>
-				</file>
-			</activation>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.codehaus.mojo</groupId>
-						<artifactId>exec-maven-plugin</artifactId>
-						<version>3.1.0</version>
-						<executions>
-							<execution>
-								<id>npm install</id>
-								<phase>generate-resources</phase>
-								<goals>
-									<goal>exec</goal>
-								</goals>
-								<configuration>
-									<executable>npm</executable>
-									<arguments>
-										<argument>install</argument>
-									</arguments>
-									<workingDirectory>frontend</workingDirectory>
-								</configuration>
-							</execution>
-							<execution>
-								<id>npm run build</id>
-								<phase>generate-resources</phase>
-								<goals>
-									<goal>exec</goal>
-								</goals>
-								<configuration>
-									<executable>npm</executable>
-									<arguments>
-										<argument>run</argument>
-										<argument>build</argument>
-									</arguments>
-									<workingDirectory>frontend</workingDirectory>
-								</configuration>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-	</profiles>
 
 </project>

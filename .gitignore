@@ -43,8 +43,5 @@ private_jwt.pem
 keys/*.pem
 !keys/.gitkeep
 
-### Local H2 database
-data/
-
 ### Claude
 .claude

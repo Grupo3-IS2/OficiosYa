@@ -13,9 +13,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Pick target folder
         id: target
         run: |
@@ -25,35 +22,9 @@ jobs:
             echo "dir=dev" >> "$GITHUB_OUTPUT"
           fi
 
-      # --- Frontend: build here, ship the static files to the server ---
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Build React app
-        working-directory: frontend
-        run: |
-          npm ci
-          npm run build
-
-      - name: Upload build to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          source: "frontend/dist/*"
-          target: "/var/www/oficiosya/${{ steps.target.outputs.dir }}"
-          strip_components: 2
-          # Wipe the target dir first so old hashed assets do not pile up.
-          rm: true
-
-      # --- Backend: pull the repo on the server and rebuild the container ---
-      - name: Deploy backend over SSH
+      # Everything lives in the clone: the repo, the built frontend
+      # (frontend/dist, served by the host's nginx) and the backend container.
+      - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -65,6 +36,18 @@ jobs:
             cd "$HOME/storage/oficios-ya/${{ steps.target.outputs.dir }}"
             git fetch origin ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
+
+            # Frontend: build into a staging dir and swap, so a failed build
+            # never leaves the site without a dist/ to serve.
+            cd frontend
+            npm ci
+            rm -rf dist.new
+            npm run build -- --outDir dist.new
+            rm -rf dist && mv dist.new dist
+            cd ..
+
+            # Backend: rebuild and restart the container.
             docker compose up -d --build --remove-orphans
             docker image prune -f
+
             sudo nginx -t && sudo systemctl reload nginx

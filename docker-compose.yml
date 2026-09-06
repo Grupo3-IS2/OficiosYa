@@ -62,7 +62,7 @@ services:
   # Frontend dev server (Vite + hot reload). Local development only:
   #   docker compose --profile dev up
   # Production never starts this (no "dev" profile on the server); there the
-  # host's nginx serves the React build from /var/www/oficiosya/<release|dev>.
+  # host's nginx serves the React build from the clone's frontend/dist.
   web:
     image: node:22
     profiles: ["dev"]

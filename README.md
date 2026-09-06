@@ -19,9 +19,10 @@ docker compose --profile dev up --build
 - Frontend (Vite + hot reload): http://localhost:5173 (proxies /api and /ws to the backend)
 - PostgreSQL and the Spring Boot API start too; without `--profile dev` only those two run.
 
-The app always runs on PostgreSQL (the `db` service). In production the host's
-nginx serves the React build and proxies /api and /ws to the `app` container;
-see `nginx/` and `.github/workflows/deploy.yml`.
+The app always runs on PostgreSQL (the `db` service). In production the deploy
+lives entirely in a clone under `~/storage/oficios-ya/<release|dev>`: the host's
+nginx serves `frontend/dist` from it and proxies /api and /ws to the `app`
+container. See `nginx/` and `.github/workflows/deploy.yml`.
 
 # Coding standards
 

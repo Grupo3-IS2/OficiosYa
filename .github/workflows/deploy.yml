@@ -37,14 +37,9 @@ jobs:
             git fetch origin ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
 
-            # Frontend: build into a staging dir and swap, so a failed build
-            # never leaves the site without a dist/ to serve.
-            cd frontend
-            npm ci
-            rm -rf dist.new
-            npm run build -- --outDir dist.new
-            rm -rf dist && mv dist.new dist
-            cd ..
+            # Frontend: build ./frontend/dist in a container (waits for it to
+            # finish). The host's nginx serves that directory.
+            docker compose run --rm frontend-build
 
             # Backend: rebuild and restart the container.
             docker compose up -d --build --remove-orphans

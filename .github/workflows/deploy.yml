@@ -1,0 +1,48 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, dev]
+
+# Never let two deploys of the same branch run at once.
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pick target folder
+        id: target
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "dir=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Everything lives in the clone: the repo, the built frontend
+      # (frontend/dist, served by the host's nginx) and the backend container.
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            cd "$HOME/storage/oficios-ya/${{ steps.target.outputs.dir }}"
+            git fetch origin ${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
+
+            # Frontend: build ./frontend/dist in a container (waits for it to
+            # finish). The host's nginx serves that directory.
+            docker compose run --rm frontend-build
+
+            # Backend: rebuild and restart the container.
+            docker compose up -d --build --remove-orphans
+            docker image prune -f
+
+            sudo nginx -t && sudo systemctl reload nginx

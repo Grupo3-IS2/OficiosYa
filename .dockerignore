@@ -1,0 +1,22 @@
+# Build artifacts
+target/
+build/
+
+# Local data (H2) and secrets: never inside the image
+data/
+keys/
+.env
+*.pem
+
+# Tooling / IDE
+.git/
+.idea/
+.claude/
+.vscode/
+*.iml
+mvnw.cmd
+.mvn/
+
+# Docs
+README.md
+*.md

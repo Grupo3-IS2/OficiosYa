@@ -1,0 +1,23 @@
+{
+  "name": "oficiosya",
+  "version": "1.0.0",
+  "description": "Digital platform that connects customers with tradespeople and home-service professionals (locksmithing, gardening, air conditioning, plumbing, etc.), letting them filter by area, price, rating and availability, with an urgent request option for immediate attention.",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Grupo3-IS2/OficiosYa.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Grupo3-IS2/OficiosYa/issues"
+  },
+  "homepage": "https://github.com/Grupo3-IS2/OficiosYa#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.4.1"
+  }
+}

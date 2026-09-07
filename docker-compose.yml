@@ -62,7 +62,7 @@ services:
   # Frontend dev server (Vite + hot reload). Local development only:
   #   docker compose --profile dev up
   # Production never starts this (no "dev" profile on the server); there the
-  # host's nginx serves the React build from /var/www/oficiosya/<release|dev>.
+  # host's nginx serves the React build from the clone's frontend/dist.
   web:
     image: node:22
     profiles: ["dev"]
@@ -82,6 +82,21 @@ services:
       - app
     networks:
       - backend
+
+  # One-shot: builds the React app into ./frontend/dist (a bind mount), which the
+  # host's nginx serves. Never a long-running service, so it sits behind the
+  # "build" profile and is invoked explicitly:
+  #   docker compose run --rm frontend-build
+  # The deploy workflow runs it on every push; plain `docker compose up` ignores it.
+  frontend-build:
+    image: node:22
+    profiles: ["build"]
+    working_dir: /app
+    command: sh -c "npm ci && npm run build"
+    volumes:
+      - ./frontend:/app
+      # Keep the container's node_modules; do not let the host's leak in.
+      - /app/node_modules
 
 volumes:
   pgdata:

@@ -1,16 +1,15 @@
 package com.um.uy.oficiosya.mapper;
 
-import com.um.uy.oficiosya.dto.request.UserCreateRequest;
+import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.response.UserResponse;
-import com.um.uy.oficiosya.entity.User;
+import com.um.uy.oficiosya.entity.Client;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
-public interface UserMapper {
-
-    User toEntity(UserCreateRequest dto);
+public interface ClientMapper {
+    Client toEntity(ClientCreateRequest dto);
 
     @Mapping(target = "id", source = "publicId")
-    UserResponse toResponse(User user);
+    UserResponse toResponse(Client client);
 }

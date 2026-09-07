@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -9,5 +10,10 @@ import lombok.experimental.SuperBuilder;
 @Data
 @SuperBuilder
 @NoArgsConstructor
-public class RegisterRequestDTO extends UserRequestDTO {
+public class ProfessionalCreateRequest extends UserCreateRequest {
+    @NotBlank
+    private String phoneNumber;
+
+    @NotBlank
+    private String workingLocation;
 }

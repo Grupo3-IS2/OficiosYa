@@ -1,18 +1,18 @@
 package com.um.uy.oficiosya.dto.request;
 
 import jakarta.validation.constraints.Email;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 @Data
-@Builder
-@AllArgsConstructor
+@SuperBuilder
 @NoArgsConstructor
-public class LoginRequestDTO {
-    @Email
-    private String email;
+public class UserCreateRequest {
+    private String name;
 
     private String password;
+
+    @Email
+    private String email;
 }

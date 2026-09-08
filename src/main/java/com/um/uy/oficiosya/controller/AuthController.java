@@ -8,6 +8,7 @@ import com.um.uy.oficiosya.dto.response.MessageResponse;
 import com.um.uy.oficiosya.dto.response.TokenResponse;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,19 +23,19 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest dto){
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest dto){
         LoginResponse response = authService.login(dto);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/register-client")
-    public ResponseEntity<LoginResponse> registerClient(@RequestBody ClientCreateRequest dto){
+    public ResponseEntity<LoginResponse> registerClient(@Valid @RequestBody ClientCreateRequest dto){
         LoginResponse response = authService.register(dto);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/register-professional")
-    public ResponseEntity<LoginResponse> registerProfessional(@RequestBody ProfessionalCreateRequest dto){
+    public ResponseEntity<LoginResponse> registerProfessional(@Valid @RequestBody ProfessionalCreateRequest dto){
         LoginResponse response = authService.register(dto);
         return ResponseEntity.ok(response);
     }

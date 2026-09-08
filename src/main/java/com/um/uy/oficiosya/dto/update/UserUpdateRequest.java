@@ -1,7 +1,6 @@
 package com.um.uy.oficiosya.dto.update;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Size;
+import com.um.uy.oficiosya.validation.annotations.FullName;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -10,7 +9,7 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @NoArgsConstructor
 public class UserUpdateRequest {
-    @Size(min = 1, max = 100, message = "Name cannot be empty")
+    @FullName
     private String name;
 
     private String profileImageUrl;

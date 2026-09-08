@@ -6,6 +6,7 @@ import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.MessageResponse;
 import com.um.uy.oficiosya.dto.response.TokenResponse;
+import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.entity.User;
 import com.um.uy.oficiosya.repository.UserRepository;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
@@ -13,6 +14,7 @@ import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.JwtService;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import com.um.uy.oficiosya.service.interfaces.TokenRevocationService;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -54,7 +56,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginResponse login(LoginRequest request) {
 
-        User user = userRepository.findByEmail(request.getEmail())
+        String email = request.getEmail().trim();
+
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "User not found")
                 );
@@ -71,6 +75,7 @@ public class AuthServiceImpl implements AuthService {
                 jwtToken,
                 user.getEmail(),
                 user.getName(),
+                Role.of(user),
                 "User " + user.getEmail() + " logged successfully");
     }
 
@@ -99,6 +104,7 @@ public class AuthServiceImpl implements AuthService {
                 jwtToken,
                 user.getEmail(),
                 user.getName(),
+                Role.of(user),
                 "User " + user.getEmail() + " registered successfully");
     }
 
@@ -120,8 +126,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * Revokes the token the request carries, so it cannot be used again even though it
-     * has not expired yet. The client is still expected to drop its copy of the token.
+     * Revokes the token the request carries and every other token of the same user
      */
     @Override
     public MessageResponse logout(HttpServletRequest request) {
@@ -133,9 +138,22 @@ public class AuthServiceImpl implements AuthService {
         }
 
         tokenRevocationService.revoke(token);
+
+        this.findByPublicId(this.subjectOf(token))
+                .ifPresent(user -> tokenRevocationService.revokeSessions(user.getPublicId()));
+
         log.info("Token revoked, the user logged out");
 
         return new MessageResponse("User logged out successfully");
+    }
+
+    private String subjectOf(String token) {
+        try {
+            return jwtService.extractUsername(token);
+        } catch (JwtException e) {
+            log.warn("Token with an unreadable subject on logout");
+            return "";
+        }
     }
 
     /** The JWT subject is the user's publicId, an unparseable one is simply not a user. */

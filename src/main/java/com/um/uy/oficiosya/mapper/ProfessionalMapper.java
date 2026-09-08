@@ -11,5 +11,6 @@ public interface ProfessionalMapper {
     Professional toEntity(ProfessionalCreateRequest dto);
 
     @Mapping(target = "id", source = "publicId")
+    @Mapping(target = "role", constant = "PROFESSIONAL")
     UserResponse toResponse(Professional professional);
 }

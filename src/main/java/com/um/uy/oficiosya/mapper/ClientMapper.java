@@ -11,5 +11,6 @@ public interface ClientMapper {
     Client toEntity(ClientCreateRequest dto);
 
     @Mapping(target = "id", source = "publicId")
+    @Mapping(target = "role", constant = "CLIENT")
     UserResponse toResponse(Client client);
 }

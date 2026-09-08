@@ -1,0 +1,20 @@
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #172235;
+  font-size: 15px;
+}
+
+.rating .icon {
+  width: 18px;
+  height: 18px;
+  color: #fbb900;
+  fill: #fbb900;
+  stroke: #fbb900;
+}
+
+.rating small {
+  color: #536174;
+  font-size: 14px;
+}

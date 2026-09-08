@@ -1,32 +1,46 @@
-# React + TypeScript + Vite
+# OficiosYa frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + TypeScript + Vite frontend for OficiosYa.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Start PostgreSQL and the Spring Boot API from the repository root:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+docker compose up db app
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Then start Vite from this directory:
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`. Vite proxies `/api` and `/ws` to the backend at
+`http://localhost:8080`.
+
+## Available scripts
+
+```bash
+npm run dev      # Start the Vite development server
+npm run build    # Type-check and create a production build
+npm run lint     # Run Oxlint
+npm run preview  # Preview the production build locally
+```
+
+## Project structure
+
+- `src/components/`: reusable UI components and their styles.
+- `src/pages/`: page-level views and page-specific styles.
+- `src/services/`: HTTP clients and backend integrations.
+- `src/types/`: shared TypeScript domain and API types.
+- `src/assets/`: static assets imported by the application.
+
+## Code conventions
+
+- Keep implementation names, comments and API-facing messages in English.
+- Keep user-facing product copy in Spanish.
+- Use four spaces for indentation and UTF-8 with LF line endings.
+- Keep backend requests inside `src/services/` rather than calling `fetch`
+  directly from page components.

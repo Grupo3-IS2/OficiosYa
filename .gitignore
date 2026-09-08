@@ -45,3 +45,5 @@ keys/*.pem
 
 ### Claude
 .claude
+
+.mcp.json

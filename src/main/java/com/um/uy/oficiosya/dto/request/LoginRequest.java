@@ -1,4 +1,4 @@
-package com.um.uy.oficiosya.dto.response;
+package com.um.uy.oficiosya.dto.request;
 
 import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
@@ -10,13 +10,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class LoginResponseDTO {
-    private String token;
-
+public class LoginRequest {
     @Email
     private String email;
 
-    private String name;
-
-    private String message;
+    private String password;
 }

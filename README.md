@@ -19,6 +19,13 @@ docker compose --profile dev up --build
 - Frontend (Vite + hot reload): http://localhost:5173 (proxies /api and /ws to the backend)
 - PostgreSQL and the Spring Boot API start too; without `--profile dev` only those two run.
 
+# API docs
+
+The backend exposes an OpenAPI spec via springdoc:
+
+- Swagger UI: http://localhost:8080/swagger-ui.html
+- OpenAPI JSON: http://localhost:8080/v3/api-docs
+
 The app always runs on PostgreSQL (the `db` service). In production the deploy
 lives entirely in a clone under `~/storage/oficios-ya/<release|dev>`: the
 `frontend-build` service compiles `frontend/dist`, the host's nginx serves that

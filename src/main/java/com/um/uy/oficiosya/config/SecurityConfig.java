@@ -4,6 +4,7 @@ import com.um.uy.oficiosya.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -12,6 +13,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -28,6 +30,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /** <a href="https://www.kindsonthegenius.com/how-to-authenticate-from-react-to-spring-boot/">...</a> **/
 @Configuration
@@ -38,11 +41,22 @@ public class SecurityConfig {
     @Value("${app.web-url:localhost}")
     String WEB_URL;
 
+    /** Only true on the local profile, where the embedded H2 console is served **/
+    @Value("${spring.h2.console.enabled:false}")
+    boolean h2ConsoleEnabled;
+
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity httpSecurity,
             AuthenticationProvider authenticationProvider,
             JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+
+        if (h2ConsoleEnabled) {
+            // The console is a frame-based app served from the backend itself
+            httpSecurity
+                    .authorizeHttpRequests(auth -> auth.requestMatchers("/h2-console/**").permitAll())
+                    .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));
+        }
 
         return httpSecurity
                 .authorizeHttpRequests(auth -> auth
@@ -54,12 +68,26 @@ public class SecurityConfig {
                                 "/static/**",
                                 "/*.js",
                                 "/*.css",
-                                "/*.ico",
-
-                                // Backend
-                                "/login/**",
-                                "/api/v1/**"
+                                "/*.ico"
                         ).permitAll()
+
+                        // OpenAPI docs and Swagger UI
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+
+                        // Login and registration
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+
+                        // Signing up cannot require an account
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/client/create",
+                                "/api/v1/professional/create"
+                        ).permitAll()
+
                         .anyRequest().authenticated()
                 )
                 .csrf(AbstractHttpConfigurer::disable)
@@ -67,12 +95,13 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+                // Without this a request with no token gets a redirect to the login form,
+                // which is useless for an API client: it has to be a 401.
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                )
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                // SPA client: an unauthenticated request must get a clean 401,
-                // not a 302 redirect to a server-rendered login form.
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(
-                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .build();
     }
 
@@ -88,16 +117,29 @@ public class SecurityConfig {
         return new DelegatingPasswordEncoder(idForEncode, encoders);
     }
 
+    /**
+     * The username here is the JWT subject, that is the user's publicId. The email is
+     * not usable as an identifier because the user can change it.
+     */
     @Bean
     public UserDetailsService userDetailsService(UserRepository userRepository) {
-        return username -> userRepository.findByEmail(username)
-                .map(user -> org.springframework.security.core.userdetails.User
-                        .withUsername(user.getEmail())
-                        .password(user.getPassword())
-                        .authorities("USER")
-                        .build()
-                )
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+        return subject -> {
+            UUID publicId;
+            try {
+                publicId = UUID.fromString(subject);
+            } catch (IllegalArgumentException e) {
+                throw new UsernameNotFoundException("Invalid user identifier: " + subject);
+            }
+
+            return userRepository.findByPublicId(publicId)
+                    .map(user -> org.springframework.security.core.userdetails.User
+                            .withUsername(user.getPublicId().toString())
+                            .password(user.getPassword())
+                            .authorities("USER")
+                            .build()
+                    )
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + subject));
+        };
     }
 
 

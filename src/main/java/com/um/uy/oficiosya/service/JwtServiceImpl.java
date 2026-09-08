@@ -60,7 +60,8 @@ public class JwtServiceImpl implements JwtService {
 
     @Override
     public String generateToken(User user) {
-        return this.generateToken(new HashMap<>(), user.getEmail());
+        // The subject is the publicId and not the email, because the email is mutable.
+        return this.generateToken(new HashMap<>(), user.getPublicId().toString());
     }
 
     @Override

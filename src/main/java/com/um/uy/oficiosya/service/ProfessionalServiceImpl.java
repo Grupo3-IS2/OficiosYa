@@ -1,8 +1,8 @@
 package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
-import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.dto.response.UserResponse;
+import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.exception.UserNotFoundException;
 import com.um.uy.oficiosya.mapper.ProfessionalMapper;
@@ -67,10 +67,6 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
         if (professionalRequest.getPhoneNumber() != null && !professionalRequest.getPhoneNumber().isBlank()) {
             professional.setPhoneNumber(professionalRequest.getPhoneNumber());
-        }
-
-        if (professionalRequest.getWorkingLocation() != null && !professionalRequest.getWorkingLocation().isBlank()) {
-            professional.setWorkingLocation(professionalRequest.getWorkingLocation());
         }
 
         professional = professionalRepository.save(professional);

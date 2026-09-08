@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.dto.response;
 
 import jakarta.validation.constraints.Email;
+import com.um.uy.oficiosya.entity.Role;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,6 +23,8 @@ public class LoginResponse {
     private String email;
 
     private String name;
+
+    private Role role;
 
     private String message;
 }

@@ -15,4 +15,7 @@ public class EmailUpdateRequest {
     @NotBlank(message = "Email cannot be empty")
     @Email(message = "Invalid email")
     private String newEmail;
+
+    @NotBlank(message = "Current password is necessary")
+    private String currentPassword;
 }

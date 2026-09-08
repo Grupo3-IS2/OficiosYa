@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.dto.request;
 
+import com.um.uy.oficiosya.validation.annotations.PhoneNumber;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -11,9 +12,7 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @NoArgsConstructor
 public class ProfessionalCreateRequest extends UserCreateRequest {
-    @NotBlank
+    @NotBlank(message = "Phone number is necessary")
+    @PhoneNumber
     private String phoneNumber;
-
-    @NotBlank
-    private String workingLocation;
 }

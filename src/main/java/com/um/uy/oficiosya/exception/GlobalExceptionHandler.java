@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,6 +48,15 @@ public class GlobalExceptionHandler {
         Map<String, String> fieldErrors = new HashMap<>();
         ex.getBindingResult().getFieldErrors()
                 .forEach(error -> fieldErrors.put(error.getField(), error.getDefaultMessage()));
+        return build(HttpStatus.BAD_REQUEST, "Validation failed", fieldErrors);
+    }
+
+    /** The same constraints as the request bodies, checked again before hitting the database. */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
+        Map<String, String> fieldErrors = new HashMap<>();
+        ex.getConstraintViolations()
+                .forEach(violation -> fieldErrors.put(violation.getPropertyPath().toString(), violation.getMessage()));
         return build(HttpStatus.BAD_REQUEST, "Validation failed", fieldErrors);
     }
 

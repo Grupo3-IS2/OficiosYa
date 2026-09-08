@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.dto.response;
 
+import com.um.uy.oficiosya.entity.Role;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,5 +18,7 @@ public class UserResponse {
     private UUID id;
     private String name;
     private String email;
+    private String phoneNumber;
+    private Role role;
     private LocalDateTime createdAt;
 }

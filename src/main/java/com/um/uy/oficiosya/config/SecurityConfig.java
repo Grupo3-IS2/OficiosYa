@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.config;
 
+import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -135,7 +136,7 @@ public class SecurityConfig {
                     .map(user -> org.springframework.security.core.userdetails.User
                             .withUsername(user.getPublicId().toString())
                             .password(user.getPassword())
-                            .authorities("USER")
+                            .roles(Role.of(user).name())
                             .build()
                     )
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + subject));

@@ -1,6 +1,9 @@
 package com.um.uy.oficiosya.dto.request;
 
+import com.um.uy.oficiosya.validation.annotations.FullName;
+import com.um.uy.oficiosya.validation.annotations.Password;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -9,10 +12,15 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @NoArgsConstructor
 public class UserCreateRequest {
+    @NotBlank(message = "Name is necessary")
+    @FullName
     private String name;
 
+    @NotBlank(message = "Password is necessary")
+    @Password
     private String password;
 
+    @NotBlank(message = "Email is necessary")
     @Email
     private String email;
 }

@@ -42,15 +42,22 @@ public class UserServiceImpl implements UserService {
     public UserResponse changeEmail(EmailUpdateRequest emailRequest, UUID id) {
         User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("User not found."));
 
-        String newEmail = emailRequest.getNewEmail();
-
-        if (!newEmail.equals(user.getEmail())) {
-            if (userRepository.existsByEmail(newEmail)) {
-                throw new UserAlreadyExists("User with email " + newEmail + " already exists");
-            }
-            user.setEmail(newEmail);
-            user = userRepository.save(user);
+        if (!passwordEncoder.matches(emailRequest.getCurrentPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
         }
+
+        String newEmail = emailRequest.getNewEmail().trim();
+
+        if (newEmail.equals(user.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The new email is the same as the current one");
+        }
+
+        if (userRepository.existsByEmail(newEmail)) {
+            throw new UserAlreadyExists("User with email " + newEmail + " already exists");
+        }
+
+        user.setEmail(newEmail);
+        user = userRepository.save(user);
 
         return userMapper.toResponse(user);
     }
@@ -62,6 +69,14 @@ public class UserServiceImpl implements UserService {
 
         if (!passwordEncoder.matches(passwordRequest.getOldPassword(), user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+
+        if (!passwordRequest.getNewPassword().equals(passwordRequest.getNewPasswordConfirmation())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password confirmation does not match");
+        }
+
+        if (passwordEncoder.matches(passwordRequest.getNewPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The new password is the same as the current one");
         }
 
         user.setPassword(passwordEncoder.encode(passwordRequest.getNewPassword()));

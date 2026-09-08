@@ -71,6 +71,13 @@ public class SecurityConfig {
                                 "/*.ico"
                         ).permitAll()
 
+                        // OpenAPI docs and Swagger UI
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+
                         // Login and registration
                         .requestMatchers("/api/v1/auth/**").permitAll()
 

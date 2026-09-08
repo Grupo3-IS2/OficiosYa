@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,4 +43,8 @@ public class Professional extends User {
     @Builder.Default
     @OneToMany(mappedBy = "professional", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ExpertiseTrade> expertiseTrades = new ArrayList<>();
+
+    @Min(0)
+    @Min(10)
+    private Double rating;
 }

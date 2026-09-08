@@ -8,6 +8,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -29,14 +31,13 @@ public class JobRequest {
     @JoinColumn(name = "professional_id", nullable = false)
     private Professional professional;
 
-    /** What is being requested. */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "task_id", nullable = false)
-    private Task task;
+    @Builder.Default
+    @OneToMany(mappedBy = "jobRequest", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Task> tasks = new ArrayList<>();
 
-    /** Calendar slot this job takes in the professional's agenda, once accepted. */
-    @OneToOne(mappedBy = "jobRequest", fetch = FetchType.LAZY)
-    private Schedule schedule;
+    @Builder.Default
+    @OneToMany(mappedBy = "jobRequest", fetch = FetchType.LAZY)
+    private List<Schedule> schedules = new ArrayList<>();
 
     @NotBlank
     @Column(nullable = false)
@@ -65,7 +66,7 @@ public class JobRequest {
 
     /** Review left by the client once the job is COMPLETED. */
     @Min(1)
-    @Max(5)
+    @Max(10)
     private Integer rating;
 
     @Column(length = 1000)

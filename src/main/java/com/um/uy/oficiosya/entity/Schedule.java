@@ -22,8 +22,8 @@ public class Schedule {
     @JoinColumn(name = "professional_id", nullable = false)
     private Professional professional;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_request_id", unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_request_id")
     private JobRequest jobRequest;
 
     @NotNull

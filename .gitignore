@@ -45,6 +45,7 @@ keys/*.pem
 
 ### Claude
 .claude
+.mcp.json
 
 # Playwright
 node_modules/

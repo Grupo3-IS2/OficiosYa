@@ -1,11 +1,12 @@
 package com.um.uy.oficiosya.config;
 
 import com.um.uy.oficiosya.service.JwtServiceImpl;
-import io.micrometer.common.lang.NonNull;
+import com.um.uy.oficiosya.service.interfaces.TokenRevocationService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -28,14 +29,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtServiceImpl jwtService;
     private final UserDetailsService userDetailsService;
+    private final TokenRevocationService tokenRevocationService;
 
     public JwtAuthenticationFilter(
             JwtServiceImpl jwtService,
             UserDetailsService userDetailsService,
+            TokenRevocationService tokenRevocationService,
             HandlerExceptionResolver handlerExceptionResolver
     ) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.tokenRevocationService = tokenRevocationService;
         this.handlerExceptionResolver = handlerExceptionResolver;
     }
 
@@ -68,6 +72,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             final String jwt = authHeader.substring(7);
+
+            // A logged out token is still well formed, only the revocation list knows it is dead
+            if (tokenRevocationService.isRevoked(jwt)) {
+                logger.info("REQUEST: {} REVOKED TOKEN", request.getRequestURI());
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             final String username = jwtService.extractUsername(jwt);
 
             logger.info("REQUEST: {} USER: {}", request.getRequestURI(), username);

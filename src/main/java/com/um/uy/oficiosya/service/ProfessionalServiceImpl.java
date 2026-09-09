@@ -69,6 +69,10 @@ public class ProfessionalServiceImpl implements ProfessionalService {
             professional.setPhoneNumber(professionalRequest.getPhoneNumber());
         }
 
+        if (professionalRequest.getWorkingLocation() != null && !professionalRequest.getWorkingLocation().isBlank()) {
+            professional.setWorkingLocation(professionalRequest.getWorkingLocation());
+        }
+
         professional = professionalRepository.save(professional);
         return professionalMapper.toResponse(professional);
     }

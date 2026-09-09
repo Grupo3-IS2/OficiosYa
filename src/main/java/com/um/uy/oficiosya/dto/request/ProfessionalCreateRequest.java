@@ -15,4 +15,7 @@ public class ProfessionalCreateRequest extends UserCreateRequest {
     @NotBlank(message = "Phone number is necessary")
     @PhoneNumber
     private String phoneNumber;
+
+    @NotBlank(message = "Working location is necessary")
+    private String workingLocation;
 }

@@ -13,4 +13,6 @@ import lombok.experimental.SuperBuilder;
 public class ProfessionalUpdateRequest extends UserUpdateRequest {
     @PhoneNumber
     private String phoneNumber;
+
+    private String workingLocation;
 }

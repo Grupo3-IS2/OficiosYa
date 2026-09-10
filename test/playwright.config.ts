@@ -19,7 +19,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'cd frontend && npm install && npm run dev -- --host 0.0.0.0 --port 5173',
+    command: 'cd ../frontend && npm install && npm run dev -- --host 0.0.0.0 --port 5173',
     url: 'http://localhost:5173',
     reuseExistingServer: true,
     timeout: 120000,

@@ -28,6 +28,10 @@ export async function apiRequest<T>(
     headers,
   })
 
+  if (response.status === 204) {
+    return undefined as T
+  }
+
   const contentType = response.headers.get('content-type') ?? ''
   const body = contentType.includes('application/json')
     ? await response.json()

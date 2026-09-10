@@ -1,9 +1,13 @@
 package com.um.uy.oficiosya.exception;
 
+import io.jsonwebtoken.JwtException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -17,6 +21,8 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private ResponseEntity<Map<String, Object>> build(HttpStatus status, String error, Object details) {
         Map<String, Object> body = new HashMap<>();
@@ -75,6 +81,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.FORBIDDEN, "You are not allowed to perform this action", null);
     }
 
+    @ExceptionHandler(JwtException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidJwt(JwtException ex) {
+        return build(HttpStatus.UNAUTHORIZED, "Invalid or expired authentication token", null);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthentication(AuthenticationException ex) {
+        return build(HttpStatus.UNAUTHORIZED, "Authentication failed", null);
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
         return build(HttpStatus.CONFLICT, "Database constraint violation", null);
@@ -82,6 +98,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
+        logger.error("Unhandled exception while processing request", ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", null);
     }
 }

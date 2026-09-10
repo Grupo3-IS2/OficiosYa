@@ -13,6 +13,7 @@ export interface RegistrationProfile {
   email: string
   accountType: AccountType
   location: string | null
+  phoneNumber: string | null
 }
 
 export interface StoredUser {

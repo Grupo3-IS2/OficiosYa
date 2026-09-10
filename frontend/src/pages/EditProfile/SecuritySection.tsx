@@ -13,12 +13,12 @@ function PasswordField({ id, label, value, onChange, current = false }: {
             <input id={id} type={visible ? 'text' : 'password'} value={value} onChange={event => onChange(event.target.value)} required minLength={current ? undefined : 8} autoComplete={current ? 'current-password' : 'new-password'} aria-describedby={id === 'new-password' ? 'password-help' : undefined} />
             <button type="button" aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${label.toLowerCase()}`} aria-pressed={visible} onClick={() => setVisible(!visible)}><Icon name={visible ? 'eye-off' : 'eye'} /></button>
         </div>
-        {id === 'new-password' && <small id="password-help">Usa al menos 8 caracteres.</small>}
+        {id === 'new-password' && <small id="password-help">Usa al menos 8 caracteres, con mayúscula, minúscula, número y símbolo.</small>}
     </div>
 }
 
-export default function SecuritySection({ value, onChange, onSave }: {
-    value: SecurityData; onChange: (value: SecurityData) => void; onSave: () => Promise<boolean>
+export default function SecuritySection({ value, onChange, onSave, message, error }: {
+    value: SecurityData; onChange: (value: SecurityData) => void; onSave: () => Promise<boolean>; message?: string; error?: string
 }) {
     const { current, password, confirmation } = value
     const setCurrent = (current: string) => onChange({ ...value, current })
@@ -34,6 +34,8 @@ export default function SecuritySection({ value, onChange, onSave }: {
                 <PasswordField id="confirm-password" label="Confirmar nueva contraseña" value={confirmation} onChange={setConfirmation} />
             </div>
             <div className="profile-actions"><Button type="submit">Actualizar contraseña</Button></div>
+            {error && <p className="profile-error" role="alert">{error}</p>}
+            {message && <p className="profile-feedback" role="status">{message}</p>}
         </form>
     </section>
 }

@@ -24,6 +24,7 @@ function Register() {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [location, setLocation] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
@@ -49,6 +50,14 @@ function Register() {
       return
     }
 
+    if (
+      accountType === 'professional'
+      && !/^(\+\d{1,3})?\d{9}$/.test(phoneNumber.trim())
+    ) {
+      setErrorMessage('Ingresá un teléfono de 9 dígitos, con prefijo internacional opcional.')
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -58,6 +67,7 @@ function Register() {
           email: email.trim(),
           accountType,
           location: accountType === 'professional' ? location.trim() : null,
+          phoneNumber: accountType === 'professional' ? phoneNumber.trim() : null,
         },
       )
 
@@ -153,6 +163,19 @@ function Register() {
 
           {accountType === 'professional' && (
             <>
+              <label htmlFor="register-phone">Número de teléfono</label>
+              <div className="register-input">
+                <Icon name="phone" />
+                <input
+                  id="register-phone"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(event) => setPhoneNumber(event.target.value)}
+                  required
+                  placeholder="Ej. +59899123456"
+                />
+              </div>
+
               <label htmlFor="register-location">Ubicación</label>
               <div className="register-input">
                 <Icon name="location" />

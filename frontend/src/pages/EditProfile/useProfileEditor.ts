@@ -1,19 +1,21 @@
 import { useRef, useState } from 'react'
 import { getCurrentUser, getRegistrationProfile, isAuthenticated, logout, updateStoredUser } from '../../services/authService'
-import { updateUser } from '../../services/userService'
+import { changeEmail, changePassword } from '../../services/userService'
+import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, readLocalProfile, securityChanged, validateSecurity, writeLocalProfile } from './profileState'
 import type { PersonalData, ProfessionalData, ProfileSection, SecurityData } from './profileState'
 
 export default function useProfileEditor(professionalOverride?: boolean) {
     const [user] = useState(getCurrentUser)
-    const [isProfessional] = useState(() => professionalOverride ?? (getRegistrationProfile()?.accountType === 'professional'))
+    const [registrationProfile] = useState(getRegistrationProfile)
+    const [isProfessional] = useState(() => professionalOverride ?? (registrationProfile?.accountType === 'professional'))
     const account = user?.email ?? 'demo'
     const [savedPersonal, setSavedPersonal] = useState<PersonalData>(() => {
         const local = readLocalProfile(account).personal
         return {
             name: user?.name ?? local?.name ?? 'Martín Rodríguez',
             email: user?.email ?? local?.email ?? 'martin.rodriguez@email.com',
-            phone: local?.phone ?? (user ? '' : '+598 99 123 456'),
+            phone: local?.phone ?? registrationProfile?.phoneNumber ?? (user ? '' : '+598 99 123 456'),
             avatar: local?.avatar ?? '',
         }
     })
@@ -25,9 +27,11 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     })
     const [professional, setProfessional] = useState(savedProfessional)
     const [security, setSecurity] = useState<SecurityData>({ current: '', password: '', confirmation: '' })
+    const [emailPassword, setEmailPassword] = useState('')
     const [busy, setBusy] = useState(false)
     const saving = useRef(false)
     const [error, setError] = useState('')
+    const [errorSection, setErrorSection] = useState<ProfileSection | ''>('')
     const [messages, setMessages] = useState<Partial<Record<ProfileSection, string>>>({})
     const dirty = {
         personal: personalChanged(personal, savedPersonal),
@@ -38,10 +42,14 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     async function save(sections: ProfileSection[]): Promise<boolean> {
         if (saving.current) return false
         setError('')
+        setErrorSection(sections.length === 1 ? sections[0] : '')
         // Validate every pending section before doing any writes.
         if (sections.includes('security') && dirty.security) {
-            setError(validateSecurity(security) || 'El cambio de contraseña aún no está disponible. Cancela para conservar lo escrito o descarta los cambios para salir.')
-            return false
+            const validationError = validateSecurity(security)
+            if (validationError) {
+                setError(validationError)
+                return false
+            }
         }
         if (sections.includes('personal')) {
             const emailInput = document.createElement('input')
@@ -52,10 +60,24 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 setError('Revisa los datos personales: ingresa un nombre y un correo válido.')
                 return false
             }
+            if (user && personal.email.trim() !== savedPersonal.email && !emailPassword) {
+                setError('Ingresa tu contraseña actual para cambiar el correo.')
+                return false
+            }
         }
         saving.current = true
         setBusy(true)
         try {
+            if (sections.includes('security') && dirty.security) {
+                if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de cambiar tu contraseña.')
+                await changePassword({
+                    oldPassword: security.current,
+                    newPassword: security.password,
+                    newPasswordConfirmation: security.confirmation,
+                })
+                setSecurity({ current: '', password: '', confirmation: '' })
+                setMessages(previous => ({ ...previous, security: 'Contraseña actualizada correctamente.' }))
+            }
             if (sections.includes('professional') && dirty.professional) {
                 writeLocalProfile(user ? savedPersonal.email : account, 'professional', professional)
                 setSavedProfessional(professional)
@@ -65,32 +87,35 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 let saved = { ...personal, name: personal.name.trim(), email: personal.email.trim() }
                 let emailChanged = false
                 if (user) {
-                    if (saved.name !== savedPersonal.name || saved.email !== savedPersonal.email) {
+                    if (saved.email !== savedPersonal.email) {
                         if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
-                        const response = await updateUser(savedPersonal.email, { name: saved.name, email: saved.email })
-                        saved = { ...saved, name: response.name, email: response.email }
-                        updateStoredUser({ name: response.name, email: response.email })
+                        const response = await changeEmail({ newEmail: saved.email, currentPassword: emailPassword })
+                        saved = { ...saved, email: response.email }
+                        updateStoredUser({ name: saved.name, email: response.email })
                         emailChanged = response.email !== savedPersonal.email
                         // Preserve server success even if local storage subsequently fails.
                         setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email }))
                     }
                 }
-                try {
-                    writeLocalProfile(user ? saved.email : account, 'personal', saved)
+                writeLocalProfile(user ? saved.email : account, 'personal', saved)
                     if (emailChanged && isProfessional) writeLocalProfile(saved.email, 'professional', sections.includes('professional') ? professional : savedProfessional)
                     setPersonal(saved)
                     setSavedPersonal(saved)
+                    setEmailPassword('')
                     setMessages(previous => ({ ...previous, personal: emailChanged
-                        ? 'Datos guardados. Inicia sesión con tu nuevo correo. Foto y teléfono guardados temporalmente en esta pestaña.'
+                        ? 'Correo y datos actualizados. Foto y teléfono guardados temporalmente en esta pestaña.'
                         : user ? 'Datos guardados. Foto y teléfono guardados temporalmente en esta pestaña.'
                             : 'Vista de prueba: datos guardados temporalmente en esta pestaña.' }))
-                } finally {
-                    if (emailChanged) logout()
-                }
             }
+            setErrorSection('')
             return true
         } catch (reason) {
-            setError(reason instanceof Error ? reason.message : 'No se pudieron guardar los cambios. Inténtalo nuevamente.')
+            if (reason instanceof ApiError && reason.status === 401) {
+                logout()
+                setError('Tu sesión venció. Inicia sesión nuevamente antes de guardar los cambios.')
+            } else {
+                setError(reason instanceof Error ? reason.message : 'No se pudieron guardar los cambios. Inténtalo nuevamente.')
+            }
             return false
         } finally {
             saving.current = false
@@ -99,16 +124,18 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     }
 
     return {
-        user, isProfessional, personal, setPersonal, professional, setProfessional, security, setSecurity,
-        busy, error, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
+        user, isProfessional, personal, setPersonal, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, professional, setProfessional, security, setSecurity,
+        busy, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),
-        clearError: () => setError(''),
+        clearError: () => { setError(''); setErrorSection('') },
         discard: () => {
             setPersonal(savedPersonal)
             setProfessional(savedProfessional)
             setSecurity({ current: '', password: '', confirmation: '' })
+            setEmailPassword('')
             setError('')
+            setErrorSection('')
         },
     }
 }

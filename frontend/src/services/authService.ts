@@ -31,9 +31,21 @@ export async function register(
   request: RegisterRequest,
   profile?: RegistrationProfile,
 ): Promise<LoginResponse> {
-  const response = await apiRequest<LoginResponse>('/auth/register', {
+  const isProfessional = profile?.accountType === 'professional'
+  const endpoint = isProfessional
+    ? '/auth/register-professional'
+    : '/auth/register-client'
+  const body = isProfessional
+    ? {
+        ...request,
+        phoneNumber: profile.phoneNumber,
+        workingLocation: profile.location,
+      }
+    : request
+
+  const response = await apiRequest<LoginResponse>(endpoint, {
     method: 'POST',
-    body: JSON.stringify(request),
+    body: JSON.stringify(body),
   })
 
   localStorage.setItem(TOKEN_KEY, response.token)

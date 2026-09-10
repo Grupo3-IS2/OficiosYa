@@ -13,6 +13,17 @@ export interface UserResponse {
   salary: number | null
 }
 
+export interface PasswordUpdateRequest {
+  oldPassword: string
+  newPassword: string
+  newPasswordConfirmation: string
+}
+
+export interface EmailUpdateRequest {
+  newEmail: string
+  currentPassword: string
+}
+
 export function createUser(request: UserRequest): Promise<UserResponse> {
   return apiRequest<UserResponse>('/user/create', {
     method: 'POST',
@@ -30,5 +41,19 @@ export function updateUser(email: string, request: Partial<UserRequest>): Promis
 export async function deleteUser(email: string): Promise<void> {
   await apiRequest<void>(`/user/${encodeURIComponent(email)}`, {
     method: 'DELETE',
+  })
+}
+
+export async function changePassword(request: PasswordUpdateRequest): Promise<void> {
+  await apiRequest<void>('/user/me/password', {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  })
+}
+
+export function changeEmail(request: EmailUpdateRequest): Promise<UserResponse> {
+  return apiRequest<UserResponse>('/user/me/email', {
+    method: 'PUT',
+    body: JSON.stringify(request),
   })
 }

@@ -37,6 +37,10 @@ export function securityChanged(value: SecurityData) {
 export function validateSecurity(value: SecurityData): string {
     if (!value.current || !value.password || !value.confirmation) return 'Completa los tres campos de contraseña.'
     if (value.password.length < 8) return 'La nueva contraseña debe tener al menos 8 caracteres.'
+    if (!/[A-Z]/.test(value.password)) return 'La nueva contraseña debe incluir al menos una mayúscula.'
+    if (!/[a-z]/.test(value.password)) return 'La nueva contraseña debe incluir al menos una minúscula.'
+    if (!/\d/.test(value.password)) return 'La nueva contraseña debe incluir al menos un número.'
+    if (!/[^A-Za-z0-9]/.test(value.password)) return 'La nueva contraseña debe incluir al menos un carácter especial.'
     if (value.password !== value.confirmation) return 'Las contraseñas nuevas no coinciden.'
     if (value.password === value.current) return 'La nueva contraseña debe ser diferente de la actual.'
     return ''

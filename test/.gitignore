@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Playwright output
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Saved storage state (may contain tokens/credentials)
+/playwright/.auth/
+
+# Logs
+*.log
+npm-debug.log*

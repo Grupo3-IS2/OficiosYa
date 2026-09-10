@@ -1,0 +1,29 @@
+{
+  "name": "oficiosya",
+  "version": "1.0.0",
+  "description": "Digital platform that connects customers with tradespeople and home-service professionals.",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Grupo3-IS2/OficiosYa.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Grupo3-IS2/OficiosYa/issues"
+  },
+  "homepage": "https://github.com/Grupo3-IS2/OficiosYa#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.4.1"
+  }
+}

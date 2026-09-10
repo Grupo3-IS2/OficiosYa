@@ -96,9 +96,9 @@ function ProfileMenu({ authenticated, onLogout }: ProfileMenuProps) {
                     style={{ top: position.top, left: position.left }}
                 >
                     {authenticated && (
-                        <button type="button" role="menuitem" disabled>
+                        <a href="/profile/edit" role="menuitem">
                             Editar perfil
-                        </button>
+                        </a>
                     )}
 
                     {authenticated ? (

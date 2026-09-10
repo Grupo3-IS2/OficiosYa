@@ -20,7 +20,7 @@ export function createUser(request: UserRequest): Promise<UserResponse> {
   })
 }
 
-export function updateUser(email: string, request: UserRequest): Promise<UserResponse> {
+export function updateUser(email: string, request: Partial<UserRequest>): Promise<UserResponse> {
   return apiRequest<UserResponse>(`/user/${encodeURIComponent(email)}`, {
     method: 'PUT',
     body: JSON.stringify(request),

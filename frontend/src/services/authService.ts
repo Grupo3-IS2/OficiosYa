@@ -61,6 +61,14 @@ export function logout(): void {
   localStorage.removeItem(USER_KEY)
 }
 
+export function updateStoredUser(user: StoredUser): void {
+  const profile = getRegistrationProfile()
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+  if (profile) {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, email: user.email }))
+  }
+}
+
 export function isAuthenticated(): boolean {
   return Boolean(localStorage.getItem(TOKEN_KEY))
 }

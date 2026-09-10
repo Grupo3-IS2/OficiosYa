@@ -1,0 +1,92 @@
+.professional-card {
+  min-height: 162px;
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 20px 18px;
+  border: 1px solid #e7ebee;
+  border-radius: 17px;
+  background: #fff;
+}
+
+.professional-card > img {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.professional-info h3 {
+  margin: 0 0 3px;
+  font-size: 17px;
+}
+
+.profession {
+  margin: 0 0 7px;
+  color: #344155;
+  font-size: 15px;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 7px 0 0;
+  color: #5d6b7d;
+  font-size: 14px;
+}
+
+.meta .icon {
+  width: 17px;
+  height: 17px;
+}
+
+.professional-action {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  color: #506075;
+  font-size: 14px;
+}
+
+.professional-action strong {
+  display: block;
+  color: #111e31;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.professional-action .button {
+  padding: 11px 20px;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .professional-card {
+    grid-template-columns: 68px 1fr;
+  }
+
+  .professional-card > img {
+    width: 64px;
+    height: 64px;
+  }
+
+  .professional-action {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    height: auto;
+  }
+
+  .professional-action span {
+    order: 2;
+    text-align: right;
+  }
+
+  .professional-action .button {
+    order: 1;
+  }
+}

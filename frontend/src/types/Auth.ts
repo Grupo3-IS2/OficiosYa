@@ -19,12 +19,15 @@ export interface RegistrationProfile {
 export interface StoredUser {
   email: string
   name: string
+  role?: 'CLIENT' | 'PROFESSIONAL'
 }
 
 export interface LoginResponse {
+  id: string
   token: string
   email: string
   name: string
+  role: 'CLIENT' | 'PROFESSIONAL'
   message: string
 }
 

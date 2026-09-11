@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getCurrentUser, getRegistrationProfile, isAuthenticated, logout, updateStoredUser } from '../../services/authService'
-import { changeEmail, changePassword } from '../../services/userService'
+import { changeEmail, changePassword, getAuthenticatedUser } from '../../services/userService'
 import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, readLocalProfile, securityChanged, validateSecurity, writeLocalProfile } from './profileState'
 import type { PersonalData, ProfessionalData, ProfileSection, SecurityData } from './profileState'
@@ -8,7 +8,7 @@ import type { PersonalData, ProfessionalData, ProfileSection, SecurityData } fro
 export default function useProfileEditor(professionalOverride?: boolean) {
     const [user] = useState(getCurrentUser)
     const [registrationProfile] = useState(getRegistrationProfile)
-    const [isProfessional] = useState(() => professionalOverride ?? (registrationProfile?.accountType === 'professional'))
+    const [isProfessional, setIsProfessional] = useState(() => professionalOverride ?? (user?.role === 'PROFESSIONAL' || registrationProfile?.accountType === 'professional'))
     const account = user?.email ?? 'demo'
     const [savedPersonal, setSavedPersonal] = useState<PersonalData>(() => {
         const local = readLocalProfile(account).personal
@@ -33,6 +33,19 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [error, setError] = useState('')
     const [errorSection, setErrorSection] = useState<ProfileSection | ''>('')
     const [messages, setMessages] = useState<Partial<Record<ProfileSection, string>>>({})
+
+    useEffect(() => {
+        if (!user || professionalOverride !== undefined) return
+        let active = true
+        void getAuthenticatedUser().then(response => {
+            if (!active) return
+            setIsProfessional(response.role === 'PROFESSIONAL')
+            updateStoredUser({ name: response.name, email: response.email, role: response.role })
+            setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: response.phoneNumber ?? '' }))
+            setPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: response.phoneNumber ?? '' }))
+        }).catch(() => undefined)
+        return () => { active = false }
+    }, [professionalOverride, user])
     const dirty = {
         personal: personalChanged(personal, savedPersonal),
         security: securityChanged(security),
@@ -91,7 +104,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                         if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
                         const response = await changeEmail({ newEmail: saved.email, currentPassword: emailPassword })
                         saved = { ...saved, email: response.email }
-                        updateStoredUser({ name: saved.name, email: response.email })
+                        updateStoredUser({ name: saved.name, email: response.email, role: response.role })
                         emailChanged = response.email !== savedPersonal.email
                         // Preserve server success even if local storage subsequently fails.
                         setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email }))

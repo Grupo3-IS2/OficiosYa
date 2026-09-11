@@ -1,9 +1,9 @@
 name: Playwright Tests
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, dev ]
 jobs:
   test:
     timeout-minutes: 60
@@ -13,6 +13,11 @@ jobs:
         working-directory: test
     steps:
     - uses: actions/checkout@v4
+    - name: Start the backend
+      working-directory: .
+      run: |
+        cp .env.example .env
+        docker compose up -d --build --wait app
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
@@ -22,6 +27,10 @@ jobs:
       run: npx playwright install --with-deps
     - name: Run Playwright tests
       run: npx playwright test
+    - name: Backend logs
+      if: failure()
+      working-directory: .
+      run: docker compose logs --no-color app db
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:

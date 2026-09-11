@@ -1,4 +1,4 @@
-# End-to-end tests
+# Test
 
 Playwright suite covering the SCRUM 9-14 stories. Most cases drive the REST API
 directly (`request` fixture); one case loads the React app in Chromium.

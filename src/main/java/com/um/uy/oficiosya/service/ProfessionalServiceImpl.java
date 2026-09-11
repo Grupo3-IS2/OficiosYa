@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.response.UserResponse;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.entity.Professional;
@@ -37,7 +38,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
     @Override
     @Transactional
-    public UserResponse createProfessional(ProfessionalCreateRequest professionalRequest) {
+    public ProfessionalResponse createProfessional(ProfessionalCreateRequest professionalRequest) {
         if (this.userRepository.existsByEmail(professionalRequest.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "User with email " + professionalRequest.getEmail() + " already exists");
@@ -53,7 +54,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
     @Override
     @Transactional
-    public UserResponse updateProfessional(ProfessionalUpdateRequest professionalRequest, UUID id) {
+    public ProfessionalResponse updateProfessional(ProfessionalUpdateRequest professionalRequest, UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
                 .orElseThrow(() -> new UserNotFoundException("Professional not found."));
 

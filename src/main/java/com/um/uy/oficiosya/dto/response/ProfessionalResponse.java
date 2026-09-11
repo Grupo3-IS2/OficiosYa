@@ -13,11 +13,12 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserResponse {
+public class ProfessionalResponse {
     /** The entity's publicId, the internal numeric id is not exposed. */
     private UUID id;
     private String name;
     private String email;
+    private String phoneNumber;
     private Role role;
     private LocalDateTime createdAt;
 }

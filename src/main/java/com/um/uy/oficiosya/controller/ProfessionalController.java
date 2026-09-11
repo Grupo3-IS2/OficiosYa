@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.controller;
 
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.response.UserResponse;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
@@ -23,16 +24,16 @@ public class ProfessionalController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<UserResponse> createProfessional(@Valid @RequestBody ProfessionalCreateRequest professionalRequest) {
-        UserResponse professional = professionalService.createProfessional(professionalRequest);
+    public ResponseEntity<ProfessionalResponse> createProfessional(@Valid @RequestBody ProfessionalCreateRequest professionalRequest) {
+        ProfessionalResponse professional = professionalService.createProfessional(professionalRequest);
         return new ResponseEntity<>(professional, HttpStatus.CREATED);
     }
 
     /** Only the owner of the account: the JWT subject is the user's publicId. */
     @PreAuthorize("#id.toString().equals(authentication.name)")
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> updateProfessional(@Valid @RequestBody ProfessionalUpdateRequest professionalRequest, @PathVariable UUID id) {
-        UserResponse professional = professionalService.updateProfessional(professionalRequest, id);
+    public ResponseEntity<ProfessionalResponse> updateProfessional(@Valid @RequestBody ProfessionalUpdateRequest professionalRequest, @PathVariable UUID id) {
+        ProfessionalResponse professional = professionalService.updateProfessional(professionalRequest, id);
         return ResponseEntity.ok(professional);
     }
 

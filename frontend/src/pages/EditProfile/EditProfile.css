@@ -24,6 +24,7 @@
 .profile-field label { font-size: 15px; }
 .profile-field input, .profile-field textarea { width: 100%; min-width: 0; border: 1px solid #cdd2cf; border-radius: 6px; background: #fff; color: #252925; padding: 10px 14px; font: inherit; font-size: 16px; }
 .profile-field input { height: 43px; }
+.profile-field input:disabled { border-color: #d8dcda; background: #f1f3f2; color: #747b77; cursor: not-allowed; opacity: 1; }
 .edit-profile-page :is(input, textarea, button, a):focus-visible { outline: 2px solid #07984c; outline-offset: 3px; }
 .profile-actions { display: flex; justify-content: flex-end; }
 .profile-password { position: relative; }

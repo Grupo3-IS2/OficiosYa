@@ -7,10 +7,12 @@ export interface UserRequest {
 }
 
 export interface UserResponse {
-  id: number
+  id: string
   name: string
   email: string
-  salary: number | null
+  phoneNumber: string | null
+  role: 'CLIENT' | 'PROFESSIONAL'
+  createdAt: string
 }
 
 export interface PasswordUpdateRequest {
@@ -56,4 +58,8 @@ export function changeEmail(request: EmailUpdateRequest): Promise<UserResponse> 
     method: 'PUT',
     body: JSON.stringify(request),
   })
+}
+
+export function getAuthenticatedUser(): Promise<UserResponse> {
+  return apiRequest<UserResponse>('/user/me')
 }

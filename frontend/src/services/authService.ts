@@ -22,6 +22,7 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
   localStorage.setItem(USER_KEY, JSON.stringify({
     email: response.email,
     name: response.name,
+    role: response.role,
   }))
 
   return response
@@ -52,6 +53,7 @@ export async function register(
   localStorage.setItem(USER_KEY, JSON.stringify({
     email: response.email,
     name: response.name,
+    role: response.role,
   }))
 
   if (profile) {

@@ -4,6 +4,7 @@ import Icon from '../Icon/Icon'
 import ProfileMenu from '../ProfileMenu/ProfileMenu'
 import {
     getRegistrationProfile,
+    getCurrentUser,
     isAuthenticated,
     logout,
 } from '../../services/authService'
@@ -12,8 +13,9 @@ import './Header.css'
 function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [authenticated, setAuthenticated] = useState(isAuthenticated)
+    const user = getCurrentUser()
     const profile = getRegistrationProfile()
-    const isProfessional = profile?.accountType === 'professional'
+    const isProfessional = user?.role === 'PROFESSIONAL' || profile?.accountType === 'professional'
     const professionalLabel = !authenticated
         ? 'Soy profesional'
         : isProfessional

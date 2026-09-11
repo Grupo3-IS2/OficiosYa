@@ -29,7 +29,7 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                 </div>
                 {editor.error && !editor.errorSection && !navigation.isOpen && <p className="profile-error profile-page-error" role="alert">{editor.error}</p>}
                 <fieldset className="profile-editor-fields" disabled={editor.busy} aria-busy={editor.busy}>
-                    <PersonalDataSection value={editor.personal} onChange={editor.setPersonal} onSave={() => editor.saveSection('personal')} message={editor.messages.personal} error={editor.errorSection === 'personal' ? editor.error : ''} emailChanged={editor.personal.email.trim() !== editor.savedPersonalEmail} currentPassword={editor.emailPassword} onCurrentPasswordChange={editor.setEmailPassword} />
+                    <PersonalDataSection value={editor.personal} onChange={editor.setPersonal} onSave={() => editor.saveSection('personal')} message={editor.messages.personal} error={editor.errorSection === 'personal' ? editor.error : ''} emailChanged={editor.personal.email.trim() !== editor.savedPersonalEmail} currentPassword={editor.emailPassword} onCurrentPasswordChange={editor.setEmailPassword} showPhone={editor.isProfessional} />
                     <SecuritySection value={editor.security} onChange={editor.setSecurity} onSave={() => editor.saveSection('security')} message={editor.messages.security} error={editor.errorSection === 'security' ? editor.error : ''} />
                     {editor.isProfessional
                         ? <ProfessionalProfileSection value={editor.professional} onChange={editor.setProfessional} onSave={() => editor.saveSection('professional')} message={editor.messages.professional} />

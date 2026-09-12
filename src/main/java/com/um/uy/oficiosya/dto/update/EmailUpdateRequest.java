@@ -12,10 +12,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class EmailUpdateRequest {
-    @NotBlank(message = "Email cannot be empty")
-    @Email(message = "Invalid email")
+    @NotBlank(message = "El nuevo email es obligatorio")
+    @Email(message = "El email no es válido")
     private String newEmail;
 
-    @NotBlank(message = "Current password is necessary")
+    @NotBlank(message = "La contraseña actual es obligatoria")
     private String currentPassword;
 }

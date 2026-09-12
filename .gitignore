@@ -43,6 +43,9 @@ private_jwt.pem
 keys/*.pem
 !keys/.gitkeep
 
+### User uploads (profile images)
+/uploads/
+
 ### Claude
 .claude
 .mcp.json

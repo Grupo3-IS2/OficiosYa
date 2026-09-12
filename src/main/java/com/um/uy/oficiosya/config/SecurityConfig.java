@@ -82,6 +82,9 @@ public class SecurityConfig {
                         // Login and registration
                         .requestMatchers("/api/v1/auth/**").permitAll()
 
+                        // Uploaded profile images are public
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
+
                         // Signing up cannot require an account
                         .requestMatchers(
                                 HttpMethod.POST,

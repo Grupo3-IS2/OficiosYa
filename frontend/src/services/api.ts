@@ -10,6 +10,31 @@ export class ApiError extends Error {
   }
 }
 
+const DEFAULT_ERROR_MESSAGE = 'Ocurrió un error al comunicarse con el servidor.'
+
+/**
+ * Validation errors come as { error: 'Error de validación', details: { field: message } }:
+ * the per-field messages say what is wrong, so they win over the generic error.
+ */
+function errorMessageFrom(body: unknown): string {
+  if (typeof body !== 'object' || body === null) {
+    return DEFAULT_ERROR_MESSAGE
+  }
+
+  const { message, error, details } = body as Record<string, unknown>
+
+  if (typeof details === 'object' && details !== null) {
+    const fieldMessages = Object.values(details).map(String)
+    if (fieldMessages.length > 0) {
+      return fieldMessages.join('\n')
+    }
+  }
+
+  if (message != null) return String(message)
+  if (error != null) return String(error)
+  return DEFAULT_ERROR_MESSAGE
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -17,7 +42,10 @@ export async function apiRequest<T>(
   const token = localStorage.getItem('oficiosya_token')
   const headers = new Headers(options.headers)
 
-  headers.set('Content-Type', 'application/json')
+  // The browser has to set the multipart Content-Type itself, boundary included.
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
@@ -38,13 +66,7 @@ export async function apiRequest<T>(
     : await response.text()
 
   if (!response.ok) {
-    const message = typeof body === 'object' && body !== null && 'message' in body
-      ? String(body.message)
-      : typeof body === 'object' && body !== null && 'error' in body
-        ? String(body.error)
-        : 'Ocurrió un error al comunicarse con el servidor.'
-
-    throw new ApiError(message, response.status)
+    throw new ApiError(errorMessageFrom(body), response.status)
   }
 
   return body as T

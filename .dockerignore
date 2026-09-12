@@ -2,8 +2,9 @@
 target/
 build/
 
-# Local data (H2) and secrets: never inside the image
+# Local data (H2), user uploads and secrets: never inside the image
 data/
+uploads/
 keys/
 .env
 *.pem

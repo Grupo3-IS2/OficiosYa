@@ -6,11 +6,13 @@ import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
@@ -43,7 +45,13 @@ public class UserController {
         userService.changePassword(passwordRequest, authenticatedUserId(authentication));
         return ResponseEntity.noContent().build();
     }
-    
+
+    @PostMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<UserResponse> changeProfileImage(@RequestParam("file") MultipartFile image,
+                                                           Authentication authentication) {
+        return ResponseEntity.ok(userService.changeProfileImage(image, authenticatedUserId(authentication)));
+    }
+
     @PreAuthorize("#id.toString().equals(authentication.name)")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
@@ -55,13 +63,13 @@ public class UserController {
         if (authentication == null
                 || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenés que iniciar sesión");
         }
 
         try {
             return UUID.fromString(authentication.getName());
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid authentication token");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "El token de autenticación es inválido");
         }
     }
 

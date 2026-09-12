@@ -12,15 +12,15 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @NoArgsConstructor
 public class UserCreateRequest {
-    @NotBlank(message = "Name is necessary")
+    @NotBlank(message = "El nombre es obligatorio")
     @FullName
     private String name;
 
-    @NotBlank(message = "Password is necessary")
+    @NotBlank(message = "La contraseña es obligatoria")
     @Password
     private String password;
 
-    @NotBlank(message = "Email is necessary")
-    @Email
+    @NotBlank(message = "El email es obligatorio")
+    @Email(message = "El email no es válido")
     private String email;
 }

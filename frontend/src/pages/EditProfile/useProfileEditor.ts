@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCurrentUser, getRegistrationProfile, isAuthenticated, logout, updateStoredUser } from '../../services/authService'
-import { changeEmail, changePassword, getAuthenticatedUser } from '../../services/userService'
+import { changeEmail, changePassword, getAuthenticatedUser, uploadProfileImage } from '../../services/userService'
 import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, readLocalProfile, securityChanged, validateSecurity, writeLocalProfile } from './profileState'
 import type { PersonalData, ProfessionalData, ProfileSection, SecurityData } from './profileState'
@@ -28,6 +28,9 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [professional, setProfessional] = useState(savedProfessional)
     const [security, setSecurity] = useState<SecurityData>({ current: '', password: '', confirmation: '' })
     const [emailPassword, setEmailPassword] = useState('')
+    // The selected photo is only uploaded when the personal section is saved.
+    const [photo, setPhoto] = useState<File | null>(null)
+    const photoPreview = useRef('')
     const [busy, setBusy] = useState(false)
     const saving = useRef(false)
     const [error, setError] = useState('')
@@ -39,13 +42,32 @@ export default function useProfileEditor(professionalOverride?: boolean) {
         let active = true
         void getAuthenticatedUser().then(response => {
             if (!active) return
+            const avatar = response.profileImageUrl ?? ''
             setIsProfessional(response.role === 'PROFESSIONAL')
             updateStoredUser({ name: response.name, email: response.email, role: response.role })
-            setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: response.phoneNumber ?? '' }))
-            setPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: response.phoneNumber ?? '' }))
+            setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: response.phoneNumber ?? '', avatar }))
+            setPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: response.phoneNumber ?? '', avatar: photoPreview.current ? previous.avatar : avatar }))
         }).catch(() => undefined)
         return () => { active = false }
     }, [professionalOverride, user])
+
+    useEffect(() => () => {
+        if (photoPreview.current) URL.revokeObjectURL(photoPreview.current)
+    }, [])
+
+    function releasePhotoPreview() {
+        if (photoPreview.current) URL.revokeObjectURL(photoPreview.current)
+        photoPreview.current = ''
+    }
+
+    function selectPhoto(file: File) {
+        releasePhotoPreview()
+        const preview = URL.createObjectURL(file)
+        photoPreview.current = preview
+        setPhoto(file)
+        setPersonal(previous => ({ ...previous, avatar: preview }))
+    }
+
     const dirty = {
         personal: personalChanged(personal, savedPersonal),
         security: securityChanged(security),
@@ -100,6 +122,17 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 let saved = { ...personal, name: personal.name.trim(), email: personal.email.trim() }
                 let emailChanged = false
                 if (user) {
+                    if (photo) {
+                        if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
+                        const response = await uploadProfileImage(photo)
+                        const avatar = response.profileImageUrl ?? ''
+                        saved = { ...saved, avatar }
+                        // Preserve the uploaded photo even if a later step of this save fails.
+                        setSavedPersonal(previous => ({ ...previous, avatar }))
+                        setPersonal(previous => ({ ...previous, avatar }))
+                        setPhoto(null)
+                        releasePhotoPreview()
+                    }
                     if (saved.email !== savedPersonal.email) {
                         if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
                         const response = await changeEmail({ newEmail: saved.email, currentPassword: emailPassword })
@@ -116,8 +149,8 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                     setSavedPersonal(saved)
                     setEmailPassword('')
                     setMessages(previous => ({ ...previous, personal: emailChanged
-                        ? 'Correo y datos actualizados. Foto y teléfono guardados temporalmente en esta pestaña.'
-                        : user ? 'Datos guardados. Foto y teléfono guardados temporalmente en esta pestaña.'
+                        ? 'Correo y datos actualizados. El teléfono se guarda temporalmente en esta pestaña.'
+                        : user ? 'Datos guardados. El teléfono se guarda temporalmente en esta pestaña.'
                             : 'Vista de prueba: datos guardados temporalmente en esta pestaña.' }))
             }
             setErrorSection('')
@@ -137,7 +170,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     }
 
     return {
-        user, isProfessional, personal, setPersonal, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, professional, setProfessional, security, setSecurity,
+        user, isProfessional, personal, setPersonal, selectPhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, professional, setProfessional, security, setSecurity,
         busy, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),
@@ -147,6 +180,8 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             setProfessional(savedProfessional)
             setSecurity({ current: '', password: '', confirmation: '' })
             setEmailPassword('')
+            setPhoto(null)
+            releasePhotoPreview()
             setError('')
             setErrorSection('')
         },

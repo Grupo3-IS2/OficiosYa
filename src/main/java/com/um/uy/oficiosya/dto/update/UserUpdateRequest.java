@@ -11,6 +11,4 @@ import lombok.experimental.SuperBuilder;
 public class UserUpdateRequest {
     @FullName
     private String name;
-
-    private String profileImageUrl;
 }

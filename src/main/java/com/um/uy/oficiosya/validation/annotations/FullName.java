@@ -16,7 +16,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface FullName {
 
-    String message() default "Full name must be at least two words, with letters and single spaces only";
+    String message() default "El nombre completo debe tener al menos dos palabras, solo con letras y un espacio entre cada una";
 
     Class<?>[] groups() default {};
 

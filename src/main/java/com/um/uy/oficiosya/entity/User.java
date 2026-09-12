@@ -30,16 +30,16 @@ public class User {
     @Column(name = "public_id", unique = true, nullable = false, updatable = false)
     private UUID publicId;
 
-    @NotBlank(message = "Name is necessary")
+    @NotBlank(message = "El nombre es obligatorio")
     @Column(nullable = false)
     private String name;
 
-    @NotBlank(message = "Password is necessary")
+    @NotBlank(message = "La contraseña es obligatoria")
     @Column(nullable = false)
     private String password;
 
-    @NotBlank(message = "Email is necessary")
-    @Email(message = "Invalid email")
+    @NotBlank(message = "El email es obligatorio")
+    @Email(message = "El email no es válido")
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 

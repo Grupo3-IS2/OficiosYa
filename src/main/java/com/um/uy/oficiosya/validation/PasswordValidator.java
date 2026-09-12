@@ -17,10 +17,10 @@ public class PasswordValidator implements ConstraintValidator<Password, String> 
     private static final Map<String, Pattern> REQUIREMENTS = new LinkedHashMap<>();
 
     static {
-        REQUIREMENTS.put("an uppercase letter", Pattern.compile("[A-Z]"));
-        REQUIREMENTS.put("a lowercase letter", Pattern.compile("[a-z]"));
-        REQUIREMENTS.put("a number", Pattern.compile("\\d"));
-        REQUIREMENTS.put("a special character", Pattern.compile("[^A-Za-z0-9]"));
+        REQUIREMENTS.put("una letra mayúscula", Pattern.compile("[A-Z]"));
+        REQUIREMENTS.put("una letra minúscula", Pattern.compile("[a-z]"));
+        REQUIREMENTS.put("un número", Pattern.compile("\\d"));
+        REQUIREMENTS.put("un carácter especial", Pattern.compile("[^A-Za-z0-9]"));
     }
 
     @Override
@@ -36,7 +36,7 @@ public class PasswordValidator implements ConstraintValidator<Password, String> 
         }
 
         context.disableDefaultConstraintViolation();
-        context.buildConstraintViolationWithTemplate("Password must have " + String.join(", ", missingRequirements))
+        context.buildConstraintViolationWithTemplate("La contraseña debe tener " + String.join(", ", missingRequirements))
                 .addConstraintViolation();
 
         return false;
@@ -46,7 +46,7 @@ public class PasswordValidator implements ConstraintValidator<Password, String> 
         List<String> missingRequirements = new ArrayList<>();
 
         if (password.length() < MIN_LENGTH) {
-            missingRequirements.add("at least " + MIN_LENGTH + " characters");
+            missingRequirements.add("al menos " + MIN_LENGTH + " caracteres");
         }
 
         REQUIREMENTS.forEach((requirement, pattern) -> {

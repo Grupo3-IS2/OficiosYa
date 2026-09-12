@@ -182,6 +182,7 @@
   color: #b42318;
   font-size: 13px;
   text-align: center;
+  white-space: pre-line;
 }
 
 .login-divider {

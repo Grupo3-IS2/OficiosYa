@@ -40,7 +40,7 @@ public class ClientServiceImpl implements ClientService {
     public UserResponse createClient(ClientCreateRequest clientRequest) {
         if (this.userRepository.existsByEmail(clientRequest.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "User with email " + clientRequest.getEmail() + " already exists");
+                    "Ya existe un usuario con el email " + clientRequest.getEmail());
         }
 
         Client client = clientMapper.toEntity(clientRequest);
@@ -55,15 +55,11 @@ public class ClientServiceImpl implements ClientService {
     @Transactional
     public UserResponse updateClient(ClientUpdateRequest clientRequest, UUID id) {
         Client client = clientRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException("Client not found."));
+                .orElseThrow(() -> new UserNotFoundException("Cliente no encontrado."));
 
         // Inherited User fields.
         if (clientRequest.getName() != null && !clientRequest.getName().isBlank()) {
             client.setName(clientRequest.getName());
-        }
-
-        if (clientRequest.getProfileImageUrl() != null) {
-            client.setProfileImageUrl(clientRequest.getProfileImageUrl());
         }
 
         client = clientRepository.save(client);
@@ -74,7 +70,7 @@ public class ClientServiceImpl implements ClientService {
     @Transactional
     public void deleteClient(UUID id) {
         Client client = clientRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException("Client not found."));
+                .orElseThrow(() -> new UserNotFoundException("Cliente no encontrado."));
         clientRepository.delete(client);
     }
 }

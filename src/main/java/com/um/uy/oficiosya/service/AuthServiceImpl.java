@@ -42,6 +42,8 @@ public class AuthServiceImpl implements AuthService {
 
     private final TokenRevocationService tokenRevocationService;
 
+    private final String dummyPasswordHash;
+
     public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
                            ClientService clientService, ProfessionalService professionalService,
                            TokenRevocationService tokenRevocationService) {
@@ -51,6 +53,7 @@ public class AuthServiceImpl implements AuthService {
         this.clientService = clientService;
         this.professionalService = professionalService;
         this.tokenRevocationService = tokenRevocationService;
+        this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     @Override
@@ -58,15 +61,15 @@ public class AuthServiceImpl implements AuthService {
 
         String email = request.getEmail().trim();
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "User not found")
-                );
+        Optional<User> candidate = userRepository.findByEmail(email);
+        String passwordHash = candidate.map(User::getPassword).orElse(dummyPasswordHash);
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(request.getPassword(), passwordHash) || candidate.isEmpty()) {
             throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Email or password incorrect");
+                    HttpStatus.BAD_REQUEST, "Email o contraseña incorrectos");
         }
+
+        User user = candidate.get();
 
         String jwtToken = jwtService.generateToken(user);
 
@@ -76,7 +79,7 @@ public class AuthServiceImpl implements AuthService {
                 user.getEmail(),
                 user.getName(),
                 Role.of(user),
-                "User " + user.getEmail() + " logged successfully");
+                "Usuario " + user.getEmail() + " inició sesión correctamente");
     }
 
     @Override
@@ -94,7 +97,7 @@ public class AuthServiceImpl implements AuthService {
     private LoginResponse loginResponseFor(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "User not found")
+                        HttpStatus.BAD_REQUEST, "Usuario no encontrado")
                 );
 
         String jwtToken = jwtService.generateToken(user);
@@ -105,7 +108,7 @@ public class AuthServiceImpl implements AuthService {
                 user.getEmail(),
                 user.getName(),
                 Role.of(user),
-                "User " + user.getEmail() + " registered successfully");
+                "Usuario " + user.getEmail() + " registrado correctamente");
     }
 
     @Override
@@ -134,7 +137,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (token.isEmpty()) {
             throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED, "Missing authentication token");
+                    HttpStatus.UNAUTHORIZED, "Falta el token de autenticación");
         }
 
         tokenRevocationService.revoke(token);
@@ -144,7 +147,7 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("Token revoked, the user logged out");
 
-        return new MessageResponse("User logged out successfully");
+        return new MessageResponse("Sesión cerrada correctamente");
     }
 
     private String subjectOf(String token) {

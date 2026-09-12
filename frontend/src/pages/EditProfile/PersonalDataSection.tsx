@@ -3,8 +3,8 @@ import Button from '../../components/Button/Button'
 import avatarPlaceholder from '../../assets/avatar-placeholder.svg'
 import type { PersonalData } from './profileState'
 
-export default function PersonalDataSection({ value, onChange, onSave, message, error, emailChanged, currentPassword, onCurrentPasswordChange, showPhone }: {
-    value: PersonalData; onChange: Dispatch<SetStateAction<PersonalData>>; onSave: () => Promise<boolean>; message?: string; error?: string
+export default function PersonalDataSection({ value, onChange, onPhotoChange, onSave, message, error, emailChanged, currentPassword, onCurrentPasswordChange, showPhone }: {
+    value: PersonalData; onChange: Dispatch<SetStateAction<PersonalData>>; onPhotoChange: (file: File) => void; onSave: () => Promise<boolean>; message?: string; error?: string
     emailChanged: boolean; currentPassword: string; onCurrentPasswordChange: (password: string) => void; showPhone: boolean
 }) {
     const { name, email, phone, avatar } = value
@@ -12,7 +12,6 @@ export default function PersonalDataSection({ value, onChange, onSave, message, 
     const setPhone = (phone: string) => onChange(previous => ({ ...previous, phone }))
     const [photoError, setPhotoError] = useState('')
     const fileInput = useRef<HTMLInputElement>(null)
-    const photoRead = useRef(0)
 
     return (
         <section className="profile-section" aria-labelledby="personal-title">
@@ -28,15 +27,8 @@ export default function PersonalDataSection({ value, onChange, onSave, message, 
                         if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024) {
                             setPhotoError('Elige un JPG o PNG de hasta 5 MB.'); return
                         }
-                        const read = ++photoRead.current
-                        const reader = new FileReader()
-                        reader.onload = () => {
-                            if (read !== photoRead.current) return
-                            setPhotoError('')
-                            onChange(previous => ({ ...previous, avatar: String(reader.result) }))
-                        }
-                        reader.onerror = () => setPhotoError('No se pudo leer la foto. Intenta con otro archivo.')
-                        reader.readAsDataURL(file)
+                        setPhotoError('')
+                        onPhotoChange(file)
                     }} />
                     <Button type="button" variant="ghost" onClick={() => fileInput.current?.click()}>Cambiar foto</Button>
                     <small>JPG o PNG. Máx. 5 MB.</small>

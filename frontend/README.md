@@ -39,8 +39,9 @@ npm run preview  # Preview the production build locally
 
 ## Code conventions
 
-- Keep implementation names, comments and API-facing messages in English.
-- Keep user-facing product copy in Spanish.
+- Keep implementation names and comments in English.
+- Keep user-facing product copy in Spanish, including the messages exchanged
+  with the backend: API errors and notices are shown to the user as they arrive.
 - Use four spaces for indentation and UTF-8 with LF line endings.
 - Keep backend requests inside `src/services/` rather than calling `fetch`
   directly from page components.

@@ -18,6 +18,7 @@ public class UserResponse {
     private UUID id;
     private String name;
     private String email;
+    private String profileImageUrl;
     private Role role;
     private LocalDateTime createdAt;
 }

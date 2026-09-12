@@ -12,10 +12,10 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @NoArgsConstructor
 public class ProfessionalCreateRequest extends UserCreateRequest {
-    @NotBlank(message = "Phone number is necessary")
+    @NotBlank(message = "El teléfono es obligatorio")
     @PhoneNumber
     private String phoneNumber;
 
-    @NotBlank(message = "Working location is necessary")
+    @NotBlank(message = "La ubicación de trabajo es obligatoria")
     private String workingLocation;
 }

@@ -16,7 +16,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Password {
 
-    String message() default "Password does not meet the security policy";
+    String message() default "La contraseña no cumple la política de seguridad";
 
     Class<?>[] groups() default {};
 

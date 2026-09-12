@@ -25,8 +25,8 @@ RUN useradd --system --uid 1001 --create-home spring
 
 COPY --from=build /build/app.jar /app/app.jar
 
-# keys/ receives JWT keys; data/ only used if APP_PROFILE=local
-RUN mkdir -p /app/keys /app/data && chown -R spring:spring /app
+# keys/ receives JWT keys; uploads/ the profile images; data/ only used if APP_PROFILE=local
+RUN mkdir -p /app/keys /app/uploads /app/data && chown -R spring:spring /app
 
 USER spring
 EXPOSE 8080

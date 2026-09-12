@@ -19,6 +19,7 @@ public class ProfessionalResponse {
     private String name;
     private String email;
     private String phoneNumber;
+    private String profileImageUrl;
     private Role role;
     private LocalDateTime createdAt;
 }

@@ -11,6 +11,7 @@ export interface UserResponse {
   name: string
   email: string
   phoneNumber: string | null
+  profileImageUrl: string | null
   role: 'CLIENT' | 'PROFESSIONAL'
   createdAt: string
 }
@@ -57,6 +58,16 @@ export function changeEmail(request: EmailUpdateRequest): Promise<UserResponse> 
   return apiRequest<UserResponse>('/user/me/email', {
     method: 'PUT',
     body: JSON.stringify(request),
+  })
+}
+
+export function uploadProfileImage(image: File): Promise<UserResponse> {
+  const body = new FormData()
+  body.append('file', image)
+
+  return apiRequest<UserResponse>('/user/me/profile-image', {
+    method: 'POST',
+    body,
   })
 }
 

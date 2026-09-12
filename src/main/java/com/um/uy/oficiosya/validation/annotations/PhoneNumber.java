@@ -16,7 +16,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface PhoneNumber {
 
-    String message() default "Phone number must be 9 digits, optionally preceded by an international prefix";
+    String message() default "El teléfono debe tener 9 dígitos, con prefijo internacional opcional";
 
     Class<?>[] groups() default {};
 

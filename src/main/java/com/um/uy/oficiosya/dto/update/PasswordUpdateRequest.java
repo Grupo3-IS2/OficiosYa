@@ -12,13 +12,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class PasswordUpdateRequest {
-    @NotBlank
+    @NotBlank(message = "La contraseña actual es obligatoria")
     private String oldPassword;
 
-    @NotBlank
+    @NotBlank(message = "La nueva contraseña es obligatoria")
     @Password
     private String newPassword;
 
-    @NotBlank
+    @NotBlank(message = "La confirmación de la contraseña es obligatoria")
     private String newPasswordConfirmation;
 }

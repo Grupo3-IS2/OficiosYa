@@ -41,7 +41,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     public ProfessionalResponse createProfessional(ProfessionalCreateRequest professionalRequest) {
         if (this.userRepository.existsByEmail(professionalRequest.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "User with email " + professionalRequest.getEmail() + " already exists");
+                    "Ya existe un usuario con el email " + professionalRequest.getEmail());
         }
 
         Professional professional = professionalMapper.toEntity(professionalRequest);
@@ -56,14 +56,10 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public ProfessionalResponse updateProfessional(ProfessionalUpdateRequest professionalRequest, UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException("Professional not found."));
+                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
 
         if (professionalRequest.getName() != null && !professionalRequest.getName().isBlank()) {
             professional.setName(professionalRequest.getName());
-        }
-
-        if (professionalRequest.getProfileImageUrl() != null) {
-            professional.setProfileImageUrl(professionalRequest.getProfileImageUrl());
         }
 
         if (professionalRequest.getPhoneNumber() != null && !professionalRequest.getPhoneNumber().isBlank()) {
@@ -82,7 +78,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public void deleteProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException("Professional not found."));
+                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
         professionalRepository.delete(professional);
     }
 }

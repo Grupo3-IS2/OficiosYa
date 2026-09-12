@@ -56,7 +56,7 @@ test.describe('SCRUM 9-14 - OficiosYa', () => {
     const second = await registerClient(request, payload);
     expect(second.status()).toBe(400);
     const body = await second.json();
-    expect(body.error).toMatch(/already exists|duplicate|bad request/i);
+    expect(body.error).toMatch(/ya existe|bad request/i);
   });
 
   test('SCRUM-10: Inicio de sesión con credenciales válidas', async ({ request }) => {
@@ -95,7 +95,7 @@ test.describe('SCRUM 9-14 - OficiosYa', () => {
 
     expect(response.status()).toBe(400);
     const body = await response.json();
-    expect(body.error).toMatch(/incorrect|bad request/i);
+    expect(body.error).toMatch(/incorrectos|bad request/i);
   });
 
   test('SCRUM-11: Cierre de sesión invalida token', async ({ request }) => {
@@ -119,7 +119,7 @@ test.describe('SCRUM 9-14 - OficiosYa', () => {
 
     expect(logoutResponse.status()).toBe(200);
     const logoutBody = await logoutResponse.json();
-    expect(logoutBody.message).toMatch(/logged out successfully|logged out/i);
+    expect(logoutBody.message).toMatch(/sesión cerrada/i);
   });
 
   test('SCRUM-13: Creación del perfil profesional exitoso', async ({ request }) => {
@@ -153,7 +153,7 @@ test.describe('SCRUM 9-14 - OficiosYa', () => {
     const response = await registerProfessional(request, payload);
     expect(response.status()).toBe(400);
     const body = await response.json();
-    expect(body.error).toMatch(/Validation failed|bad request|Phone/i);
+    expect(body.error).toMatch(/Error de validación|bad request|teléfono/i);
   });
 
   test('SCRUM-12: Edición de datos básicos del cliente', async ({ request }) => {

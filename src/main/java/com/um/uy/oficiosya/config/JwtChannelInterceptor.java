@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.config;
 
 import com.um.uy.oficiosya.service.JwtServiceImpl;
+import com.um.uy.oficiosya.service.interfaces.TokenRevocationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.messaging.Message;
@@ -19,10 +20,13 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
 
     private final JwtServiceImpl jwtService;
     private final UserDetailsService userDetailsService;
+    private final TokenRevocationService tokenRevocationService;
 
-    public JwtChannelInterceptor(JwtServiceImpl jwtService, UserDetailsService userDetailsService) {
+    public JwtChannelInterceptor(JwtServiceImpl jwtService, UserDetailsService userDetailsService,
+                                 TokenRevocationService tokenRevocationService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.tokenRevocationService = tokenRevocationService;
     }
 
     @Override
@@ -34,6 +38,11 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
 
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String token = authHeader.substring(7);
+
+                if (tokenRevocationService.isRevoked(token)) {
+                    log.warn("Revoked token used to open a WebSocket connection");
+                    return message;
+                }
 
                 try {
                     String username = jwtService.extractUsername(token);

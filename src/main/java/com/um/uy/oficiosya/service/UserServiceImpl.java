@@ -1,73 +1,112 @@
 package com.um.uy.oficiosya.service;
 
-import com.um.uy.oficiosya.dto.request.UserRequestDTO;
-import com.um.uy.oficiosya.dto.response.UserResponseDTO;
+import com.um.uy.oficiosya.dto.response.UserResponse;
+import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
+import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.entity.User;
+import com.um.uy.oficiosya.exception.UserAlreadyExists;
 import com.um.uy.oficiosya.exception.UserNotFoundException;
 import com.um.uy.oficiosya.mapper.UserMapper;
 import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.service.interfaces.ProfileImageStorage;
 import com.um.uy.oficiosya.service.interfaces.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.UUID;
 
 @Service
 public class UserServiceImpl implements UserService {
+
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final UserMapper userMapper;
+    private final ProfileImageStorage profileImageStorage;
 
-    @Autowired
-    private UserMapper userMapper;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    public UserServiceImpl(UserRepository userRepository) {
+    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, UserMapper userMapper,
+                           ProfileImageStorage profileImageStorage) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.userMapper = userMapper;
+        this.profileImageStorage = profileImageStorage;
     }
 
     @Override
-    public UserResponseDTO createUser(UserRequestDTO userRequest){
-        if (this.userRepository.existsByEmail(userRequest.getEmail())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User with email " + userRequest.getEmail() + " already exists");
-        }
-        
-        User user = userMapper.toEntity(userRequest);
-        user.setPassword(this.passwordEncoder.encode(userRequest.getPassword()));
+    @Transactional(readOnly = true)
+    public UserResponse getUser(UUID id) {
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+        return userMapper.toResponse(user);
+    }
 
-        try {
-            user = this.userRepository.save(user);
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error saving the user " + e.getMessage());
+    @Override
+    @Transactional
+    public UserResponse changeEmail(EmailUpdateRequest emailRequest, UUID id) {
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+
+        if (!passwordEncoder.matches(emailRequest.getCurrentPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña actual es incorrecta");
         }
+
+        String newEmail = emailRequest.getNewEmail().trim();
+
+        if (newEmail.equals(user.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nuevo email es igual al actual");
+        }
+
+        if (userRepository.existsByEmail(newEmail)) {
+            throw new UserAlreadyExists("Ya existe un usuario con el email " + newEmail);
+        }
+
+        user.setEmail(newEmail);
+        user = userRepository.save(user);
 
         return userMapper.toResponse(user);
-
     }
 
     @Override
-    public UserResponseDTO updateUser(UserRequestDTO userRequest, String email){
-        User user = userRepository.findByEmail(email).orElseThrow(()-> new UserNotFoundException("User not found."));
-        if (userRequest.getName() != null) {
-            user.setName(userRequest.getName());
+    @Transactional
+    public void changePassword(PasswordUpdateRequest passwordRequest, UUID id){
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+
+        if (!passwordEncoder.matches(passwordRequest.getOldPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña actual es incorrecta");
         }
 
-        if (userRequest.getEmail() != null) {
-            user.setEmail(userRequest.getEmail());
+        if (!passwordRequest.getNewPassword().equals(passwordRequest.getNewPasswordConfirmation())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La confirmación de la contraseña no coincide");
         }
 
-        if (userRequest.getPassword() != null && !userRequest.getPassword().isBlank()) {
-            user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
+        if (passwordEncoder.matches(passwordRequest.getNewPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La nueva contraseña es igual a la actual");
         }
 
+        user.setPassword(passwordEncoder.encode(passwordRequest.getNewPassword()));
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse changeProfileImage(MultipartFile image, UUID id) {
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+
+        String previousImageUrl = user.getProfileImageUrl();
+
+        user.setProfileImageUrl(profileImageStorage.store(image));
+        user = userRepository.save(user);
+
+        profileImageStorage.delete(previousImageUrl);
+
         return userMapper.toResponse(user);
     }
 
     @Override
-    public void deleteUser(String email){
-        User user =  userRepository.findByEmail(email).orElseThrow(()-> new UserNotFoundException("User not found."));
+    @Transactional
+    public void deleteUser(UUID id){
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
         userRepository.delete(user);
     }
 

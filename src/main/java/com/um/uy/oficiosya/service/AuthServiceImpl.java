@@ -1,14 +1,20 @@
 package com.um.uy.oficiosya.service;
 
-import com.um.uy.oficiosya.dto.request.LoginRequestDTO;
-import com.um.uy.oficiosya.dto.request.RegisterRequestDTO;
-import com.um.uy.oficiosya.dto.response.LoginResponseDTO;
+import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
+import com.um.uy.oficiosya.dto.request.LoginRequest;
+import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.response.LoginResponse;
+import com.um.uy.oficiosya.dto.response.MessageResponse;
 import com.um.uy.oficiosya.dto.response.TokenResponse;
+import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.entity.User;
 import com.um.uy.oficiosya.repository.UserRepository;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
+import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.JwtService;
-import com.um.uy.oficiosya.service.interfaces.UserService;
+import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
+import com.um.uy.oficiosya.service.interfaces.TokenRevocationService;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -17,6 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Date;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -28,68 +36,90 @@ public class AuthServiceImpl implements AuthService {
 
     private final JwtService jwtService;
 
-    private final UserService userService;
+    private final ClientService clientService;
 
-    public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, UserService userService) {
+    private final ProfessionalService professionalService;
+
+    private final TokenRevocationService tokenRevocationService;
+
+    private final String dummyPasswordHash;
+
+    public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
+                           ClientService clientService, ProfessionalService professionalService,
+                           TokenRevocationService tokenRevocationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.userService = userService;
+        this.clientService = clientService;
+        this.professionalService = professionalService;
+        this.tokenRevocationService = tokenRevocationService;
+        this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     @Override
-    public LoginResponseDTO login(LoginRequestDTO request) {
+    public LoginResponse login(LoginRequest request) {
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "User not found")
-                );
+        String email = request.getEmail().trim();
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        Optional<User> candidate = userRepository.findByEmail(email);
+        String passwordHash = candidate.map(User::getPassword).orElse(dummyPasswordHash);
+
+        if (!passwordEncoder.matches(request.getPassword(), passwordHash) || candidate.isEmpty()) {
             throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Email or password incorrect");
+                    HttpStatus.BAD_REQUEST, "Email o contraseña incorrectos");
         }
 
+        User user = candidate.get();
+
         String jwtToken = jwtService.generateToken(user);
 
-        return new LoginResponseDTO(
+        return new LoginResponse(
+                user.getPublicId(),
                 jwtToken,
                 user.getEmail(),
                 user.getName(),
-                "User " + user.getEmail() + " logged successfully");
+                Role.of(user),
+                "Usuario " + user.getEmail() + " inició sesión correctamente");
     }
 
     @Override
-    public LoginResponseDTO register(RegisterRequestDTO request) {
+    public LoginResponse register(ClientCreateRequest request) {
+        clientService.createClient(request);
+        return this.loginResponseFor(request.getEmail());
+    }
 
-        // Create user
-        userService.createUser(request);
+    @Override
+    public LoginResponse register(ProfessionalCreateRequest request) {
+        professionalService.createProfessional(request);
+        return this.loginResponseFor(request.getEmail());
+    }
 
-        User user = userRepository.findByEmail(request.getEmail())
+    private LoginResponse loginResponseFor(String email) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "User not found")
+                        HttpStatus.BAD_REQUEST, "Usuario no encontrado")
                 );
 
         String jwtToken = jwtService.generateToken(user);
 
-        return new LoginResponseDTO(
+        return new LoginResponse(
+                user.getPublicId(),
                 jwtToken,
                 user.getEmail(),
                 user.getName(),
-                "User " + user.getEmail() + " logged successfully");
-
+                Role.of(user),
+                "Usuario " + user.getEmail() + " registrado correctamente");
     }
 
     @Override
     public TokenResponse verifyUser(HttpServletRequest request) {
         String token = this.getToken(request);
-        log.info("Token: {}", token);
-        String userEmail = this.jwtService.extractUsername(token);
+        String subject = token.isEmpty() ? "" : this.jwtService.extractUsername(token);
 
         boolean verified = false;
         Date expirationDate = null;
         Date emissionDate = null;
-        if (!token.isEmpty() && userRepository.findByEmail(userEmail).isPresent()) {
+        if (!token.isEmpty() && this.findByPublicId(subject).isPresent()) {
             verified = !jwtService.isTokenExpired(token);
             expirationDate = this.jwtService.extractExpiration(token);
             emissionDate = this.jwtService.extractEmisionDate(token);
@@ -98,9 +128,50 @@ public class AuthServiceImpl implements AuthService {
 
     }
 
+    /**
+     * Revokes the token the request carries and every other token of the same user
+     */
+    @Override
+    public MessageResponse logout(HttpServletRequest request) {
+        String token = this.getToken(request);
+
+        if (token.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Falta el token de autenticación");
+        }
+
+        tokenRevocationService.revoke(token);
+
+        this.findByPublicId(this.subjectOf(token))
+                .ifPresent(user -> tokenRevocationService.revokeSessions(user.getPublicId()));
+
+        log.info("Token revoked, the user logged out");
+
+        return new MessageResponse("Sesión cerrada correctamente");
+    }
+
+    private String subjectOf(String token) {
+        try {
+            return jwtService.extractUsername(token);
+        } catch (JwtException e) {
+            log.warn("Token with an unreadable subject on logout");
+            return "";
+        }
+    }
+
+    /** The JWT subject is the user's publicId, an unparseable one is simply not a user. */
+    private Optional<User> findByPublicId(String subject) {
+        try {
+            return userRepository.findByPublicId(UUID.fromString(subject));
+        } catch (IllegalArgumentException e) {
+            log.warn("Token with an invalid subject: {}", subject);
+            return Optional.empty();
+        }
+    }
+
     private String getToken(HttpServletRequest request){
         String authHeader = request.getHeader("Authorization");
-        if (authHeader.startsWith("Bearer ")){
+        if (authHeader != null && authHeader.startsWith("Bearer ")){
             return request.getHeader("Authorization").substring(7);
         }
         return "";

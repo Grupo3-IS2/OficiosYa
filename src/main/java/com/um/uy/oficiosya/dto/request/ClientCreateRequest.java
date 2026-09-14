@@ -9,5 +9,5 @@ import lombok.experimental.SuperBuilder;
 @Data
 @SuperBuilder
 @NoArgsConstructor
-public class RegisterRequestDTO extends UserRequestDTO {
+public class ClientCreateRequest extends UserCreateRequest {
 }

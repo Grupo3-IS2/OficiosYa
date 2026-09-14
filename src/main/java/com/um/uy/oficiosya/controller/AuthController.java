@@ -1,11 +1,14 @@
 package com.um.uy.oficiosya.controller;
 
-import com.um.uy.oficiosya.dto.request.LoginRequestDTO;
-import com.um.uy.oficiosya.dto.request.RegisterRequestDTO;
-import com.um.uy.oficiosya.dto.response.LoginResponseDTO;
+import com.um.uy.oficiosya.dto.request.LoginRequest;
+import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
+import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.response.LoginResponse;
+import com.um.uy.oficiosya.dto.response.MessageResponse;
 import com.um.uy.oficiosya.dto.response.TokenResponse;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,15 +23,26 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@RequestBody LoginRequestDTO dto){
-        LoginResponseDTO response = authService.login(dto);
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest dto){
+        LoginResponse response = authService.login(dto);
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/register")
-    public ResponseEntity<LoginResponseDTO> register(@RequestBody RegisterRequestDTO dto){
-        LoginResponseDTO response = authService.register(dto);
+    @PostMapping("/register-client")
+    public ResponseEntity<LoginResponse> registerClient(@Valid @RequestBody ClientCreateRequest dto){
+        LoginResponse response = authService.register(dto);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/register-professional")
+    public ResponseEntity<LoginResponse> registerProfessional(@Valid @RequestBody ProfessionalCreateRequest dto){
+        LoginResponse response = authService.register(dto);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<MessageResponse> logout(HttpServletRequest request){
+        return ResponseEntity.ok(authService.logout(request));
     }
 
     @GetMapping("/verify")

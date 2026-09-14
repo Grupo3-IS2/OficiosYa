@@ -1,0 +1,18 @@
+.unsaved-modal { width: min(420px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; overflow: auto; border: 1px solid #e2e9e7; border-radius: 9px; background: #fff; color: #132238; }
+.unsaved-modal::backdrop { background: rgb(24 38 48 / 60%); }
+.unsaved-modal__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #e6ece9; font-size: 15px; font-weight: 600; }
+.unsaved-modal__header button { width: 32px; height: 32px; background: none; border: 0; color: inherit; font-size: 26px; font-weight: 300; }
+.unsaved-modal__body { padding: 20px; text-align: center; }
+.unsaved-modal__warning { display: grid; place-items: center; width: 58px; height: 58px; margin: 0 auto 12px; border-radius: 50%; color: #dd870b; background: #fff4e2; font-size: 28px; font-weight: 500; }
+.unsaved-modal h2 { margin: 0 0 8px; font-size: 21px; line-height: 1.35; letter-spacing: -.6px; }
+.unsaved-modal p { margin: 0 0 24px; color: #6b7890; font-size: 14px; line-height: 1.5; }
+.unsaved-modal__actions { display: flex; flex-direction: column; gap: 12px; }
+.unsaved-modal .button { min-height: 44px; border-radius: 6px; padding: 10px 16px; font-size: 14px; font-weight: 600; background: #009647; box-shadow: none; }
+.unsaved-modal .button:hover { transform: none; background: #087f41; }
+.unsaved-modal .unsaved-modal__discard { background: #fbfcfc; border: 1px solid #d6dfe6; color: #5b6a80; }
+.unsaved-modal .unsaved-modal__discard:hover { background: #f0f4f2; }
+.unsaved-modal__cancel { border: 0; background: none; color: #009647; padding: 12px; min-height: 44px; font-size: 14px; }
+.unsaved-modal button:disabled { opacity: .55; cursor: wait; }
+.unsaved-modal button:focus-visible { outline: 2px solid #07984c; outline-offset: 2px; }
+.unsaved-modal .unsaved-modal__error { color: #b42318; padding: 10px; background: #fff4f1; border-radius: 6px; overflow-wrap: anywhere; }
+@media (max-width: 420px) { .unsaved-modal__body { padding: 20px 16px 14px; } .unsaved-modal h2 { font-size: 20px; } }

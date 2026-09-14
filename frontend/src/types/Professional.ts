@@ -1,0 +1,1 @@
+export interface Professional { id: number; name: string; profession: string; rating: number; reviewCount: number; neighborhood: string; distanceKm: number; availability: string; startingPrice: number; avatarUrl: string }

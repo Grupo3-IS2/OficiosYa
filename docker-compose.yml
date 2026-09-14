@@ -43,9 +43,13 @@ services:
       JWT_PRIVATE_KEY_PATH: /app/keys/private_jwt.pem
       JWT_PUBLIC_KEY_PATH: /app/keys/public_jwt.pem
       JWT_EXPIRATION_TIME: ${JWT_EXPIRATION_TIME:-3600000}
+      UPLOADS_DIR: /app/uploads
     volumes:
       # The .pem files must be readable by uid 1001 (the "spring" user).
       - ./keys:/app/keys:ro
+      # Profile images. The host's nginx serves this directory at /uploads/, and
+      # uid 1001 must be able to write it: mkdir uploads && sudo chown 1001:1001 uploads
+      - ./uploads:/app/uploads
     # Published on loopback only; the host's nginx proxies /api and /ws here and
     # serves the React build from disk. 8080 for ~/release, 8081 for ~/dev.
     ports:

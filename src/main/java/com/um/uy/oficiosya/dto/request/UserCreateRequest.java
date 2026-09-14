@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.um.uy.oficiosya.validation.annotations.FullName;
 import com.um.uy.oficiosya.validation.annotations.Password;
 import jakarta.validation.constraints.Email;
@@ -7,6 +8,8 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+
+import java.util.Locale;
 
 @Data
 @SuperBuilder
@@ -20,7 +23,16 @@ public class UserCreateRequest {
     @Password
     private String password;
 
+    private String email;
+
     @NotBlank(message = "El email es obligatorio")
     @Email(message = "El email no es válido")
-    private String email;
+    public String getEmail() {
+        return email;
+    }
+
+    @JsonSetter("email")
+    public void setEmail(String email) {
+        this.email = email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
 }

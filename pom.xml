@@ -16,7 +16,7 @@
 
 	<groupId>com.um.uy</groupId>
 	<artifactId>oficiosya</artifactId>
-	<version>0.1.0-alpha</version>
+	<version>0.1.1-alpha</version>
 	<name>oficiosYa</name>
 	<description>
 		Digital platform that connects customers with tradespeople and home-service professionals (locksmithing, gardening, air conditioning, plumbing, etc.),

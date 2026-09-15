@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Date;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,9 +60,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginResponse login(LoginRequest request) {
 
-        String email = request.getEmail().trim();
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase(Locale.ROOT);
 
-        Optional<User> candidate = userRepository.findByEmail(email);
+        Optional<User> candidate = userRepository.findByEmailIgnoreCase(email);
         String passwordHash = candidate.map(User::getPassword).orElse(dummyPasswordHash);
 
         if (!passwordEncoder.matches(request.getPassword(), passwordHash) || candidate.isEmpty()) {
@@ -95,7 +96,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private LoginResponse loginResponseFor(String email) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailIgnoreCase(email == null ? "" : email.trim().toLowerCase(Locale.ROOT))
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Usuario no encontrado")
                 );

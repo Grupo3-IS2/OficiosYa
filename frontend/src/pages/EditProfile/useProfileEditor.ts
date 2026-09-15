@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getCurrentUser, getRegistrationProfile, isAuthenticated, logout, updateStoredUser } from '../../services/authService'
+import { getCurrentUser, getRegistrationProfile, isAuthenticated, updateStoredUser } from '../../services/authService'
 import { changeEmail, changePassword, getAuthenticatedUser, uploadProfileImage } from '../../services/userService'
 import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, readLocalProfile, securityChanged, validateSecurity, writeLocalProfile } from './profileState'
@@ -13,16 +13,16 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [savedPersonal, setSavedPersonal] = useState<PersonalData>(() => {
         const local = readLocalProfile(account).personal
         return {
-            name: user?.name ?? local?.name ?? 'Martín Rodríguez',
-            email: user?.email ?? local?.email ?? 'martin.rodriguez@email.com',
-            phone: local?.phone ?? registrationProfile?.phoneNumber ?? (user ? '' : '+598 99 123 456'),
+            name: user?.name ?? local?.name ?? '',
+            email: user?.email ?? local?.email ?? '',
+            phone: local?.phone ?? registrationProfile?.phoneNumber ?? '',
             avatar: local?.avatar ?? '',
         }
     })
     const [personal, setPersonal] = useState(savedPersonal)
     const [savedProfessional, setSavedProfessional] = useState<ProfessionalData>(() => readLocalProfile(account).professional ?? {
-        description: 'Electricista con experiencia en instalaciones y mantenimiento eléctrico. Trabajo con compromiso, puntualidad y atención a cada detalle, ofreciendo soluciones seguras y de calidad.',
-        zones: ['Montevideo', 'Ciudad de la Costa'],
+        description: '',
+        zones: [],
         accepting: true,
     })
     const [professional, setProfessional] = useState(savedProfessional)
@@ -156,10 +156,8 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             setErrorSection('')
             return true
         } catch (reason) {
-            if (reason instanceof ApiError && reason.status === 401) {
-                logout()
-                setError('Tu sesión venció. Inicia sesión nuevamente antes de guardar los cambios.')
-            } else {
+            // A 401 never lands here as a visible error: apiRequest already sends the user to log in.
+            if (!(reason instanceof ApiError && reason.status === 401)) {
                 setError(reason instanceof Error ? reason.message : 'No se pudieron guardar los cambios. Inténtalo nuevamente.')
             }
             return false

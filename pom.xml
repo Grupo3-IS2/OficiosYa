@@ -10,13 +10,13 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.1.0-M1</version>
+		<version>4.1.1</version>
 		<relativePath/>
 	</parent>
 
 	<groupId>com.um.uy</groupId>
 	<artifactId>oficiosya</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.1.1-alpha</version>
 	<name>oficiosYa</name>
 	<description>
 		Digital platform that connects customers with tradespeople and home-service professionals (locksmithing, gardening, air conditioning, plumbing, etc.),

@@ -22,6 +22,9 @@ function Login() {
     const [showPassword, setShowPassword] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
+    const [sessionExpired] = useState(
+        () => new URLSearchParams(window.location.search).get('expired') === '1',
+    )
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
@@ -63,6 +66,12 @@ function Login() {
                         profesionales.
                     </p>
                 </div>
+
+                {sessionExpired && (
+                    <p className="login-notice" role="status">
+                        Tu sesión venció. Iniciá sesión nuevamente.
+                    </p>
+                )}
 
                 <form className="login-form" onSubmit={handleSubmit}>
                     <label htmlFor="email">Correo electrónico</label>

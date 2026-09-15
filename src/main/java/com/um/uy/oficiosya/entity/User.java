@@ -51,9 +51,13 @@ public class User {
     private LocalDateTime createdAt;
 
     @PrePersist
-    private void assignPublicId() {
+    @PreUpdate
+    private void normalizeFields() {
         if (this.publicId == null) {
             this.publicId = UUID.randomUUID();
+        }
+        if (this.email != null) {
+            this.email = this.email.trim().toLowerCase();
         }
     }
 }

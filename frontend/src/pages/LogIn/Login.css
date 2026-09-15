@@ -185,6 +185,16 @@
   white-space: pre-line;
 }
 
+.login-notice {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 13px;
+  text-align: center;
+}
+
 .login-divider {
   height: 1px;
   margin: 30px 0 22px;

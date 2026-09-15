@@ -1,10 +1,45 @@
-import { test, expect, type APIRequestContext } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:8080';
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL ?? 'http://localhost:5173';
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}@qa.test`;
+}
+
+/**
+ * Unsigned JWT for UI tests. The frontend only reads `exp` to decide if the session
+ * looks alive; the backend rejects it, so pages that call the API need mockVerifiedSession.
+ */
+function fakeJwt(expiresInSeconds = 3600) {
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  return `${encode({ alg: 'RS256' })}.${encode({ sub: 'qa-ui-user', iat: now, exp: now + expiresInSeconds })}.firma-invalida`;
+}
+
+async function mockVerifiedSession(page: Page, user: { name: string; email: string; role?: 'CLIENT' | 'PROFESSIONAL' }) {
+  await page.route('**/api/v1/auth/verify', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      verified: true,
+      emittedDate: new Date().toISOString(),
+      expirationDate: new Date(Date.now() + 3600_000).toISOString()
+    })
+  }));
+  await page.route('**/api/v1/user/me', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      id: '33333333-3333-3333-3333-333333333333',
+      name: user.name,
+      email: user.email,
+      phoneNumber: null,
+      profileImageUrl: null,
+      role: user.role ?? 'CLIENT',
+      createdAt: new Date().toISOString()
+    })
+  }));
 }
 
 async function postJson(request: APIRequestContext, url: string, payload: unknown) {
@@ -1322,14 +1357,14 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
   test.fixme('UI: botón de logout deshabilitado mientras se procesa', async ({ page }) => {
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((token) => {
+      localStorage.setItem('oficiosya_token', token);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Logout Busy',
         email: 'logout.busy@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, fakeJwt());
     await page.reload();
 
     await page.locator('.profile-menu__trigger').click();
@@ -1339,14 +1374,14 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
   test('UI: recarga de página mantiene sesión activa', async ({ page }) => {
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((token) => {
+      localStorage.setItem('oficiosya_token', token);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Persistente',
         email: 'persistente.ui@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, fakeJwt());
     await page.reload();
 
     await expect(page.locator('.profile-menu__trigger')).toBeVisible();
@@ -1362,14 +1397,14 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
   test('UI: menú de perfil funciona en desktop y mobile', async ({ page }) => {
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((token) => {
+      localStorage.setItem('oficiosya_token', token);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Mobile',
         email: 'mobile.ui@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, fakeJwt());
     await page.reload();
 
     await expect(page.locator('.profile-menu__trigger')).toBeVisible();
@@ -1385,15 +1420,16 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('UI: teclado Tab, Enter y Escape controlan el menú y el modal de cambios sin guardar', async ({ page }) => {
+    await mockVerifiedSession(page, { name: 'Usuario Teclado', email: 'teclado.ui@qa.test' });
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((token) => {
+      localStorage.setItem('oficiosya_token', token);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Teclado',
         email: 'teclado.ui@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, fakeJwt());
     await page.reload();
 
     await page.locator('.profile-menu__trigger').click();
@@ -1464,46 +1500,115 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
   test.fixme('UI: guardar perfil muestra estado visual de loading mientras se guarda', async ({ page }) => {
     await page.goto(`${FRONTEND_BASE}/profile/edit`);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((token) => {
+      localStorage.setItem('oficiosya_token', token);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Perfil Loading',
         email: 'perfil.loading@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, fakeJwt());
     await page.reload();
     await page.locator('#profile-email').fill('perfil.loading.nuevo@qa.test');
     await page.getByRole('button', { name: /guardar cambios/i }).click();
     await expect(page.getByRole('button', { name: /guardando/i })).toBeVisible();
   });
 
+  async function storeSession(page: Page, token: string, email = 'sesion.ui@qa.test') {
+    await page.goto(FRONTEND_BASE);
+    await page.evaluate(({ token, email }) => {
+      localStorage.setItem('oficiosya_token', token);
+      localStorage.setItem('oficiosya_user', JSON.stringify({ name: 'Usuario Sesión', email, role: 'CLIENT' }));
+    }, { token, email });
+  }
+
   test('UI: edición de perfil muestra la vista autenticada cuando hay token persistido', async ({ page }) => {
-    const token = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJmY2JhOTYxZi0zOWQ4LTQwNTItOTU1Ny0xMmQ1ODk3M2RjYjEiLCJpYXQiOjE3ODkzOTEzMTAsImV4cCI6MTc4OTM5NDkxMH0.';
-    await page.addInitScript((value) => {
-      localStorage.setItem('oficiosya_token', value);
-      localStorage.setItem('oficiosya_user', JSON.stringify({
-        name: 'Perfil UI QA',
-        email: 'perfil.ui.qa@qa.test',
-        role: 'CLIENT'
-      }));
-    }, token);
+    await mockVerifiedSession(page, { name: 'Perfil UI QA', email: 'perfil.ui.qa@qa.test' });
+    await storeSession(page, fakeJwt(), 'perfil.ui.qa@qa.test');
 
     await page.goto(`${FRONTEND_BASE}/profile/edit`);
     await expect(page.getByRole('heading', { name: 'Editar perfil' })).toBeVisible();
-    await expect(page.getByLabel('Correo electrónico')).toBeVisible();
+    await expect(page.getByLabel('Correo electrónico')).toHaveValue('perfil.ui.qa@qa.test');
+  });
+
+  test('UI: token vencido no deja entrar a editar perfil y redirige al login con aviso', async ({ page }) => {
+    await storeSession(page, fakeJwt(-60));
+
+    await page.goto(`${FRONTEND_BASE}/profile/edit`);
+    await expect(page).toHaveURL(/\/login\?expired=1$/);
+    await expect(page.getByRole('status')).toContainText('Tu sesión venció');
+    await expect(page.getByRole('heading', { name: 'Editar perfil' })).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('oficiosya_token'))).toBeNull();
+  });
+
+  test('UI: token rechazado por el backend redirige al login aunque no parezca vencido', async ({ page }) => {
+    // fakeJwt has a future exp but no valid signature, so the real /auth/verify rejects it
+    await storeSession(page, fakeJwt(3600));
+
+    await page.goto(`${FRONTEND_BASE}/profile/edit`);
+    await expect(page).toHaveURL(/\/login\?expired=1$/);
+    expect(await page.evaluate(() => localStorage.getItem('oficiosya_token'))).toBeNull();
+  });
+
+  test('UI: un 401 de la API durante la sesión la cierra y redirige al login', async ({ page }) => {
+    await mockVerifiedSession(page, { name: 'Usuario Sesión', email: 'sesion.ui@qa.test' });
+    await page.route('**/api/v1/user/me', (route) => route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'El token de autenticación es inválido o expiró' })
+    }));
+    await storeSession(page, fakeJwt());
+
+    await page.goto(`${FRONTEND_BASE}/profile/edit`);
+    await expect(page).toHaveURL(/\/login\?expired=1$/);
+    expect(await page.evaluate(() => localStorage.getItem('oficiosya_token'))).toBeNull();
+  });
+
+  test('UI: login con credenciales incorrectas no se trata como sesión vencida', async ({ page }) => {
+    await page.route('**/api/v1/auth/login', (route) => route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Credenciales inválidas' })
+    }));
+    // A token is stored so apiRequest sends it: the 401 still must not end in a redirect
+    await storeSession(page, fakeJwt());
+
+    await page.goto(`${FRONTEND_BASE}/login`);
+    await page.locator('#email').fill('credenciales.malas@qa.test');
+    await page.locator('#password').fill('ClaveIncorrecta2026!');
+    await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+
+    await expect(page.getByRole('alert')).toContainText('Credenciales inválidas');
+    await expect(page).toHaveURL(/\/login$/);
+  });
+
+  test('UI: la sesión se cierra sola cuando vence el token', async ({ page }) => {
+    await storeSession(page, fakeJwt(3));
+    await page.reload();
+
+    await expect(page.locator('.profile-menu__trigger')).toBeVisible();
+    await expect(page).toHaveURL(/\/login\?expired=1$/, { timeout: 10000 });
+    expect(await page.evaluate(() => localStorage.getItem('oficiosya_token'))).toBeNull();
+  });
+
+  test('UI: header muestra iniciar sesión cuando el token guardado está vencido', async ({ page }) => {
+    await storeSession(page, fakeJwt(-60));
+    await page.reload();
+
+    await expect(page.locator('a.auth-login-button')).toBeVisible();
+    await expect(page.locator('.profile-menu__trigger')).toHaveCount(0);
   });
 
   test('UI: cerrar sesión remueve el token y redirige a la vista principal', async ({ page }) => {
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((token) => {
+      localStorage.setItem('oficiosya_token', token);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Cierre',
         email: 'logout.ui@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, fakeJwt());
     await page.reload();
 
     const profileTrigger = page.locator('.profile-menu__trigger').first();

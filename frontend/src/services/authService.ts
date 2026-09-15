@@ -1,14 +1,4 @@
 import { apiRequest } from './api'
-import {
-  PROFILE_KEY,
-  TOKEN_KEY,
-  USER_KEY,
-  clearSession,
-  expireSession,
-  getToken,
-  getTokenExpiration,
-  isTokenUsable,
-} from './session'
 import type {
   LoginRequest,
   LoginResponse,
@@ -18,8 +8,9 @@ import type {
   TokenResponse,
 } from '../types/Auth'
 
-// setTimeout overflows past this delay (~24.8 days) and would fire immediately.
-const MAX_TIMEOUT_DELAY = 2 ** 31 - 1
+const TOKEN_KEY = 'oficiosya_token'
+const USER_KEY = 'oficiosya_user'
+const PROFILE_KEY = 'oficiosya_profile'
 
 export async function login(request: LoginRequest): Promise<LoginResponse> {
   const response = await apiRequest<LoginResponse>('/auth/login', {
@@ -80,18 +71,8 @@ export async function verifyToken(): Promise<TokenResponse> {
 }
 
 export function logout(): void {
-  clearSession()
-}
-
-/** Ends the session on its own when the token expires, even if the tab is left open. */
-export function scheduleSessionExpiry(): void {
-  const token = getToken()
-  if (!isTokenUsable(token)) return
-
-  const delay = getTokenExpiration(token!)! - Date.now()
-  if (delay <= MAX_TIMEOUT_DELAY) {
-    window.setTimeout(expireSession, delay)
-  }
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
 }
 
 export function updateStoredUser(user: StoredUser): void {
@@ -102,9 +83,8 @@ export function updateStoredUser(user: StoredUser): void {
   }
 }
 
-/** Local check only: the token exists and has not expired. The backend has the final word. */
 export function isAuthenticated(): boolean {
-  return isTokenUsable(getToken())
+  return Boolean(localStorage.getItem(TOKEN_KEY))
 }
 
 export function getCurrentUser(): StoredUser | null {

@@ -1,5 +1,3 @@
-import { expireSession, getToken } from './session'
-
 const API_BASE_URL = '/api/v1'
 
 export class ApiError extends Error {
@@ -41,7 +39,7 @@ export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getToken()
+  const token = localStorage.getItem('oficiosya_token')
   const headers = new Headers(options.headers)
 
   // The browser has to set the multipart Content-Type itself, boundary included.
@@ -66,11 +64,6 @@ export async function apiRequest<T>(
   const body = contentType.includes('application/json')
     ? await response.json()
     : await response.text()
-
-  // A 401 on /auth/* means bad credentials, not a dead session, so it stays with the caller.
-  if (response.status === 401 && token && !path.startsWith('/auth/')) {
-    expireSession()
-  }
 
   if (!response.ok) {
     throw new ApiError(errorMessageFrom(body), response.status)

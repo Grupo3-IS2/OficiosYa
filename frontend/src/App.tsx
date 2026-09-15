@@ -2,17 +2,12 @@ import Home from './pages/Home/Home'
 import Login from './pages/LogIn/Login'
 import Register from './pages/Register/Register'
 import EditProfilePage from './pages/EditProfile/EditProfilePage'
-import RequireAuth from './components/RequireAuth/RequireAuth'
 
 function App() {
     const currentPath = window.location.pathname
 
     if (currentPath === '/profile/edit') {
-        return (
-            <RequireAuth>
-                <EditProfilePage />
-            </RequireAuth>
-        )
+        return <EditProfilePage />
     }
 
     if (currentPath === '/login') {

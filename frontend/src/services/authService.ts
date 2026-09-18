@@ -29,6 +29,7 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
 
   localStorage.setItem(TOKEN_KEY, response.token)
   localStorage.setItem(USER_KEY, JSON.stringify({
+    id: response.id,
     email: response.email,
     name: response.name,
     role: response.role,
@@ -60,6 +61,7 @@ export async function register(
 
   localStorage.setItem(TOKEN_KEY, response.token)
   localStorage.setItem(USER_KEY, JSON.stringify({
+    id: response.id,
     email: response.email,
     name: response.name,
     role: response.role,

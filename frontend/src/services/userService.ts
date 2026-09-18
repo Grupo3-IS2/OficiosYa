@@ -1,19 +1,37 @@
 import { apiRequest } from './api'
 
-export interface UserRequest {
-  name: string
-  email: string
-  password: string
-}
-
 export interface UserResponse {
   id: string
   name: string
   email: string
-  phoneNumber: string | null
   profileImageUrl: string | null
   role: 'CLIENT' | 'PROFESSIONAL'
   createdAt: string
+}
+
+export interface ProfessionalResponse extends UserResponse {
+  role: 'PROFESSIONAL'
+  phoneNumber: string
+  workingLocation: string
+}
+
+export type AuthenticatedUserResponse = UserResponse | ProfessionalResponse
+
+export function isProfessionalResponse(
+  user: AuthenticatedUserResponse,
+): user is ProfessionalResponse {
+  return user.role === 'PROFESSIONAL'
+}
+
+export interface UserUpdateRequest {
+  name?: string
+}
+
+export type ClientUpdateRequest = UserUpdateRequest
+
+export interface ProfessionalUpdateRequest extends UserUpdateRequest {
+  phoneNumber?: string
+  workingLocation?: string
 }
 
 export interface PasswordUpdateRequest {
@@ -27,23 +45,14 @@ export interface EmailUpdateRequest {
   currentPassword: string
 }
 
-export function createUser(request: UserRequest): Promise<UserResponse> {
-  return apiRequest<UserResponse>('/user/create', {
-    method: 'POST',
-    body: JSON.stringify(request),
-  })
+export function getAuthenticatedUser(): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/user/me')
 }
 
-export function updateUser(email: string, request: Partial<UserRequest>): Promise<UserResponse> {
-  return apiRequest<UserResponse>(`/user/${encodeURIComponent(email)}`, {
+export function changeEmail(request: EmailUpdateRequest): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/user/me/email', {
     method: 'PUT',
     body: JSON.stringify(request),
-  })
-}
-
-export async function deleteUser(email: string): Promise<void> {
-  await apiRequest<void>(`/user/${encodeURIComponent(email)}`, {
-    method: 'DELETE',
   })
 }
 
@@ -54,23 +63,35 @@ export async function changePassword(request: PasswordUpdateRequest): Promise<vo
   })
 }
 
-export function changeEmail(request: EmailUpdateRequest): Promise<UserResponse> {
-  return apiRequest<UserResponse>('/user/me/email', {
-    method: 'PUT',
-    body: JSON.stringify(request),
-  })
-}
-
-export function uploadProfileImage(image: File): Promise<UserResponse> {
+export function uploadProfileImage(image: File): Promise<AuthenticatedUserResponse> {
   const body = new FormData()
   body.append('file', image)
 
-  return apiRequest<UserResponse>('/user/me/profile-image', {
+  return apiRequest<AuthenticatedUserResponse>('/user/me/profile-image', {
     method: 'POST',
     body,
   })
 }
 
-export function getAuthenticatedUser(): Promise<UserResponse> {
-  return apiRequest<UserResponse>('/user/me')
+export function updateClient(id: string, request: ClientUpdateRequest): Promise<UserResponse> {
+  return apiRequest<UserResponse>(`/client/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  })
+}
+
+export function updateProfessional(
+  id: string,
+  request: ProfessionalUpdateRequest,
+): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>(`/professional/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  })
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await apiRequest<void>(`/user/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
 }

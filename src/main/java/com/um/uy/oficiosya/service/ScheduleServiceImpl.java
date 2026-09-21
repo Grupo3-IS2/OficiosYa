@@ -139,13 +139,23 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ScheduleResponse> getAgenda(UUID professionalId, LocalDateTime from, LocalDateTime to) {
-        if (!professionalRepository.existsByPublicId(professionalId)) {
+    public List<ScheduleResponse> getAgenda(UUID professionalId, LocalDateTime from, LocalDateTime to,
+                                            boolean ownerOrAdmin) {
+        boolean visible = ownerOrAdmin
+                ? professionalRepository.existsByPublicId(professionalId)
+                : professionalRepository.existsByPublicIdAndPublishedTrue(professionalId);
+        if (!visible) {
             throw new UserNotFoundException("Profesional no encontrado.");
         }
 
         return scheduleRepository.findAgenda(professionalId, from, to).stream()
                 .map(scheduleMapper::toResponse)
+                .peek(schedule -> {
+                    // Which job a block belongs to is not for the public to know
+                    if (!ownerOrAdmin) {
+                        schedule.setJobRequestId(null);
+                    }
+                })
                 .toList();
     }
 

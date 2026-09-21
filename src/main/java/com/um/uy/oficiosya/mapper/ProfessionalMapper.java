@@ -2,6 +2,7 @@ package com.um.uy.oficiosya.mapper;
 
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.response.ExpertiseTradeResponse;
+import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.entity.ExpertiseTrade;
 import com.um.uy.oficiosya.entity.Professional;
@@ -15,6 +16,9 @@ public interface ProfessionalMapper {
     @Mapping(target = "id", source = "publicId")
     @Mapping(target = "role", constant = "PROFESSIONAL")
     ProfessionalResponse toResponse(Professional professional);
+
+    @Mapping(target = "id", source = "publicId")
+    ProfessionalPublicResponse toPublicResponse(Professional professional);
 
     @Mapping(target = "tradeId", source = "trade.id")
     @Mapping(target = "tradeName", source = "trade.name")

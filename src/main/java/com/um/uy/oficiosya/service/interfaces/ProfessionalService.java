@@ -2,6 +2,7 @@ package com.um.uy.oficiosya.service.interfaces;
 
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import org.springframework.data.domain.Page;
@@ -14,7 +15,11 @@ import java.util.UUID;
 public interface ProfessionalService {
     ProfessionalResponse createProfessional(ProfessionalCreateRequest professionalRequest);
     ProfessionalResponse updateProfessional(ProfessionalUpdateRequest professionalRequest, UUID id);
+    /** The full profile, contact data included: only for the owner and admins. */
     ProfessionalResponse getProfessional(UUID id);
+
+    /** The public view of a professional; not found unless the professional is published. */
+    ProfessionalPublicResponse getPublicProfessional(UUID id);
     void deleteProfessional(UUID id);
 
     /** Admin-only. */
@@ -34,6 +39,6 @@ public interface ProfessionalService {
      * Published professionals only; every filter is optional and combinable. tradeIds, minPrice
      * and maxPrice are matched against the same offered trade.
      */
-    Page<ProfessionalResponse> searchProfessionals(List<Long> tradeIds, BigDecimal minPrice, BigDecimal maxPrice,
+    Page<ProfessionalPublicResponse> searchProfessionals(List<Long> tradeIds, BigDecimal minPrice, BigDecimal maxPrice,
                                                     Double minRating, String location, String query, Pageable pageable);
 }

@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.controller;
 
+import com.um.uy.oficiosya.config.ViewerAccess;
 import com.um.uy.oficiosya.dto.request.ScheduleCreateRequest;
 import com.um.uy.oficiosya.dto.response.ScheduleResponse;
 import com.um.uy.oficiosya.dto.update.ScheduleUpdateRequest;
@@ -53,8 +54,10 @@ public class ScheduleController {
     public ResponseEntity<List<ScheduleResponse>> getAgenda(
             @PathVariable UUID professionalId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
-        return ResponseEntity.ok(scheduleService.getAgenda(professionalId, from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            Authentication authentication) {
+        boolean ownerOrAdmin = ViewerAccess.isOwnerOrAdmin(authentication, professionalId);
+        return ResponseEntity.ok(scheduleService.getAgenda(professionalId, from, to, ownerOrAdmin));
     }
 
     private UUID authenticatedProfessionalId(Authentication authentication) {

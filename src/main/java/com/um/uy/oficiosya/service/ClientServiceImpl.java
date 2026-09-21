@@ -41,7 +41,7 @@ public class ClientServiceImpl implements ClientService {
     public UserResponse createClient(ClientCreateRequest clientRequest) {
         if (this.userRepository.existsByEmail(clientRequest.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Ya existe un usuario con el email " + clientRequest.getEmail());
+                    "No se pudo completar el registro. Verificá los datos e intentá nuevamente.");
         }
 
         Client client = clientMapper.toEntity(clientRequest);

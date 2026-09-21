@@ -92,6 +92,25 @@ public class SecurityConfig {
                                 "/api/v1/professional/create"
                         ).permitAll()
 
+                        // Professional search, public profile and agenda. The controllers decide how much
+                        // each caller sees: contact data and job details are for the owner and admins only.
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/professional/search",
+                                "/api/v1/professional/{id}",
+                                "/api/v1/schedule/professional/{professionalId}"
+                        ).permitAll()
+
+                        // Where the container forwards unhandled errors; without this an anonymous
+                        // caller gets a 401 instead of the real error
+                        .requestMatchers("/error").permitAll()
+
+                        // Trade list
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/trade"
+                        ).permitAll()
+
                         .anyRequest().authenticated()
                 )
                 .csrf(AbstractHttpConfigurer::disable)

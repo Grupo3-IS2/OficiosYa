@@ -1,4 +1,4 @@
-import { expireSession, getToken } from './session'
+import { expireSession, getToken, isTokenUsable } from './session'
 
 const API_BASE_URL = '/api/v1'
 
@@ -49,7 +49,9 @@ export async function apiRequest<T>(
     headers.set('Content-Type', 'application/json')
   }
 
-  if (token) {
+  // An expired token is never sent: public endpoints (search, profiles) would answer 401 to it
+  // instead of treating the visitor as anonymous. Protected ones answer 401 either way.
+  if (isTokenUsable(token)) {
     headers.set('Authorization', `Bearer ${token}`)
   }
 

@@ -2,6 +2,7 @@ package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.entity.ExpertiseTrade;
@@ -57,7 +58,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     public ProfessionalResponse createProfessional(ProfessionalCreateRequest professionalRequest) {
         if (this.userRepository.existsByEmail(professionalRequest.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Ya existe un usuario con el email " + professionalRequest.getEmail());
+                    "No se pudo completar el registro. Verificá los datos e intentá nuevamente.");
         }
 
         Professional professional = professionalMapper.toEntity(professionalRequest);
@@ -99,6 +100,15 @@ public class ProfessionalServiceImpl implements ProfessionalService {
         Professional professional = professionalRepository.findByPublicId(id)
                 .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
         return professionalMapper.toResponse(professional);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProfessionalPublicResponse getPublicProfessional(UUID id) {
+        Professional professional = professionalRepository.findByPublicId(id)
+                .filter(Professional::isPublished)
+                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+        return professionalMapper.toPublicResponse(professional);
     }
 
     @Override
@@ -207,7 +217,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ProfessionalResponse> searchProfessionals(List<Long> tradeIds, BigDecimal minPrice, BigDecimal maxPrice,
+    public Page<ProfessionalPublicResponse> searchProfessionals(List<Long> tradeIds, BigDecimal minPrice, BigDecimal maxPrice,
                                                             Double minRating, String location, String query,
                                                             Pageable pageable) {
         if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
@@ -221,6 +231,6 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
         return professionalRepository
                 .search(normalizedTradeIds, minPrice, maxPrice, minRating, normalizedLocation, normalizedQuery, pageable)
-                .map(professionalMapper::toResponse);
+                .map(professionalMapper::toPublicResponse);
     }
 }

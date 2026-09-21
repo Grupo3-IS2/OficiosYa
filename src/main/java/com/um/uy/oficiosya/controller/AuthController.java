@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/** Every auth endpoint is public **/
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {

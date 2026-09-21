@@ -15,6 +15,7 @@ import java.util.UUID;
 public interface ProfessionalRepository extends JpaRepository<Professional, Long> {
     Optional<Professional> findByPublicId(UUID publicId);
     boolean existsByPublicId(UUID publicId);
+    boolean existsByPublicIdAndPublishedTrue(UUID publicId);
 
     /**
      * Published professionals; every filter is optional and they combine (AND). tradeIds,

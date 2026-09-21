@@ -12,7 +12,11 @@ import java.util.UUID;
 public interface ScheduleService {
     ScheduleResponse createSchedule(ScheduleCreateRequest scheduleRequest, UUID professionalId);
     ScheduleResponse updateSchedule(ScheduleUpdateRequest scheduleRequest, Long id, UUID professionalId);
-    List<ScheduleResponse> getAgenda(UUID professionalId, LocalDateTime from, LocalDateTime to);
+    /**
+     * Anyone can read the agenda of a published professional, but without the job each block
+     * belongs to; the owner and admins see everything, published or not.
+     */
+    List<ScheduleResponse> getAgenda(UUID professionalId, LocalDateTime from, LocalDateTime to, boolean ownerOrAdmin);
     void deleteSchedule(Long id, UUID professionalId);
 
     /**

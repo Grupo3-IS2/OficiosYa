@@ -108,7 +108,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const second = await registerClient(request, payload);
     expect(second.status()).toBe(400);
     const body = await second.json();
-    expect(body.error).toMatch(/already exists|duplicate|bad request|ya existe/i);
+    expect(body.error).toMatch(/no se pudo completar el registro/i);
   });
 
   test('API: registro de cliente rechaza nombre inválido', async ({ request }) => {
@@ -196,7 +196,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
     expect(second.status()).toBe(400);
     const body = await second.json();
-    expect(body.error).toMatch(/already exists|duplicate|ya existe|email/i);
+    expect(body.error).toMatch(/no se pudo completar el registro/i);
   });
 
   test('API: login acepta email con mayúsculas', async ({ request }) => {
@@ -309,7 +309,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
     expect(second.status()).toBe(400);
     const body = await second.json();
-    expect(body.error).toMatch(/already exists|duplicate|ya existe|email|duplicado/i);
+    expect(body.error).toMatch(/no se pudo completar el registro/i);
   });
 
   test('API: contraseña con longitud mínima exacta (8) es válida cuando cumple requisitos', async ({ request }) => {

@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -108,6 +109,14 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(UUID id){
         User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
         userRepository.delete(user);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> listUsers() {
+        return userRepository.findAll().stream()
+                .map(userMapper::toResponse)
+                .toList();
     }
 
 }

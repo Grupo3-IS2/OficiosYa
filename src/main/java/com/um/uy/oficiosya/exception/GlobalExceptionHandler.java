@@ -9,7 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -53,6 +55,26 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), null);
     }
 
+    @ExceptionHandler(ScheduleNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleScheduleNotFound(ScheduleNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(JobRequestNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleJobRequestNotFound(JobRequestNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(TradeNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleTradeNotFound(TradeNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(ExpertiseTradeNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleExpertiseTradeNotFound(ExpertiseTradeNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new HashMap<>();
@@ -68,6 +90,18 @@ public class GlobalExceptionHandler {
         ex.getConstraintViolations()
                 .forEach(violation -> fieldErrors.put(violation.getPropertyPath().toString(), violation.getMessage()));
         return build(HttpStatus.BAD_REQUEST, "Error de validación", fieldErrors);
+    }
+
+    /** A malformed JSON body (unparsable date, invalid enum value, etc.) is a bad request, not a server error. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleNotReadable(HttpMessageNotReadableException ex) {
+        return build(HttpStatus.BAD_REQUEST, "El cuerpo de la solicitud es inválido o está mal formado", null);
+    }
+
+    /** Hitting an existing path with the wrong HTTP method (e.g. POST on a GET-only route). */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return build(HttpStatus.METHOD_NOT_ALLOWED, "Método no soportado para esta ruta", null);
     }
 
     /** A path variable that is not a valid UUID is a bad request, not a server error. */

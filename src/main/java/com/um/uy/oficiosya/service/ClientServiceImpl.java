@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -72,5 +73,13 @@ public class ClientServiceImpl implements ClientService {
         Client client = clientRepository.findByPublicId(id)
                 .orElseThrow(() -> new UserNotFoundException("Cliente no encontrado."));
         clientRepository.delete(client);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> listClients() {
+        return clientRepository.findAll().stream()
+                .map(clientMapper::toResponse)
+                .toList();
     }
 }

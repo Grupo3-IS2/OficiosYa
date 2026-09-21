@@ -34,6 +34,16 @@ export function securityChanged(value: SecurityData) {
     return Boolean(value.current || value.password || value.confirmation)
 }
 
+// La misma regla que PhoneNumberValidator en el backend, que un profesional tiene que cumplir.
+const PHONE_FORMAT = /^(\+\d{1,3})?\d{9}$/
+
+export function validatePhone(phone: string): string {
+    const value = phone.trim()
+    if (!value) return 'Ingresa tu número de teléfono.'
+    if (!PHONE_FORMAT.test(value)) return 'Ingresa un teléfono válido: 9 dígitos, con prefijo internacional opcional.'
+    return ''
+}
+
 export function validateSecurity(value: SecurityData): string {
     if (!value.current || !value.password || !value.confirmation) return 'Completa los tres campos de contraseña.'
     if (value.password.length < 8) return 'La nueva contraseña debe tener al menos 8 caracteres.'

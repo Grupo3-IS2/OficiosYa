@@ -27,7 +27,11 @@ public class UserController {
         this.userService = userService;
     }
 
-    /** The profile of whoever owns the token*/
+    /**
+     * The profile of whoever owns the token. A professional answers with a
+     * {@link com.um.uy.oficiosya.dto.response.ProfessionalResponse}: the same body plus
+     * its phone number and working location.
+     */
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getAuthenticatedUser(Authentication authentication) {
         return ResponseEntity.ok(userService.getUser(authenticatedUserId(authentication)));

@@ -17,6 +17,8 @@ export interface RegistrationProfile {
 }
 
 export interface StoredUser {
+  /** El publicId: es lo que identifica al usuario en la API, no el correo. */
+  id: string
   email: string
   name: string
   role?: 'CLIENT' | 'PROFESSIONAL'

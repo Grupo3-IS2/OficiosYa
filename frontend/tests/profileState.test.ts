@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { personalChanged, professionalChanged, securityChanged, validateSecurity, readLocalProfile, writeLocalProfile } from '../src/pages/EditProfile/profileState.ts'
+import { personalChanged, professionalChanged, securityChanged, validatePhone, validateSecurity, readLocalProfile, writeLocalProfile } from '../src/pages/EditProfile/profileState.ts'
 
 const personal = { name: 'Ana', email: 'ana@example.com', phone: '099123456', avatar: '' }
 const professional = { description: 'Electricista', zones: ['Montevideo', 'Pando'], accepting: true }
@@ -18,6 +18,15 @@ test('professional changes include description, zones and availability; zone ord
     assert.equal(professionalChanged({ ...professional, zones: ['Montevideo'] }, professional), true)
     assert.equal(professionalChanged({ ...professional, accepting: false }, professional), true)
     assert.equal(professionalChanged({ ...professional, description: '' }, professional), true)
+})
+
+test('a professional phone is required and follows the same rule as the backend', () => {
+    assert.match(validatePhone(''), /Ingresa tu número/)
+    assert.match(validatePhone('   '), /Ingresa tu número/)
+    assert.match(validatePhone('12345'), /teléfono válido/)
+    assert.match(validatePhone('+5989912345678'), /teléfono válido/)
+    assert.equal(validatePhone('099123456'), '')
+    assert.equal(validatePhone(' +598991234567 '), '')
 })
 
 test('clearing password fields restores clean state and validation rejects incomplete or mismatched input', () => {

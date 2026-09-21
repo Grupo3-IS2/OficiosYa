@@ -1,25 +1,18 @@
 package com.um.uy.oficiosya.dto.response;
 
-import com.um.uy.oficiosya.entity.Role;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
+/** A user's response plus what only a professional has. */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProfessionalResponse {
-    /** The entity's publicId, the internal numeric id is not exposed. */
-    private UUID id;
-    private String name;
-    private String email;
+public class ProfessionalResponse extends UserResponse {
     private String phoneNumber;
-    private String profileImageUrl;
-    private Role role;
-    private LocalDateTime createdAt;
+    private String workingLocation;
 }

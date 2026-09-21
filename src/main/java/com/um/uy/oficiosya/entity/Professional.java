@@ -5,8 +5,10 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -45,6 +47,15 @@ public class Professional extends User {
     private List<ExpertiseTrade> expertiseTrades = new ArrayList<>();
 
     @Min(0)
-    @Min(10)
+    @Max(10)
     private Double rating;
+
+    @Size(min = 20, max = 500, message = "La descripción debe tener entre 20 y 500 caracteres")
+    @Column(length = 500)
+    private String description;
+
+    /** Whether the profile is visible to clients. Only settable through /publish and /unpublish. */
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "boolean not null default false")
+    private boolean published = false;
 }

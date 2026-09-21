@@ -44,6 +44,10 @@ services:
       JWT_PUBLIC_KEY_PATH: /app/keys/public_jwt.pem
       JWT_EXPIRATION_TIME: ${JWT_EXPIRATION_TIME:-3600000}
       UPLOADS_DIR: /app/uploads
+      # Default administrator, created on startup if it doesn't exist yet (see AdminSeeder).
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@oficiosya.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
       # The .pem files must be readable by uid 1001 (the "spring" user).
       - ./keys:/app/keys:ro

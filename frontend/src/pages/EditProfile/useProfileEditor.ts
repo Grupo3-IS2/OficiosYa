@@ -1,33 +1,52 @@
 import { useEffect, useRef, useState } from 'react'
-import { getCurrentUser, getRegistrationProfile, isAuthenticated, updateStoredUser } from '../../services/authService'
-import { changeEmail, changePassword, getAuthenticatedUser, isProfessionalResponse, updateClient, updateProfessional, uploadProfileImage } from '../../services/userService'
+import { getCurrentUser, isAuthenticated, updateStoredUser } from '../../services/authService'
+import { addExpertiseTrade, changeEmail, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, setProfessionalPublished, updateClient, updateProfessional, uploadProfileImage } from '../../services/userService'
+import type { ProfessionalResponse } from '../../services/userService'
 import { ApiError } from '../../services/api'
-import { personalChanged, professionalChanged, readLocalProfile, securityChanged, validatePhone, validateSecurity, writeLocalProfile } from './profileState'
+import { personalChanged, professionalChanged, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
 import type { PersonalData, ProfessionalData, ProfileSection, SecurityData } from './profileState'
+import type { Trade } from '../../types/Professional'
+
+function professionalDataFrom(response: ProfessionalResponse): ProfessionalData {
+    return {
+        description: response.description ?? '',
+        workingLocation: response.workingLocation ?? '',
+        published: response.published,
+        trades: response.expertiseTrades.map(trade => ({
+            id: trade.id,
+            tradeId: trade.tradeId,
+            tradeName: trade.tradeName,
+            minimumHourlyWage: String(trade.minimumHourlyWage),
+            maximumHourlyWage: String(trade.maximumHourlyWage),
+        })),
+    }
+}
 
 export default function useProfileEditor(professionalOverride?: boolean) {
     const [user] = useState(getCurrentUser)
-    const [registrationProfile] = useState(getRegistrationProfile)
-    const [isProfessional, setIsProfessional] = useState(() => professionalOverride ?? (user?.role === 'PROFESSIONAL' || registrationProfile?.accountType === 'professional'))
-    const account = user?.email ?? 'demo'
+    const [isProfessional, setIsProfessional] = useState(() => professionalOverride ?? user?.role === 'PROFESSIONAL')
+    const [loadingProfile, setLoadingProfile] = useState(Boolean(user) && professionalOverride === undefined)
     // Sesiones abiertas antes de que se guardara el publicId lo recuperan de /user/me.
     const [userId, setUserId] = useState(() => user?.id ?? '')
     const [savedPersonal, setSavedPersonal] = useState<PersonalData>(() => {
-        const local = readLocalProfile(account).personal
         return {
-            name: user?.name ?? local?.name ?? '',
-            email: user?.email ?? local?.email ?? '',
-            phone: local?.phone ?? registrationProfile?.phoneNumber ?? '',
-            avatar: local?.avatar ?? '',
+            name: user?.name ?? '',
+            email: user?.email ?? '',
+            phone: '',
+            avatar: '',
         }
     })
     const [personal, setPersonal] = useState(savedPersonal)
-    const [savedProfessional, setSavedProfessional] = useState<ProfessionalData>(() => readLocalProfile(account).professional ?? {
+    const [savedProfessional, setSavedProfessional] = useState<ProfessionalData>({
         description: '',
-        zones: [],
-        accepting: true,
+        workingLocation: '',
+        trades: [],
+        published: false,
     })
     const [professional, setProfessional] = useState(savedProfessional)
+    const [trades, setTrades] = useState<Trade[]>([])
+    const [tradesError, setTradesError] = useState('')
+    const [tradesLoading, setTradesLoading] = useState(true)
     const [security, setSecurity] = useState<SecurityData>({ current: '', password: '', confirmation: '' })
     const [emailPassword, setEmailPassword] = useState('')
     // The selected photo is only uploaded when the personal section is saved.
@@ -38,6 +57,15 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [error, setError] = useState('')
     const [errorSection, setErrorSection] = useState<ProfileSection | ''>('')
     const [messages, setMessages] = useState<Partial<Record<ProfileSection, string>>>({})
+
+    useEffect(() => {
+        try {
+            for (let index = sessionStorage.length - 1; index >= 0; index--) {
+                const key = sessionStorage.key(index)
+                if (key?.startsWith('oficiosya_edit_profile:')) sessionStorage.removeItem(key)
+            }
+        } catch { /* El editor ya no depende del almacenamiento del navegador. */ }
+    }, [])
 
     useEffect(() => {
         if (!user || professionalOverride !== undefined) return
@@ -52,9 +80,31 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             updateStoredUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar }))
             setPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar: photoPreview.current ? previous.avatar : avatar }))
-        }).catch(() => undefined)
+            if (isProfessionalResponse(response)) {
+                const professionalData = professionalDataFrom(response)
+                setSavedProfessional(professionalData)
+                setProfessional(professionalData)
+            }
+        }).catch(() => {
+            if (active) setError('No pudimos cargar tu perfil. Intentá nuevamente más tarde.')
+        }).finally(() => {
+            if (active) setLoadingProfile(false)
+        })
         return () => { active = false }
     }, [professionalOverride, user])
+
+    useEffect(() => {
+        if (!isProfessional) return
+        let active = true
+        void getTrades().then(response => {
+            if (active) setTrades(response)
+        }).catch(() => {
+            if (active) setTradesError('No pudimos cargar los oficios disponibles.')
+        }).finally(() => {
+            if (active) setTradesLoading(false)
+        })
+        return () => { active = false }
+    }, [isProfessional])
 
     useEffect(() => () => {
         if (photoPreview.current) URL.revokeObjectURL(photoPreview.current)
@@ -77,6 +127,12 @@ export default function useProfileEditor(professionalOverride?: boolean) {
         personal: personalChanged(personal, savedPersonal),
         security: securityChanged(security),
         professional: isProfessional && professionalChanged(professional, savedProfessional),
+    }
+
+    function changeProfessional(value: ProfessionalData) {
+        setProfessional(value)
+        setMessages(previous => ({ ...previous, professional: '' }))
+        if (errorSection === 'professional') setError('')
     }
 
     async function save(sections: ProfileSection[]): Promise<boolean> {
@@ -112,6 +168,13 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 }
             }
         }
+        if (sections.includes('professional') && dirty.professional) {
+            const validationError = validateProfessional(professional, savedProfessional)
+            if (validationError) {
+                setError(validationError)
+                return false
+            }
+        }
         saving.current = true
         setBusy(true)
         try {
@@ -126,13 +189,49 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 setMessages(previous => ({ ...previous, security: 'Contraseña actualizada correctamente.' }))
             }
             if (sections.includes('professional') && dirty.professional) {
-                writeLocalProfile(user ? savedPersonal.email : account, 'professional', professional)
-                setSavedProfessional(professional)
-                setMessages(previous => ({ ...previous, professional: 'Perfil guardado temporalmente en esta pestaña. Todavía no se sincroniza con tu cuenta.' }))
+                if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tu perfil profesional.')
+                if (!userId) throw new Error('No pudimos identificar tu cuenta. Vuelve a iniciar sesión.')
+                let persisted = savedProfessional
+                const record = (response: ProfessionalResponse) => {
+                    persisted = professionalDataFrom(response)
+                    setSavedProfessional(persisted)
+                }
+                const tradesChanged = professional.trades.length !== persisted.trades.length
+                    || professional.trades.some(trade => {
+                        const original = persisted.trades.find(item => item.tradeId === trade.tradeId)
+                        return !original || original.minimumHourlyWage !== trade.minimumHourlyWage
+                            || original.maximumHourlyWage !== trade.maximumHourlyWage
+                    })
+                if (persisted.published && (!professional.published || tradesChanged)) {
+                    record(await setProfessionalPublished(userId, false))
+                }
+                if (professional.description.trim() !== persisted.description || professional.workingLocation.trim() !== persisted.workingLocation) {
+                    record(await updateProfessional(userId, {
+                        ...(professional.description.trim() !== persisted.description && { description: professional.description.trim() }),
+                        ...(professional.workingLocation.trim() !== persisted.workingLocation && { workingLocation: professional.workingLocation.trim() }),
+                    }))
+                }
+                for (const trade of professional.trades.filter(item => !persisted.trades.some(saved => saved.tradeId === item.tradeId))) {
+                    record(await addExpertiseTrade(userId, trade.tradeId, Number(trade.minimumHourlyWage), Number(trade.maximumHourlyWage)))
+                }
+                for (const trade of persisted.trades.filter(item => !professional.trades.some(selected => selected.tradeId === item.tradeId))) {
+                    if (trade.id !== null) record(await removeExpertiseTrade(userId, trade.id))
+                }
+                for (const trade of professional.trades) {
+                    const original = persisted.trades.find(item => item.tradeId === trade.tradeId)
+                    if (original && original.id !== null && (trade.minimumHourlyWage !== original.minimumHourlyWage || trade.maximumHourlyWage !== original.maximumHourlyWage)) {
+                        record(await removeExpertiseTrade(userId, original.id))
+                        record(await addExpertiseTrade(userId, trade.tradeId, Number(trade.minimumHourlyWage), Number(trade.maximumHourlyWage)))
+                    }
+                }
+                if (professional.published && !persisted.published) {
+                    record(await setProfessionalPublished(userId, true))
+                }
+                setProfessional(persisted)
+                setMessages(previous => ({ ...previous, professional: 'Perfil profesional actualizado.' }))
             }
             if (sections.includes('personal') && dirty.personal) {
                 let saved = { ...personal, name: personal.name.trim(), email: personal.email.trim(), phone: personal.phone.trim() }
-                let emailChanged = false
                 if (user) {
                     if (photo) {
                         if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
@@ -170,20 +269,14 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                         const response = await changeEmail({ newEmail: saved.email, currentPassword: emailPassword })
                         saved = { ...saved, email: response.email }
                         updateStoredUser({ id: userId, name: saved.name, email: response.email, role: response.role })
-                        emailChanged = response.email !== savedPersonal.email
                         // Preserve server success even if local storage subsequently fails.
                         setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email }))
                     }
                 }
-                writeLocalProfile(user ? saved.email : account, 'personal', saved)
-                    if (emailChanged && isProfessional) writeLocalProfile(saved.email, 'professional', sections.includes('professional') ? professional : savedProfessional)
-                    setPersonal(saved)
-                    setSavedPersonal(saved)
-                    setEmailPassword('')
-                    setMessages(previous => ({ ...previous, personal: emailChanged
-                        ? 'Correo y datos actualizados.'
-                        : user ? 'Datos guardados.'
-                            : 'Vista de prueba: datos guardados temporalmente en esta pestaña.' }))
+                setPersonal(saved)
+                setSavedPersonal(saved)
+                setEmailPassword('')
+                setMessages(previous => ({ ...previous, personal: 'Datos guardados.' }))
             }
             setErrorSection('')
             return true
@@ -200,8 +293,8 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     }
 
     return {
-        user, isProfessional, personal, setPersonal, selectPhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, professional, setProfessional, security, setSecurity,
-        busy, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
+        user, isProfessional, personal, setPersonal, selectPhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
+        busy, loadingProfile, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),
         clearError: () => { setError(''); setErrorSection('') },

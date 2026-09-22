@@ -54,6 +54,15 @@
 .profile-availability input:checked { background: #009f4b; }
 .profile-availability input:checked::after { transform: translateX(23px); }
 .profile-availability small { margin-top: 3px; font-size: 14px; }
+.profile-trade-picker { display: flex; gap: 10px; }
+.profile-trade-picker select { flex: 1; min-width: 0; border: 1px solid #cdd2cf; border-radius: 6px; background: #fff; color: #252925; padding: 10px 14px; font: inherit; }
+.profile-trade-picker .button { min-height: 43px; padding: 8px 20px; }
+.profile-trade { border: 1px solid #e2e9e7; border-radius: 8px; padding: 14px; margin-top: 12px; }
+.profile-trade-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.profile-trade-heading button { border: 0; background: transparent; color: #087f41; font: inherit; cursor: pointer; }
+.profile-trade-prices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.profile-trade-prices label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.profile-availability { margin-top: 26px; }
 .profile-feedback, .profile-error { margin: 14px 0 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .profile-feedback { color: #42664c; }
 .profile-error { color: #b42318; }
@@ -83,5 +92,7 @@
     .professional-heading { flex-direction: column; gap: 0; margin-bottom: 18px; }
     .professional-heading .profile-subtitle { margin-bottom: 8px; }
     .profile-availability { margin-top: 36px; }
+    .profile-trade-prices { grid-template-columns: 1fr; }
+    .profile-trade-picker .button { padding-inline: 12px; }
     .profile-actions .button { width: 100%; padding-inline: 12px; }
 }

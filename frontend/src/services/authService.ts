@@ -34,6 +34,7 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
     name: response.name,
     role: response.role,
   }))
+  localStorage.removeItem(PROFILE_KEY)
 
   return response
 }
@@ -67,12 +68,7 @@ export async function register(
     role: response.role,
   }))
 
-  if (profile) {
-    localStorage.setItem(
-      PROFILE_KEY,
-      JSON.stringify({ ...profile, email: response.email }),
-    )
-  }
+  localStorage.removeItem(PROFILE_KEY)
 
   return response
 }
@@ -97,11 +93,8 @@ export function scheduleSessionExpiry(): void {
 }
 
 export function updateStoredUser(user: StoredUser): void {
-  const profile = getRegistrationProfile()
   localStorage.setItem(USER_KEY, JSON.stringify(user))
-  if (profile) {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, email: user.email }))
-  }
+  localStorage.removeItem(PROFILE_KEY)
 }
 
 /** Local check only: the token exists and has not expired. The backend has the final word. */
@@ -118,22 +111,6 @@ export function getCurrentUser(): StoredUser | null {
 
   try {
     return JSON.parse(storedUser) as StoredUser
-  } catch {
-    return null
-  }
-}
-
-export function getRegistrationProfile(): RegistrationProfile | null {
-  const currentUser = getCurrentUser()
-  const storedProfile = localStorage.getItem(PROFILE_KEY)
-
-  if (!currentUser || !storedProfile) {
-    return null
-  }
-
-  try {
-    const profile = JSON.parse(storedProfile) as RegistrationProfile
-    return profile.email === currentUser.email ? profile : null
   } catch {
     return null
   }

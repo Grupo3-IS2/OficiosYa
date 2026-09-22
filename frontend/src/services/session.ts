@@ -9,6 +9,7 @@ export function getToken(): string | null {
 export function clearSession(): void {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(PROFILE_KEY)
 }
 
 /**

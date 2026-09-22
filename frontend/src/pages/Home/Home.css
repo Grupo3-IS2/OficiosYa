@@ -79,6 +79,11 @@
 }
 
 /* Category cards reflow naturally and expand the final row. */
+.filters button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
 .category-list {
   display: flex;
   flex-wrap: wrap;

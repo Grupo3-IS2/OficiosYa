@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import Button from '../../components/Button/Button'
+import Button from '../../../components/Button/Button'
 import './UnsavedChangesModal.css'
 
 interface Props {

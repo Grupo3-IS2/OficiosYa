@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
-import type { Category } from '../../types/Category'
-import Icon from '../Icon/Icon'
+import type { Category } from '../Category'
+import Icon from '../../../components/Icon/Icon'
 import './CategoryCard.css'
 
 function CategoryCard({

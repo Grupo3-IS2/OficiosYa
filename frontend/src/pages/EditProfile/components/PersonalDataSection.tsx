@@ -1,7 +1,7 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import Button from '../../components/Button/Button'
-import avatarPlaceholder from '../../assets/avatar-placeholder.svg'
-import type { PersonalData } from './profileState'
+import Button from '../../../components/Button/Button'
+import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
+import type { PersonalData } from '../profileState'
 
 export default function PersonalDataSection({ value, onChange, onPhotoChange, onSave, message, error, emailChanged, currentPassword, onCurrentPasswordChange, showPhone }: {
     value: PersonalData; onChange: Dispatch<SetStateAction<PersonalData>>; onPhotoChange: (file: File) => void; onSave: () => Promise<boolean>; message?: string; error?: string

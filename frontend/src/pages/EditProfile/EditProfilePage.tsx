@@ -1,9 +1,9 @@
 import Icon from '../../components/Icon/Icon'
-import PersonalDataSection from './PersonalDataSection'
-import SecuritySection from './SecuritySection'
-import ProfessionalProfileSection from './ProfessionalProfileSection'
-import BecomeProfessionalCard from './BecomeProfessionalCard'
-import UnsavedChangesModal from './UnsavedChangesModal'
+import PersonalDataSection from './components/PersonalDataSection'
+import SecuritySection from './components/SecuritySection'
+import ProfessionalProfileSection from './components/ProfessionalProfileSection'
+import BecomeProfessionalCard from './components/BecomeProfessionalCard'
+import UnsavedChangesModal from './components/UnsavedChangesModal'
 import useProfileEditor from './useProfileEditor'
 import useUnsavedNavigation from './useUnsavedNavigation'
 import './EditProfile.css'
@@ -28,11 +28,11 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                     <p>Actualiza tus datos personales y la información de tu cuenta.</p>
                 </div>
                 {editor.error && !editor.errorSection && !navigation.isOpen && <p className="profile-error profile-page-error" role="alert">{editor.error}</p>}
-                <fieldset className="profile-editor-fields" disabled={editor.busy} aria-busy={editor.busy}>
+                <fieldset className="profile-editor-fields" disabled={editor.busy || editor.loadingProfile || editor.profileLoadFailed} aria-busy={editor.busy || editor.loadingProfile}>
                     <PersonalDataSection value={editor.personal} onChange={editor.setPersonal} onPhotoChange={editor.selectPhoto} onSave={() => editor.saveSection('personal')} message={editor.messages.personal} error={editor.errorSection === 'personal' ? editor.error : ''} emailChanged={editor.personal.email.trim() !== editor.savedPersonalEmail} currentPassword={editor.emailPassword} onCurrentPasswordChange={editor.setEmailPassword} showPhone={editor.isProfessional} />
                     <SecuritySection value={editor.security} onChange={editor.setSecurity} onSave={() => editor.saveSection('security')} message={editor.messages.security} error={editor.errorSection === 'security' ? editor.error : ''} />
                     {editor.isProfessional
-                        ? <ProfessionalProfileSection value={editor.professional} onChange={editor.setProfessional} onSave={() => editor.saveSection('professional')} message={editor.messages.professional} />
+                        ? <ProfessionalProfileSection value={editor.professional} onChange={editor.setProfessional} onSave={() => editor.saveSection('professional')} message={editor.messages.professional} error={editor.errorSection === 'professional' ? editor.error : ''} trades={editor.trades} tradesLoading={editor.tradesLoading} tradesError={editor.tradesError} />
                         : <BecomeProfessionalCard />}
                 </fieldset>
             </main>

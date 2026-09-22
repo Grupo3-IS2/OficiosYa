@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import Button from '../../components/Button/Button'
-import professionalIllustration from '../../assets/become-professional.png'
+import Button from '../../../components/Button/Button'
+import professionalIllustration from '../../../assets/become-professional.png'
 
 export default function BecomeProfessionalCard() {
     const [message, setMessage] = useState('')

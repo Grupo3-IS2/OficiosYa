@@ -1,4 +1,5 @@
 import { apiRequest } from './api'
+import type { ExpertiseTrade, Trade } from '../types/Professional'
 
 export interface UserResponse {
   id: string
@@ -13,6 +14,9 @@ export interface ProfessionalResponse extends UserResponse {
   role: 'PROFESSIONAL'
   phoneNumber: string
   workingLocation: string
+  description: string | null
+  published: boolean
+  expertiseTrades: ExpertiseTrade[]
 }
 
 export type AuthenticatedUserResponse = UserResponse | ProfessionalResponse
@@ -32,6 +36,7 @@ export type ClientUpdateRequest = UserUpdateRequest
 export interface ProfessionalUpdateRequest extends UserUpdateRequest {
   phoneNumber?: string
   workingLocation?: string
+  description?: string
 }
 
 export interface PasswordUpdateRequest {
@@ -87,6 +92,29 @@ export function updateProfessional(
   return apiRequest<ProfessionalResponse>(`/professional/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(request),
+  })
+}
+
+export function getTrades(): Promise<Trade[]> {
+  return apiRequest<Trade[]>('/trade')
+}
+
+export function addExpertiseTrade(id: string, tradeId: number, minimumHourlyWage: number, maximumHourlyWage: number): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>(`/professional/${encodeURIComponent(id)}/expertise-trade`, {
+    method: 'POST',
+    body: JSON.stringify({ tradeId, minimumHourlyWage, maximumHourlyWage }),
+  })
+}
+
+export function removeExpertiseTrade(id: string, expertiseTradeId: number): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>(`/professional/${encodeURIComponent(id)}/expertise-trade/${expertiseTradeId}`, {
+    method: 'DELETE',
+  })
+}
+
+export function setProfessionalPublished(id: string, published: boolean): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>(`/professional/${encodeURIComponent(id)}/${published ? 'publish' : 'unpublish'}`, {
+    method: 'POST',
   })
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import Button from '../../components/Button/Button'
-import Icon from '../../components/Icon/Icon'
-import type { SecurityData } from './profileState'
+import Button from '../../../components/Button/Button'
+import Icon from '../../../components/Icon/Icon'
+import type { SecurityData } from '../profileState'
 
 function PasswordField({ id, label, value, onChange, current = false }: {
     id: string; label: string; value: string; onChange: (value: string) => void; current?: boolean

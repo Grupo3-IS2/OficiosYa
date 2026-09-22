@@ -18,3 +18,9 @@
   color: #536174;
   font-size: 14px;
 }
+
+.rating--empty, .rating--empty .icon {
+  color: #7b8797;
+  fill: none;
+  stroke: #7b8797;
+}

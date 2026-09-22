@@ -5,7 +5,7 @@ import {
     useState,
 } from 'react'
 import { createPortal } from 'react-dom'
-import Icon from '../Icon/Icon'
+import Icon from '../../Icon/Icon'
 import './ProfileMenu.css'
 
 interface ProfileMenuProps {

@@ -31,8 +31,9 @@ npm run preview  # Preview the production build locally
 
 ## Project structure
 
-- `src/components/`: reusable UI components and their styles.
-- `src/pages/`: page-level views and page-specific styles.
+- `src/components/`: UI shared across pages and its styles. Components used only by another shared component stay inside that component's folder.
+- `src/pages/<Page>/`: the page view, its styles, state and page-specific helpers.
+- `src/pages/<Page>/components/`: UI used only by that page. Component-specific styles sit beside the component; shared page styles remain in the page stylesheet.
 - `src/services/`: HTTP clients and backend integrations.
 - `src/types/`: shared TypeScript domain and API types.
 - `src/assets/`: static assets imported by the application.

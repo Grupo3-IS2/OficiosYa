@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import Button from '../Button/Button'
-import Icon from '../Icon/Icon'
+import Button from '../../../components/Button/Button'
+import Icon from '../../../components/Icon/Icon'
 import './SearchBar.css'
 
 function SearchBar() {

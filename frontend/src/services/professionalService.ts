@@ -3,9 +3,20 @@ import { apiRequest } from './api'
 
 interface ProfessionalPage {
     content: Professional[]
+    totalPages: number
 }
 
 export async function getProfessionals(): Promise<Professional[]> {
-    const page = await apiRequest<ProfessionalPage>('/professional/search?size=20')
-    return page.content
+    const professionals: Professional[] = []
+    let pageNumber = 0
+    let totalPages: number
+
+    do {
+        const page = await apiRequest<ProfessionalPage>(`/professional/search?page=${pageNumber}&size=20`)
+        professionals.push(...page.content)
+        totalPages = page.totalPages
+        pageNumber++
+    } while (pageNumber < totalPages)
+
+    return professionals
 }

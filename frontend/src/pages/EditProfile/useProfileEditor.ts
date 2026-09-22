@@ -23,9 +23,10 @@ function professionalDataFrom(response: ProfessionalResponse): ProfessionalData 
 }
 
 export default function useProfileEditor(professionalOverride?: boolean) {
-    const [user] = useState(getCurrentUser)
+    const [user, setUser] = useState(getCurrentUser)
     const [isProfessional, setIsProfessional] = useState(() => professionalOverride ?? user?.role === 'PROFESSIONAL')
-    const [loadingProfile, setLoadingProfile] = useState(Boolean(user) && professionalOverride === undefined)
+    const [loadingProfile, setLoadingProfile] = useState(professionalOverride === undefined)
+    const [profileLoadFailed, setProfileLoadFailed] = useState(false)
     // Sesiones abiertas antes de que se guardara el publicId lo recuperan de /user/me.
     const [userId, setUserId] = useState(() => user?.id ?? '')
     const [savedPersonal, setSavedPersonal] = useState<PersonalData>(() => {
@@ -68,7 +69,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     }, [])
 
     useEffect(() => {
-        if (!user || professionalOverride !== undefined) return
+        if (professionalOverride !== undefined) return
         let active = true
         void getAuthenticatedUser().then(response => {
             if (!active) return
@@ -77,6 +78,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             const phone = isProfessionalResponse(response) ? response.phoneNumber : null
             setIsProfessional(response.role === 'PROFESSIONAL')
             setUserId(response.id)
+            setUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             updateStoredUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar }))
             setPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar: photoPreview.current ? previous.avatar : avatar }))
@@ -86,12 +88,15 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 setProfessional(professionalData)
             }
         }).catch(() => {
-            if (active) setError('No pudimos cargar tu perfil. Intentá nuevamente más tarde.')
+            if (active) {
+                setProfileLoadFailed(true)
+                setError('No pudimos cargar tu perfil. Intentá nuevamente más tarde.')
+            }
         }).finally(() => {
             if (active) setLoadingProfile(false)
         })
         return () => { active = false }
-    }, [professionalOverride, user])
+    }, [professionalOverride])
 
     useEffect(() => {
         if (!isProfessional) return
@@ -294,7 +299,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
 
     return {
         user, isProfessional, personal, setPersonal, selectPhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
-        busy, loadingProfile, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
+        busy, loadingProfile, profileLoadFailed, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),
         clearError: () => { setError(''); setErrorSection('') },

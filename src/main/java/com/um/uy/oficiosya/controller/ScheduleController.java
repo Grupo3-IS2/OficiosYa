@@ -6,6 +6,7 @@ import com.um.uy.oficiosya.dto.request.ScheduleCreateRequest;
 import com.um.uy.oficiosya.dto.response.ScheduleResponse;
 import com.um.uy.oficiosya.dto.update.ScheduleUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.ScheduleService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -18,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/schedule")
+@RequestMapping("/api/v1/schedules")
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
@@ -35,7 +36,7 @@ public class ScheduleController {
         return new ResponseEntity<>(schedule, HttpStatus.CREATED);
     }
 
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     public ResponseEntity<ScheduleResponse> updateSchedule(@Valid @RequestBody ScheduleUpdateRequest scheduleRequest,
                                                             @PathVariable Long id,
                                                             Authentication authentication) {
@@ -49,9 +50,11 @@ public class ScheduleController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/professional/{professionalId}")
+    /** Public agenda of a professional. The owner and admins also see which job each block belongs to. */
+    @SecurityRequirements
+    @GetMapping
     public ResponseEntity<List<ScheduleResponse>> getAgenda(
-            @PathVariable UUID professionalId,
+            @RequestParam UUID professionalId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             Authentication authentication) {

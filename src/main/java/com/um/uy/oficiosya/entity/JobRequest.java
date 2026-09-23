@@ -64,7 +64,6 @@ public class JobRequest {
     @Column(nullable = false, length = 32)
     private JobStatus status = JobStatus.PROPOSED;
 
-    /** Review left by the client once the job is COMPLETED. */
     @Min(1)
     @Max(10)
     private Integer rating;

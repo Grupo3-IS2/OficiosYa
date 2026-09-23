@@ -12,6 +12,4 @@ public class TaskResponse {
     private Long tradeId;
     private String tradeName;
     private String description;
-    private Integer reviewRating;
-    private String review;
 }

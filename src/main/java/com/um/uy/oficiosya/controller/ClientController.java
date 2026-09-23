@@ -11,7 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/client")
+@RequestMapping("/api/v1/clients")
 public class ClientController {
 
     private final ClientService clientService;
@@ -21,7 +21,7 @@ public class ClientController {
     }
 
     @PreAuthorize("hasRole('CLIENT')")
-    @PutMapping("/me")
+    @PatchMapping("/me")
     public ResponseEntity<UserResponse> updateClient(@Valid @RequestBody ClientUpdateRequest clientRequest,
                                                      Authentication authentication) {
         UserResponse client = clientService.updateClient(clientRequest, AuthenticatedUser.id(authentication));

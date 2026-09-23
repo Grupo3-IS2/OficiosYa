@@ -1,13 +1,15 @@
 package com.um.uy.oficiosya.controller;
 
-import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.config.AuthenticatedUser;
-import com.um.uy.oficiosya.config.ViewerAccess;
+import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
+import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -22,7 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/professional")
+@RequestMapping("/api/v1/professionals")
 public class ProfessionalController {
 
     private final ProfessionalService professionalService;
@@ -31,23 +33,25 @@ public class ProfessionalController {
         this.professionalService = professionalService;
     }
 
+    /** The caller's full profile, contact data included and whether published or not. */
     @PreAuthorize("hasRole('PROFESSIONAL')")
-    @PutMapping("/me")
+    @GetMapping("/me")
+    public ResponseEntity<ProfessionalResponse> getMyProfile(Authentication authentication) {
+        return ResponseEntity.ok(professionalService.getProfessional(AuthenticatedUser.id(authentication)));
+    }
+
+    @PreAuthorize("hasRole('PROFESSIONAL')")
+    @PatchMapping("/me")
     public ResponseEntity<ProfessionalResponse> updateProfessional(@Valid @RequestBody ProfessionalUpdateRequest professionalRequest,
                                                                    Authentication authentication) {
         ProfessionalResponse professional = professionalService.updateProfessional(professionalRequest, AuthenticatedUser.id(authentication));
         return ResponseEntity.ok(professional);
     }
 
-    /**
-     * Public. The owner and admins get the full profile (email and phone included, published or
-     * not); everyone else gets the public view, and only if the professional is published.
-     */
+    /** Public view, without email or phone; not found unless the professional is published. */
+    @SecurityRequirements
     @GetMapping("/{id}")
-    public ResponseEntity<?> getProfessional(@PathVariable UUID id, Authentication authentication) {
-        if (ViewerAccess.isOwnerOrAdmin(authentication, id)) {
-            return ResponseEntity.ok(professionalService.getProfessional(id));
-        }
+    public ResponseEntity<ProfessionalPublicResponse> getProfessional(@PathVariable UUID id) {
         return ResponseEntity.ok(professionalService.getPublicProfessional(id));
     }
 
@@ -56,6 +60,7 @@ public class ProfessionalController {
      * and maxPrice are matched against the same offered trade. Paginated:
      * ?page=&size=&sort=field,asc|desc.
      */
+    @SecurityRequirements
     @GetMapping("/search")
     public ResponseEntity<Page<ProfessionalPublicResponse>> searchProfessionals(
             @RequestParam(required = false) List<Long> tradeIds,
@@ -64,7 +69,7 @@ public class ProfessionalController {
             @RequestParam(required = false) Double minRating,
             @RequestParam(required = false) String location,
             @RequestParam(required = false) String query,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(
                 professionalService.searchProfessionals(tradeIds, minPrice, maxPrice, minRating, location, query, pageable));
     }
@@ -85,14 +90,23 @@ public class ProfessionalController {
 
     /** Declares a trade the professional offers and at what hourly rate. */
     @PreAuthorize("hasRole('PROFESSIONAL')")
-    @PostMapping("/me/expertise-trade")
+    @PostMapping("/me/expertise-trades")
     public ResponseEntity<ProfessionalResponse> addExpertiseTrade(@Valid @RequestBody ExpertiseTradeCreateRequest request,
                                                                     Authentication authentication) {
         return new ResponseEntity<>(professionalService.addExpertiseTrade(AuthenticatedUser.id(authentication), request), HttpStatus.CREATED);
     }
 
+    /** Changes the hourly rates of a trade the professional already offers. */
     @PreAuthorize("hasRole('PROFESSIONAL')")
-    @DeleteMapping("/me/expertise-trade/{expertiseTradeId}")
+    @PatchMapping("/me/expertise-trades/{expertiseTradeId}")
+    public ResponseEntity<ProfessionalResponse> updateExpertiseTrade(@PathVariable Long expertiseTradeId,
+                                                                       @Valid @RequestBody ExpertiseTradeUpdateRequest request,
+                                                                       Authentication authentication) {
+        return ResponseEntity.ok(professionalService.updateExpertiseTrade(AuthenticatedUser.id(authentication), expertiseTradeId, request));
+    }
+
+    @PreAuthorize("hasRole('PROFESSIONAL')")
+    @DeleteMapping("/me/expertise-trades/{expertiseTradeId}")
     public ResponseEntity<ProfessionalResponse> removeExpertiseTrade(@PathVariable Long expertiseTradeId,
                                                                         Authentication authentication) {
         return ResponseEntity.ok(professionalService.removeExpertiseTrade(AuthenticatedUser.id(authentication), expertiseTradeId));

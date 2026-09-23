@@ -85,13 +85,16 @@ public class SecurityConfig {
                         // Uploaded profile images are public
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 
-                        // Professional search, public profile and agenda. The controllers decide how much
-                        // each caller sees: contact data and job details are for the owner and admins only.
+                        // The caller's own profile; listed first so the public {id} rule below doesn't match it
+                        .requestMatchers(HttpMethod.GET, "/api/v1/professionals/me").authenticated()
+
+                        // Professional search, public profile and agenda. Contact data and which job each
+                        // agenda block belongs to are for the owner and admins only.
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/api/v1/professional/search",
-                                "/api/v1/professional/{id}",
-                                "/api/v1/schedule/professional/{professionalId}"
+                                "/api/v1/professionals/search",
+                                "/api/v1/professionals/{id}",
+                                "/api/v1/schedules"
                         ).permitAll()
 
                         // Where the container forwards unhandled errors; without this an anonymous
@@ -101,7 +104,7 @@ public class SecurityConfig {
                         // Trade list
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/api/v1/trade"
+                                "/api/v1/trades"
                         ).permitAll()
 
                         .anyRequest().authenticated()

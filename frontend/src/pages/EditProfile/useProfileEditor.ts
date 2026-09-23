@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCurrentUser, isAuthenticated, updateStoredUser } from '../../services/authService'
-import { addExpertiseTrade, changeEmail, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, setProfessionalPublished, updateClient, updateProfessional, uploadProfileImage } from '../../services/userService'
+import { addExpertiseTrade, changeEmail, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, setProfessionalPublished, updateClient, updateExpertiseTrade, updateProfessional, uploadProfileImage } from '../../services/userService'
 import type { ProfessionalResponse } from '../../services/userService'
 import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
@@ -221,8 +221,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 for (const trade of professional.trades) {
                     const original = persisted.trades.find(item => item.tradeId === trade.tradeId)
                     if (original && original.id !== null && (trade.minimumHourlyWage !== original.minimumHourlyWage || trade.maximumHourlyWage !== original.maximumHourlyWage)) {
-                        record(await removeExpertiseTrade(original.id))
-                        record(await addExpertiseTrade(trade.tradeId, Number(trade.minimumHourlyWage), Number(trade.maximumHourlyWage)))
+                        record(await updateExpertiseTrade(original.id, Number(trade.minimumHourlyWage), Number(trade.maximumHourlyWage)))
                     }
                 }
                 if (professional.published && !persisted.published) {

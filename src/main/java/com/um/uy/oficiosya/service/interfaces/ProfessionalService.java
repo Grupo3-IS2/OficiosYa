@@ -4,6 +4,7 @@ import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
+import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,14 +26,12 @@ public interface ProfessionalService {
     /** Admin-only. */
     List<ProfessionalResponse> listProfessionals();
 
-    /** Admin-only: sets the professional's overall rating directly. */
-    ProfessionalResponse updateRating(UUID professionalId, Double rating);
-
     /** Requires a description and at least one offered trade already set. */
     ProfessionalResponse publishProfessional(UUID id);
     ProfessionalResponse unpublishProfessional(UUID id);
 
     ProfessionalResponse addExpertiseTrade(UUID professionalId, ExpertiseTradeCreateRequest request);
+    ProfessionalResponse updateExpertiseTrade(UUID professionalId, Long expertiseTradeId, ExpertiseTradeUpdateRequest request);
     ProfessionalResponse removeExpertiseTrade(UUID professionalId, Long expertiseTradeId);
 
     /**

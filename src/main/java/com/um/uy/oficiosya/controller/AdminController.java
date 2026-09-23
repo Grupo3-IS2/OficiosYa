@@ -6,7 +6,6 @@ import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.response.ScheduleResponse;
 import com.um.uy.oficiosya.dto.response.TradeResponse;
 import com.um.uy.oficiosya.dto.response.UserResponse;
-import com.um.uy.oficiosya.dto.update.ProfessionalRatingUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
@@ -18,15 +17,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.UUID;
 
 /** Oversight of the whole platform, plus catalog management. Every endpoint here requires the ADMIN role. */
 @RestController
@@ -70,13 +66,6 @@ public class AdminController {
     @GetMapping("/professionals")
     public ResponseEntity<List<ProfessionalResponse>> listProfessionals() {
         return ResponseEntity.ok(professionalService.listProfessionals());
-    }
-
-    @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/professionals/{id}/rating")
-    public ResponseEntity<ProfessionalResponse> updateProfessionalRating(
-            @PathVariable UUID id, @Valid @RequestBody ProfessionalRatingUpdateRequest request) {
-        return ResponseEntity.ok(professionalService.updateRating(id, request.getRating()));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

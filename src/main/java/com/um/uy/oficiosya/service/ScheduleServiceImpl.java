@@ -125,6 +125,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .build();
 
         schedule = scheduleRepository.save(schedule);
+        // Keeps the in-memory job in sync, so the accept response already carries the timeframe.
+        jobRequest.getSchedules().add(schedule);
         return scheduleMapper.toResponse(schedule);
     }
 
@@ -134,6 +136,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         List<Schedule> jobSchedules = jobRequest.getSchedules().stream()
                 .filter(schedule -> schedule.getType() == ScheduleType.SCHEDULED_JOB)
                 .toList();
+        jobRequest.getSchedules().removeAll(jobSchedules);
         scheduleRepository.deleteAll(jobSchedules);
     }
 

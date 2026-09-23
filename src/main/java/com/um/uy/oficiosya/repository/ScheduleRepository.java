@@ -14,8 +14,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     @Query("""
             SELECT s FROM Schedule s
             WHERE s.professional.publicId = :professionalPublicId
-            AND (:from IS NULL OR s.endTimestamp > :from)
-            AND (:to IS NULL OR s.startTimestamp < :to)
+            AND (CAST(:from AS LocalDateTime) IS NULL OR s.endTimestamp > :from)
+            AND (CAST(:to AS LocalDateTime) IS NULL OR s.startTimestamp < :to)
             ORDER BY s.startTimestamp ASC
             """)
     List<Schedule> findAgenda(@Param("professionalPublicId") UUID professionalPublicId,

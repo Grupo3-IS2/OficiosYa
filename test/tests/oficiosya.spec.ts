@@ -22,12 +22,12 @@ function fakeJwt(expiresInSeconds = 3600) {
  * 401 to those calls and the frontend expires the session, so UI tests with a session mock them.
  */
 async function mockHomeApi(page: Page) {
-  await page.route('**/api/v1/trade', (route) => route.fulfill({
+  await page.route('**/api/v1/trades', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: '[]'
   }));
-  await page.route('**/api/v1/professional/search**', (route) => route.fulfill({
+  await page.route('**/api/v1/professionals/search**', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({ content: [], totalPages: 0 })
@@ -45,7 +45,7 @@ async function mockVerifiedSession(page: Page, user: { name: string; email: stri
       expirationDate: new Date(Date.now() + 3600_000).toISOString()
     })
   }));
-  await page.route('**/api/v1/user/me', (route) => route.fulfill({
+  await page.route('**/api/v1/users/me', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({
@@ -88,7 +88,7 @@ async function login(request: APIRequestContext, payload: { email: string; passw
 }
 
 async function getAuthenticatedUser(request: APIRequestContext, token: string) {
-  return request.get(`${API_BASE}/api/v1/user/me`, {
+  return request.get(`${API_BASE}/api/v1/users/me`, {
     headers: {
       Authorization: `Bearer ${token}`
     }
@@ -519,7 +519,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     });
     expect(logoutResponse.status()).toBe(200);
 
-    const profileResponse = await request.get(`${API_BASE}/api/v1/user/me`, {
+    const profileResponse = await request.get(`${API_BASE}/api/v1/users/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       }
@@ -564,7 +564,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('API: acceso directo a rutas protegidas sin token devuelve 401', async ({ request }) => {
-    const response = await request.get(`${API_BASE}/api/v1/user/me`);
+    const response = await request.get(`${API_BASE}/api/v1/users/me`);
     expect(response.status()).toBe(401);
   });
 
@@ -579,7 +579,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(clientCreated.status()).toBe(200);
     const clientAuth = await clientCreated.json();
 
-    const forbidden = await request.put(`${API_BASE}/api/v1/professional/me`, {
+    const forbidden = await request.patch(`${API_BASE}/api/v1/professionals/me`, {
       headers: {
         Authorization: `Bearer ${clientAuth.token}`
       },
@@ -668,7 +668,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const token = createdBody.token;
-    const updated = await request.put(`${API_BASE}/api/v1/client/me`, {
+    const updated = await request.patch(`${API_BASE}/api/v1/clients/me`, {
       headers: {
         Authorization: `Bearer ${token}`
       },
@@ -693,7 +693,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -719,7 +719,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -746,7 +746,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -771,7 +771,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -798,7 +798,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -834,7 +834,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(secondCreated.status()).toBe(200);
     const secondAuth = await secondCreated.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${secondAuth.token}`
       },
@@ -850,7 +850,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('API: perfil sin autenticación devuelve 401 al intentar actualizar', async ({ request }) => {
-    const response = await request.put(`${API_BASE}/api/v1/client/00000000-0000-0000-0000-000000000001`, {
+    const response = await request.patch(`${API_BASE}/api/v1/clients/me`, {
       data: {
         name: 'Cliente no autenticado'
       }
@@ -870,7 +870,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -895,7 +895,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.post(`${API_BASE}/api/v1/user/me/profile-image`, {
+    const response = await request.post(`${API_BASE}/api/v1/users/me/profile-image`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -924,7 +924,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.post(`${API_BASE}/api/v1/user/me/profile-image`, {
+    const response = await request.post(`${API_BASE}/api/v1/users/me/profile-image`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -954,7 +954,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const hugeBuffer = Buffer.alloc(6 * 1024 * 1024, 0x41);
-    const response = await request.post(`${API_BASE}/api/v1/user/me/profile-image`, {
+    const response = await request.post(`${API_BASE}/api/v1/users/me/profile-image`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -1002,7 +1002,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const token = createdBody.token;
-    const updated = await request.put(`${API_BASE}/api/v1/professional/me`, {
+    const updated = await request.patch(`${API_BASE}/api/v1/professionals/me`, {
       headers: {
         Authorization: `Bearer ${token}`
       },
@@ -1066,7 +1066,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(secondCreated.status()).toBe(200);
     const secondAuth = await secondCreated.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${secondAuth.token}`
       },
@@ -1128,7 +1128,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const auth = await created.json();
 
-    const updated = await request.put(`${API_BASE}/api/v1/client/me`, {
+    const updated = await request.patch(`${API_BASE}/api/v1/clients/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1158,7 +1158,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const auth = await created.json();
 
-    const changePassword = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const changePassword = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1217,7 +1217,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const auth = await created.json();
     const newEmail = `maria.ñandú.${Date.now()}@qa.test`;
 
-    const emailUpdate = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const emailUpdate = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1231,7 +1231,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const emailBody = await emailUpdate.json();
     expect(emailBody.email).toBe(newEmail);
 
-    const nameUpdate = await request.put(`${API_BASE}/api/v1/client/me`, {
+    const nameUpdate = await request.patch(`${API_BASE}/api/v1/clients/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1283,7 +1283,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('API: perfil requiere autenticación', async ({ request }) => {
-    const response = await request.get(`${API_BASE}/api/v1/user/me`);
+    const response = await request.get(`${API_BASE}/api/v1/users/me`);
     expect(response.status()).toBe(401);
   });
 
@@ -1299,7 +1299,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const newEmail = uniqueEmail('cliente.email.nuevo');
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -1332,7 +1332,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     });
     expect(logoutResponse.status()).toBe(200);
 
-    const profileResponse = await request.get(`${API_BASE}/api/v1/user/me`, {
+    const profileResponse = await request.get(`${API_BASE}/api/v1/users/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       }
@@ -1562,7 +1562,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
   test('UI: un 401 de la API durante la sesión la cierra y redirige al login', async ({ page }) => {
     await mockVerifiedSession(page, { name: 'Usuario Sesión', email: 'sesion.ui@qa.test' });
-    await page.route('**/api/v1/user/me', (route) => route.fulfill({
+    await page.route('**/api/v1/users/me', (route) => route.fulfill({
       status: 401,
       contentType: 'application/json',
       body: JSON.stringify({ error: 'El token de autenticación es inválido o expiró' })

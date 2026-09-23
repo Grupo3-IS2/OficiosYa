@@ -46,7 +46,7 @@ public class Professional extends User {
     @OneToMany(mappedBy = "professional", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ExpertiseTrade> expertiseTrades = new ArrayList<>();
 
-    @Min(0)
+    @Min(1)
     @Max(10)
     private Double rating;
 

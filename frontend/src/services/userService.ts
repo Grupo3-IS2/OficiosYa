@@ -51,18 +51,18 @@ export interface EmailUpdateRequest {
 }
 
 export function getAuthenticatedUser(): Promise<AuthenticatedUserResponse> {
-  return apiRequest<AuthenticatedUserResponse>('/user/me')
+  return apiRequest<AuthenticatedUserResponse>('/users/me')
 }
 
 export function changeEmail(request: EmailUpdateRequest): Promise<AuthenticatedUserResponse> {
-  return apiRequest<AuthenticatedUserResponse>('/user/me/email', {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/email', {
     method: 'PUT',
     body: JSON.stringify(request),
   })
 }
 
 export async function changePassword(request: PasswordUpdateRequest): Promise<void> {
-  await apiRequest<void>('/user/me/password', {
+  await apiRequest<void>('/users/me/password', {
     method: 'PUT',
     body: JSON.stringify(request),
   })
@@ -72,51 +72,58 @@ export function uploadProfileImage(image: File): Promise<AuthenticatedUserRespon
   const body = new FormData()
   body.append('file', image)
 
-  return apiRequest<AuthenticatedUserResponse>('/user/me/profile-image', {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/profile-image', {
     method: 'POST',
     body,
   })
 }
 
 export function updateClient(request: ClientUpdateRequest): Promise<UserResponse> {
-  return apiRequest<UserResponse>('/client/me', {
-    method: 'PUT',
+  return apiRequest<UserResponse>('/clients/me', {
+    method: 'PATCH',
     body: JSON.stringify(request),
   })
 }
 
 export function updateProfessional(request: ProfessionalUpdateRequest): Promise<ProfessionalResponse> {
-  return apiRequest<ProfessionalResponse>('/professional/me', {
-    method: 'PUT',
+  return apiRequest<ProfessionalResponse>('/professionals/me', {
+    method: 'PATCH',
     body: JSON.stringify(request),
   })
 }
 
 export function getTrades(): Promise<Trade[]> {
-  return apiRequest<Trade[]>('/trade')
+  return apiRequest<Trade[]>('/trades')
 }
 
 export function addExpertiseTrade(tradeId: number, minimumHourlyWage: number, maximumHourlyWage: number): Promise<ProfessionalResponse> {
-  return apiRequest<ProfessionalResponse>('/professional/me/expertise-trade', {
+  return apiRequest<ProfessionalResponse>('/professionals/me/expertise-trades', {
     method: 'POST',
     body: JSON.stringify({ tradeId, minimumHourlyWage, maximumHourlyWage }),
   })
 }
 
+export function updateExpertiseTrade(expertiseTradeId: number, minimumHourlyWage: number, maximumHourlyWage: number): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>(`/professionals/me/expertise-trades/${expertiseTradeId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ minimumHourlyWage, maximumHourlyWage }),
+  })
+}
+
 export function removeExpertiseTrade(expertiseTradeId: number): Promise<ProfessionalResponse> {
-  return apiRequest<ProfessionalResponse>(`/professional/me/expertise-trade/${expertiseTradeId}`, {
+  return apiRequest<ProfessionalResponse>(`/professionals/me/expertise-trades/${expertiseTradeId}`, {
     method: 'DELETE',
   })
 }
 
 export function setProfessionalPublished(published: boolean): Promise<ProfessionalResponse> {
-  return apiRequest<ProfessionalResponse>(`/professional/me/${published ? 'publish' : 'unpublish'}`, {
+  return apiRequest<ProfessionalResponse>(`/professionals/me/${published ? 'publish' : 'unpublish'}`, {
     method: 'POST',
   })
 }
 
 export async function deleteUser(): Promise<void> {
-  await apiRequest<void>('/user/me', {
+  await apiRequest<void>('/users/me', {
     method: 'DELETE',
   })
 }

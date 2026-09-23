@@ -12,7 +12,7 @@ export async function getProfessionals(): Promise<Professional[]> {
     let totalPages: number
 
     do {
-        const page = await apiRequest<ProfessionalPage>(`/professional/search?page=${pageNumber}&size=20`)
+        const page = await apiRequest<ProfessionalPage>(`/professionals/search?page=${pageNumber}&size=20`)
         professionals.push(...page.content)
         totalPages = page.totalPages
         pageNumber++

@@ -6,7 +6,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class JobRequestConfirmRequest {
+public class JobRequestCompleteRequest {
     @NotBlank(message = "El PIN es obligatorio")
     private String pin;
 }

@@ -1,8 +1,9 @@
 package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.dto.request.JobRequestAcceptRequest;
-import com.um.uy.oficiosya.dto.request.JobRequestConfirmRequest;
+import com.um.uy.oficiosya.dto.request.JobRequestCompleteRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCreateRequest;
+import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.request.TaskCreateRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.entity.Client;
@@ -159,12 +160,12 @@ public class JobRequestServiceImpl implements JobRequestService {
 
     @Override
     @Transactional
-    public JobRequestResponse confirmJobRequest(Long id, JobRequestConfirmRequest request, UUID professionalId) {
-        JobRequest jobRequest = findOwnedByProfessional(id, professionalId, "confirmar");
+    public JobRequestResponse completeJobRequest(Long id, JobRequestCompleteRequest request, UUID professionalId) {
+        JobRequest jobRequest = findOwnedByProfessional(id, professionalId, "completar");
 
         if (jobRequest.getStatus() != JobStatus.ACCEPTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Solo se puede confirmar un trabajo en estado ACCEPTED");
+                    "Solo se puede completar un trabajo en estado ACCEPTED");
         }
 
         if (!passwordEncoder.matches(request.getPin(), jobRequest.getConfirmationPinHash())) {
@@ -173,6 +174,37 @@ public class JobRequestServiceImpl implements JobRequestService {
 
         jobRequest.setStatus(JobStatus.COMPLETED);
         jobRequest = jobRequestRepository.save(jobRequest);
+        return jobRequestMapper.toResponse(jobRequest);
+    }
+
+    @Override
+    @Transactional
+    public JobRequestResponse reviewJobRequest(Long id, JobRequestReviewRequest request, UUID clientId) {
+        JobRequest jobRequest = jobRequestRepository.findById(id)
+                .orElseThrow(() -> new JobRequestNotFoundException("Trabajo no encontrado."));
+
+        if (!jobRequest.getClient().getPublicId().equals(clientId)) {
+            throw new AccessDeniedException("No tenés permiso para calificar este trabajo");
+        }
+
+        if (jobRequest.getStatus() != JobStatus.COMPLETED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Solo se puede calificar un trabajo en estado COMPLETED");
+        }
+
+        if (jobRequest.getRating() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya calificaste este trabajo");
+        }
+
+        jobRequest.setRating(request.getRating());
+        jobRequest.setReview(request.getReview() == null || request.getReview().isBlank()
+                ? null : request.getReview().trim());
+        jobRequest = jobRequestRepository.saveAndFlush(jobRequest);
+
+        Professional professional = jobRequest.getProfessional();
+        professional.setRating(jobRequestRepository.averageRatingOf(professional.getPublicId()));
+        professionalRepository.save(professional);
+
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -191,16 +223,8 @@ public class JobRequestServiceImpl implements JobRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<JobRequestResponse> getJobRequestsAsClient(UUID clientId) {
-        return jobRequestRepository.findByClient_PublicIdOrderByCreatedAtDesc(clientId).stream()
-                .map(jobRequestMapper::toResponse)
-                .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<JobRequestResponse> getJobRequestsAsProfessional(UUID professionalId) {
-        return jobRequestRepository.findByProfessional_PublicIdOrderByCreatedAtDesc(professionalId).stream()
+    public List<JobRequestResponse> getMyJobRequests(UUID userId) {
+        return jobRequestRepository.findByParticipant(userId).stream()
                 .map(jobRequestMapper::toResponse)
                 .toList();
     }

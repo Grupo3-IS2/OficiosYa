@@ -2,6 +2,7 @@ package com.um.uy.oficiosya.dto.response;
 
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.PaymentState;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -23,6 +24,13 @@ public class JobRequestResponse {
     private PaymentState paymentState;
     private JobStatus status;
     private List<TaskResponse> tasks;
+
+    /** The timeframe the professional agreed to when accepting; null while PROPOSED, REJECTED or CANCELLED. */
+    private LocalDateTime scheduledStart;
+    private LocalDateTime scheduledEnd;
+
+    /** The client's review, left once the job is COMPLETED; null until then. */
+    @Schema(minimum = "1", maximum = "10")
     private Integer rating;
     private String review;
     private LocalDateTime createdAt;

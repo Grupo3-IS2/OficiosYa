@@ -1,8 +1,6 @@
 package com.um.uy.oficiosya.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
@@ -29,11 +27,4 @@ public class Task {
     @NotBlank
     @Column(nullable = false)
     private String description;
-
-    @Min(0)
-    @Max(10)
-    private Integer reviewRating;
-
-    @Column(length = 1000)
-    private String review;
 }

@@ -4,6 +4,7 @@ import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
+import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.entity.ExpertiseTrade;
 import com.um.uy.oficiosya.entity.Professional;
@@ -96,6 +97,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ProfessionalResponse getProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
                 .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
@@ -125,17 +127,6 @@ public class ProfessionalServiceImpl implements ProfessionalService {
         return professionalRepository.findAll().stream()
                 .map(professionalMapper::toResponse)
                 .toList();
-    }
-
-    @Override
-    @Transactional
-    public ProfessionalResponse updateRating(UUID professionalId, Double rating) {
-        Professional professional = professionalRepository.findByPublicId(professionalId)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
-
-        professional.setRating(rating);
-        professional = professionalRepository.save(professional);
-        return professionalMapper.toResponse(professional);
     }
 
     @Override
@@ -199,6 +190,31 @@ public class ProfessionalServiceImpl implements ProfessionalService {
         professional.getExpertiseTrades().add(expertiseTrade);
 
         return professionalMapper.toResponse(professional);
+    }
+
+    @Override
+    @Transactional
+    public ProfessionalResponse updateExpertiseTrade(UUID professionalId, Long expertiseTradeId,
+                                                     ExpertiseTradeUpdateRequest request) {
+        ExpertiseTrade expertiseTrade = expertiseTradeRepository
+                .findByIdAndProfessional_PublicId(expertiseTradeId, professionalId)
+                .orElseThrow(() -> new ExpertiseTradeNotFoundException("No tenés ese oficio en tu perfil."));
+
+        BigDecimal minimum = request.getMinimumHourlyWage() != null
+                ? request.getMinimumHourlyWage() : expertiseTrade.getMinimumHourlyWage();
+        BigDecimal maximum = request.getMaximumHourlyWage() != null
+                ? request.getMaximumHourlyWage() : expertiseTrade.getMaximumHourlyWage();
+
+        if (minimum.compareTo(maximum) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La tarifa mínima no puede ser mayor a la máxima");
+        }
+
+        expertiseTrade.setMinimumHourlyWage(minimum);
+        expertiseTrade.setMaximumHourlyWage(maximum);
+        expertiseTradeRepository.save(expertiseTrade);
+
+        return professionalMapper.toResponse(expertiseTrade.getProfessional());
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.controller;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import com.um.uy.oficiosya.dto.request.LoginRequest;
 import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /** Every auth endpoint is public **/
+@SecurityRequirements
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {

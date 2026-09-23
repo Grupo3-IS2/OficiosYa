@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/** Partial update (PATCH): a null field keeps its current value. */
 @Data
 @NoArgsConstructor
 public class ScheduleUpdateRequest {

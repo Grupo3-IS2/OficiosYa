@@ -78,18 +78,15 @@ export function uploadProfileImage(image: File): Promise<AuthenticatedUserRespon
   })
 }
 
-export function updateClient(id: string, request: ClientUpdateRequest): Promise<UserResponse> {
-  return apiRequest<UserResponse>(`/client/${encodeURIComponent(id)}`, {
+export function updateClient(request: ClientUpdateRequest): Promise<UserResponse> {
+  return apiRequest<UserResponse>('/client/me', {
     method: 'PUT',
     body: JSON.stringify(request),
   })
 }
 
-export function updateProfessional(
-  id: string,
-  request: ProfessionalUpdateRequest,
-): Promise<ProfessionalResponse> {
-  return apiRequest<ProfessionalResponse>(`/professional/${encodeURIComponent(id)}`, {
+export function updateProfessional(request: ProfessionalUpdateRequest): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>('/professional/me', {
     method: 'PUT',
     body: JSON.stringify(request),
   })
@@ -99,27 +96,27 @@ export function getTrades(): Promise<Trade[]> {
   return apiRequest<Trade[]>('/trade')
 }
 
-export function addExpertiseTrade(id: string, tradeId: number, minimumHourlyWage: number, maximumHourlyWage: number): Promise<ProfessionalResponse> {
-  return apiRequest<ProfessionalResponse>(`/professional/${encodeURIComponent(id)}/expertise-trade`, {
+export function addExpertiseTrade(tradeId: number, minimumHourlyWage: number, maximumHourlyWage: number): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>('/professional/me/expertise-trade', {
     method: 'POST',
     body: JSON.stringify({ tradeId, minimumHourlyWage, maximumHourlyWage }),
   })
 }
 
-export function removeExpertiseTrade(id: string, expertiseTradeId: number): Promise<ProfessionalResponse> {
-  return apiRequest<ProfessionalResponse>(`/professional/${encodeURIComponent(id)}/expertise-trade/${expertiseTradeId}`, {
+export function removeExpertiseTrade(expertiseTradeId: number): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>(`/professional/me/expertise-trade/${expertiseTradeId}`, {
     method: 'DELETE',
   })
 }
 
-export function setProfessionalPublished(id: string, published: boolean): Promise<ProfessionalResponse> {
-  return apiRequest<ProfessionalResponse>(`/professional/${encodeURIComponent(id)}/${published ? 'publish' : 'unpublish'}`, {
+export function setProfessionalPublished(published: boolean): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>(`/professional/me/${published ? 'publish' : 'unpublish'}`, {
     method: 'POST',
   })
 }
 
-export async function deleteUser(id: string): Promise<void> {
-  await apiRequest<void>(`/user/${encodeURIComponent(id)}`, {
+export async function deleteUser(): Promise<void> {
+  await apiRequest<void>('/user/me', {
     method: 'DELETE',
   })
 }

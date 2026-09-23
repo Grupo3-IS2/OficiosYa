@@ -85,13 +85,6 @@ public class SecurityConfig {
                         // Uploaded profile images are public
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 
-                        // Signing up cannot require an account
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/client/create",
-                                "/api/v1/professional/create"
-                        ).permitAll()
-
                         // Professional search, public profile and agenda. The controllers decide how much
                         // each caller sees: contact data and job details are for the owner and admins only.
                         .requestMatchers(

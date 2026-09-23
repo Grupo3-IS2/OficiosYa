@@ -27,8 +27,6 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [isProfessional, setIsProfessional] = useState(() => professionalOverride ?? user?.role === 'PROFESSIONAL')
     const [loadingProfile, setLoadingProfile] = useState(professionalOverride === undefined)
     const [profileLoadFailed, setProfileLoadFailed] = useState(false)
-    // Sesiones abiertas antes de que se guardara el publicId lo recuperan de /user/me.
-    const [userId, setUserId] = useState(() => user?.id ?? '')
     const [savedPersonal, setSavedPersonal] = useState<PersonalData>(() => {
         return {
             name: user?.name ?? '',
@@ -77,7 +75,6 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             // Sólo el profesional tiene teléfono en el servidor; el del cliente sigue siendo local.
             const phone = isProfessionalResponse(response) ? response.phoneNumber : null
             setIsProfessional(response.role === 'PROFESSIONAL')
-            setUserId(response.id)
             setUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             updateStoredUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar }))
@@ -195,7 +192,6 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             }
             if (sections.includes('professional') && dirty.professional) {
                 if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tu perfil profesional.')
-                if (!userId) throw new Error('No pudimos identificar tu cuenta. Vuelve a iniciar sesión.')
                 let persisted = savedProfessional
                 const record = (response: ProfessionalResponse) => {
                     persisted = professionalDataFrom(response)
@@ -208,29 +204,29 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                             || original.maximumHourlyWage !== trade.maximumHourlyWage
                     })
                 if (persisted.published && (!professional.published || tradesChanged)) {
-                    record(await setProfessionalPublished(userId, false))
+                    record(await setProfessionalPublished(false))
                 }
                 if (professional.description.trim() !== persisted.description || professional.workingLocation.trim() !== persisted.workingLocation) {
-                    record(await updateProfessional(userId, {
+                    record(await updateProfessional({
                         ...(professional.description.trim() !== persisted.description && { description: professional.description.trim() }),
                         ...(professional.workingLocation.trim() !== persisted.workingLocation && { workingLocation: professional.workingLocation.trim() }),
                     }))
                 }
                 for (const trade of professional.trades.filter(item => !persisted.trades.some(saved => saved.tradeId === item.tradeId))) {
-                    record(await addExpertiseTrade(userId, trade.tradeId, Number(trade.minimumHourlyWage), Number(trade.maximumHourlyWage)))
+                    record(await addExpertiseTrade(trade.tradeId, Number(trade.minimumHourlyWage), Number(trade.maximumHourlyWage)))
                 }
                 for (const trade of persisted.trades.filter(item => !professional.trades.some(selected => selected.tradeId === item.tradeId))) {
-                    if (trade.id !== null) record(await removeExpertiseTrade(userId, trade.id))
+                    if (trade.id !== null) record(await removeExpertiseTrade(trade.id))
                 }
                 for (const trade of professional.trades) {
                     const original = persisted.trades.find(item => item.tradeId === trade.tradeId)
                     if (original && original.id !== null && (trade.minimumHourlyWage !== original.minimumHourlyWage || trade.maximumHourlyWage !== original.maximumHourlyWage)) {
-                        record(await removeExpertiseTrade(userId, original.id))
-                        record(await addExpertiseTrade(userId, trade.tradeId, Number(trade.minimumHourlyWage), Number(trade.maximumHourlyWage)))
+                        record(await removeExpertiseTrade(original.id))
+                        record(await addExpertiseTrade(trade.tradeId, Number(trade.minimumHourlyWage), Number(trade.maximumHourlyWage)))
                     }
                 }
                 if (professional.published && !persisted.published) {
-                    record(await setProfessionalPublished(userId, true))
+                    record(await setProfessionalPublished(true))
                 }
                 setProfessional(persisted)
                 setMessages(previous => ({ ...previous, professional: 'Perfil profesional actualizado.' }))
@@ -254,17 +250,16 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                     const phoneChanged = isProfessional && saved.phone !== savedPersonal.phone
                     if (nameChanged || phoneChanged) {
                         if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
-                        if (!userId) throw new Error('No pudimos identificar tu cuenta. Vuelve a iniciar sesión.')
                         const response = isProfessional
-                            ? await updateProfessional(userId, {
+                            ? await updateProfessional({
                                 ...(nameChanged && { name: saved.name }),
                                 ...(phoneChanged && { phoneNumber: saved.phone }),
                             })
-                            : await updateClient(userId, { name: saved.name })
+                            : await updateClient({ name: saved.name })
                         // El servidor manda: ignora un teléfono en blanco, así que devuelve el vigente.
                         const phone = isProfessionalResponse(response) ? response.phoneNumber : saved.phone
                         saved = { ...saved, name: response.name, phone }
-                        updateStoredUser({ id: userId, name: response.name, email: savedPersonal.email, role: response.role })
+                        updateStoredUser({ id: response.id, name: response.name, email: savedPersonal.email, role: response.role })
                         // Preserve server success even if a later step of this save fails.
                         setSavedPersonal(previous => ({ ...previous, name: response.name, phone }))
                         setPersonal(previous => ({ ...previous, name: response.name, phone }))
@@ -273,7 +268,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                         if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
                         const response = await changeEmail({ newEmail: saved.email, currentPassword: emailPassword })
                         saved = { ...saved, email: response.email }
-                        updateStoredUser({ id: userId, name: saved.name, email: response.email, role: response.role })
+                        updateStoredUser({ id: response.id, name: saved.name, email: response.email, role: response.role })
                         // Preserve server success even if local storage subsequently fails.
                         setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email }))
                     }

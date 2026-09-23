@@ -1,7 +1,7 @@
 package com.um.uy.oficiosya.controller;
 
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
-import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.config.AuthenticatedUser;
 import com.um.uy.oficiosya.config.ViewerAccess;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
@@ -31,17 +31,11 @@ public class ProfessionalController {
         this.professionalService = professionalService;
     }
 
-    @PostMapping("/create")
-    public ResponseEntity<ProfessionalResponse> createProfessional(@Valid @RequestBody ProfessionalCreateRequest professionalRequest) {
-        ProfessionalResponse professional = professionalService.createProfessional(professionalRequest);
-        return new ResponseEntity<>(professional, HttpStatus.CREATED);
-    }
-
-    /** Only the owner of the account: the JWT subject is the user's publicId. */
-    @PreAuthorize("#id.toString().equals(authentication.name)")
-    @PutMapping("/{id}")
-    public ResponseEntity<ProfessionalResponse> updateProfessional(@Valid @RequestBody ProfessionalUpdateRequest professionalRequest, @PathVariable UUID id) {
-        ProfessionalResponse professional = professionalService.updateProfessional(professionalRequest, id);
+    @PreAuthorize("hasRole('PROFESSIONAL')")
+    @PutMapping("/me")
+    public ResponseEntity<ProfessionalResponse> updateProfessional(@Valid @RequestBody ProfessionalUpdateRequest professionalRequest,
+                                                                   Authentication authentication) {
+        ProfessionalResponse professional = professionalService.updateProfessional(professionalRequest, AuthenticatedUser.id(authentication));
         return ResponseEntity.ok(professional);
     }
 
@@ -75,33 +69,33 @@ public class ProfessionalController {
                 professionalService.searchProfessionals(tradeIds, minPrice, maxPrice, minRating, location, query, pageable));
     }
 
-    /** Only the owner; requires a description and at least one offered trade already set. */
-    @PreAuthorize("#id.toString().equals(authentication.name)")
-    @PostMapping("/{id}/publish")
-    public ResponseEntity<ProfessionalResponse> publishProfessional(@PathVariable UUID id) {
-        return ResponseEntity.ok(professionalService.publishProfessional(id));
+    /** Requires a description and at least one offered trade already set. */
+    @PreAuthorize("hasRole('PROFESSIONAL')")
+    @PostMapping("/me/publish")
+    public ResponseEntity<ProfessionalResponse> publishProfessional(Authentication authentication) {
+        return ResponseEntity.ok(professionalService.publishProfessional(AuthenticatedUser.id(authentication)));
     }
 
-    /** Only the owner: takes the profile off client-facing search and lookups. */
-    @PreAuthorize("#id.toString().equals(authentication.name)")
-    @PostMapping("/{id}/unpublish")
-    public ResponseEntity<ProfessionalResponse> unpublishProfessional(@PathVariable UUID id) {
-        return ResponseEntity.ok(professionalService.unpublishProfessional(id));
+    /** Takes the profile off client-facing search and lookups. */
+    @PreAuthorize("hasRole('PROFESSIONAL')")
+    @PostMapping("/me/unpublish")
+    public ResponseEntity<ProfessionalResponse> unpublishProfessional(Authentication authentication) {
+        return ResponseEntity.ok(professionalService.unpublishProfessional(AuthenticatedUser.id(authentication)));
     }
 
-    /** Only the owner can declare which trades they offer and at what hourly rate. */
-    @PreAuthorize("#id.toString().equals(authentication.name)")
-    @PostMapping("/{id}/expertise-trade")
-    public ResponseEntity<ProfessionalResponse> addExpertiseTrade(@PathVariable UUID id,
-                                                                    @Valid @RequestBody ExpertiseTradeCreateRequest request) {
-        return new ResponseEntity<>(professionalService.addExpertiseTrade(id, request), HttpStatus.CREATED);
+    /** Declares a trade the professional offers and at what hourly rate. */
+    @PreAuthorize("hasRole('PROFESSIONAL')")
+    @PostMapping("/me/expertise-trade")
+    public ResponseEntity<ProfessionalResponse> addExpertiseTrade(@Valid @RequestBody ExpertiseTradeCreateRequest request,
+                                                                    Authentication authentication) {
+        return new ResponseEntity<>(professionalService.addExpertiseTrade(AuthenticatedUser.id(authentication), request), HttpStatus.CREATED);
     }
 
-    @PreAuthorize("#id.toString().equals(authentication.name)")
-    @DeleteMapping("/{id}/expertise-trade/{expertiseTradeId}")
-    public ResponseEntity<ProfessionalResponse> removeExpertiseTrade(@PathVariable UUID id,
-                                                                        @PathVariable Long expertiseTradeId) {
-        return ResponseEntity.ok(professionalService.removeExpertiseTrade(id, expertiseTradeId));
+    @PreAuthorize("hasRole('PROFESSIONAL')")
+    @DeleteMapping("/me/expertise-trade/{expertiseTradeId}")
+    public ResponseEntity<ProfessionalResponse> removeExpertiseTrade(@PathVariable Long expertiseTradeId,
+                                                                        Authentication authentication) {
+        return ResponseEntity.ok(professionalService.removeExpertiseTrade(AuthenticatedUser.id(authentication), expertiseTradeId));
     }
 
 }

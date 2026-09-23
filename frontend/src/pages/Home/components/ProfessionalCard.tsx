@@ -7,11 +7,15 @@ import './ProfessionalCard.css'
 
 interface ProfessionalCardProps {
     professional: Professional
+    selectedTradeId?: number | null
 }
 
-function ProfessionalCard({ professional }: ProfessionalCardProps) {
-    const price = professional.expertiseTrades.length
-        ? Math.min(...professional.expertiseTrades.map(trade => trade.minimumHourlyWage))
+function ProfessionalCard({ professional, selectedTradeId = null }: ProfessionalCardProps) {
+    const relevantTrades = selectedTradeId === null
+        ? professional.expertiseTrades
+        : professional.expertiseTrades.filter(trade => trade.tradeId === selectedTradeId)
+    const price = relevantTrades.length
+        ? Math.min(...relevantTrades.map(trade => trade.minimumHourlyWage))
         : null
     return (
         <article className="professional-card">
@@ -25,7 +29,7 @@ function ProfessionalCard({ professional }: ProfessionalCardProps) {
                 <h3>{professional.name}</h3>
                 {professional.expertiseTrades.length > 0 && (
                     <div className="professional-trades" aria-label="Rubros">
-                        {professional.expertiseTrades.map(trade => <span key={trade.tradeId}>{trade.tradeName}</span>)}
+                        {professional.expertiseTrades.map(trade => <span className={trade.tradeId === selectedTradeId ? 'selected' : ''} key={trade.tradeId}>{trade.tradeName}</span>)}
                     </div>
                 )}
                 <Rating value={professional.rating} />

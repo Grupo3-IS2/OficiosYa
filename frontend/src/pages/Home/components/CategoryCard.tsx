@@ -8,14 +8,16 @@ function CategoryCard({
     backgroundColor,
     accentColor,
     icon,
-}: Category) {
+    selected = false,
+    onClick,
+}: Category & { selected?: boolean; onClick?: () => void }) {
     const style = {
         '--category-background': backgroundColor,
         '--category-accent': accentColor,
     } as CSSProperties
 
     return (
-        <button className="category-card" style={style} type="button">
+        <button className={`category-card${selected ? ' category-card--selected' : ''}`} style={style} type="button" aria-pressed={selected} onClick={onClick}>
             <span className="category-card__icon">
                 <Icon name={icon} />
             </span>

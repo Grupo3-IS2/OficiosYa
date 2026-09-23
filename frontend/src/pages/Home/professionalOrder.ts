@@ -1,14 +1,15 @@
 import type { Professional } from '../../types/Professional'
+import { tradesFor } from './professionalFilters.ts'
 
-export type ProfessionalOrder = 'price-asc' | 'price-desc' | 'rating-desc' | 'rating-asc' | null
+export type ProfessionalOrder = 'relevance' | 'distance' | 'price-asc' | 'price-desc' | 'rating-desc' | 'rating-asc' | null
 
-export function orderProfessionals(professionals: Professional[], order: ProfessionalOrder): Professional[] {
-    if (!order) return professionals
+export function orderProfessionals(professionals: Professional[], order: ProfessionalOrder, tradeId: number | null = null): Professional[] {
+    if (!order || order === 'relevance' || order === 'distance') return professionals
 
     return [...professionals].sort((first, second) => {
         if (order.startsWith('price')) {
-            const firstPrice = Math.min(...first.expertiseTrades.map(trade => trade.minimumHourlyWage))
-            const secondPrice = Math.min(...second.expertiseTrades.map(trade => trade.minimumHourlyWage))
+            const firstPrice = Math.min(...tradesFor(first, tradeId).map(trade => trade.minimumHourlyWage))
+            const secondPrice = Math.min(...tradesFor(second, tradeId).map(trade => trade.minimumHourlyWage))
             if (!Number.isFinite(firstPrice)) return Number.isFinite(secondPrice) ? 1 : first.name.localeCompare(second.name, 'es')
             if (!Number.isFinite(secondPrice)) return -1
             const difference = order === 'price-asc' ? firstPrice - secondPrice : secondPrice - firstPrice

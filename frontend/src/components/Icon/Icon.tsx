@@ -1,7 +1,7 @@
 import type { ReactNode, SVGProps } from 'react'
 import './Icon.css'
 
-export type IconName = 'location' | 'document' | 'user' | 'search' | 'money' | 'calendar' | 'star' | 'wrench' | 'home' | 'mail' | 'phone' | 'lock' | 'eye' | 'eye-off'
+export type IconName = 'location' | 'document' | 'user' | 'search' | 'money' | 'calendar' | 'star' | 'wrench' | 'home' | 'mail' | 'phone' | 'lock' | 'eye' | 'eye-off' | 'filter' | 'chevron-down'
 interface IconProps extends SVGProps<SVGSVGElement> { name: IconName }
 
 function Icon({ name, ...props }: IconProps) {
@@ -20,6 +20,8 @@ function Icon({ name, ...props }: IconProps) {
     lock: <><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>,
     eye: <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="2.5" /></>,
     'eye-off': <><path d="m3 3 18 18M10.6 6.2A10.8 10.8 0 0 1 12 6c6.5 0 10 6 10 6a17.4 17.4 0 0 1-3.2 3.7M6.2 6.7C3.5 8.5 2 12 2 12s3.5 6 10 6c1.2 0 2.3-.2 3.3-.6" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>,
+    filter: <><path d="M4 6h16M7 12h10M10 18h4" /></>,
+    'chevron-down': <path d="m7 10 5 5 5-5" />,
   }
   return <svg className="icon" viewBox="0 0 24 24" aria-hidden="true" {...props}>{paths[name]}</svg>
 }

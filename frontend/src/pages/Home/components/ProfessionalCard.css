@@ -38,6 +38,11 @@
   font-weight: 600;
 }
 
+.professional-trades span.selected {
+  color: #fff;
+  background: #07984c;
+}
+
 .meta {
   display: flex;
   align-items: center;

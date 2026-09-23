@@ -17,7 +17,25 @@ function fakeJwt(expiresInSeconds = 3600) {
   return `${encode({ alg: 'RS256' })}.${encode({ sub: 'qa-ui-user', iat: now, exp: now + expiresInSeconds })}.firma-invalida`;
 }
 
+/**
+ * Home loads trades and professionals on mount. With a fakeJwt stored, the real backend answers
+ * 401 to those calls and the frontend expires the session, so UI tests with a session mock them.
+ */
+async function mockHomeApi(page: Page) {
+  await page.route('**/api/v1/trade', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '[]'
+  }));
+  await page.route('**/api/v1/professional/search**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ content: [], totalPages: 0 })
+  }));
+}
+
 async function mockVerifiedSession(page: Page, user: { name: string; email: string; role?: 'CLIENT' | 'PROFESSIONAL' }) {
+  await mockHomeApi(page);
   await page.route('**/api/v1/auth/verify', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -550,7 +568,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(response.status()).toBe(401);
   });
 
-  test('API: token de otro rol no puede modificar recursos ajenos', async ({ request }) => {
+  test('API: un cliente no puede usar los endpoints del profesional', async ({ request }) => {
     const clientPayload = {
       name: 'Cliente Otro Rol',
       email: uniqueEmail('cliente.otra.rol'),
@@ -561,19 +579,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(clientCreated.status()).toBe(200);
     const clientAuth = await clientCreated.json();
 
-    const professionalPayload = {
-      name: 'Profesional Otro Rol',
-      email: uniqueEmail('profesional.otra.rol'),
-      password: 'ClaveSegura2026!',
-      phoneNumber: '+598991234567',
-      workingLocation: 'Montevideo'
-    };
-
-    const professionalCreated = await registerProfessional(request, professionalPayload);
-    expect(professionalCreated.status()).toBe(200);
-    const professionalAuth = await professionalCreated.json();
-
-    const forbidden = await request.put(`${API_BASE}/api/v1/professional/${professionalAuth.id}`, {
+    const forbidden = await request.put(`${API_BASE}/api/v1/professional/me`, {
       headers: {
         Authorization: `Bearer ${clientAuth.token}`
       },
@@ -662,7 +668,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const token = createdBody.token;
-    const updated = await request.put(`${API_BASE}/api/v1/client/${createdBody.id}`, {
+    const updated = await request.put(`${API_BASE}/api/v1/client/me`, {
       headers: {
         Authorization: `Bearer ${token}`
       },
@@ -996,7 +1002,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const token = createdBody.token;
-    const updated = await request.put(`${API_BASE}/api/v1/professional/${createdBody.id}`, {
+    const updated = await request.put(`${API_BASE}/api/v1/professional/me`, {
       headers: {
         Authorization: `Bearer ${token}`
       },
@@ -1122,7 +1128,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const auth = await created.json();
 
-    const updated = await request.put(`${API_BASE}/api/v1/client/${auth.id}`, {
+    const updated = await request.put(`${API_BASE}/api/v1/client/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1225,7 +1231,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const emailBody = await emailUpdate.json();
     expect(emailBody.email).toBe(newEmail);
 
-    const nameUpdate = await request.put(`${API_BASE}/api/v1/client/${auth.id}`, {
+    const nameUpdate = await request.put(`${API_BASE}/api/v1/client/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1356,6 +1362,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test.fixme('UI: botón de logout deshabilitado mientras se procesa', async ({ page }) => {
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
     await page.evaluate((token) => {
       localStorage.setItem('oficiosya_token', token);
@@ -1373,6 +1380,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('UI: recarga de página mantiene sesión activa', async ({ page }) => {
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
     await page.evaluate((token) => {
       localStorage.setItem('oficiosya_token', token);
@@ -1396,6 +1404,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('UI: menú de perfil funciona en desktop y mobile', async ({ page }) => {
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
     await page.evaluate((token) => {
       localStorage.setItem('oficiosya_token', token);
@@ -1515,6 +1524,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   async function storeSession(page: Page, token: string, email = 'sesion.ui@qa.test') {
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
     await page.evaluate(({ token, email }) => {
       localStorage.setItem('oficiosya_token', token);
@@ -1600,6 +1610,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('UI: cerrar sesión remueve el token y redirige a la vista principal', async ({ page }) => {
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
     await page.evaluate((token) => {
       localStorage.setItem('oficiosya_token', token);

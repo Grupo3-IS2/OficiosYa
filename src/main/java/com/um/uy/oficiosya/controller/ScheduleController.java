@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.controller;
 
+import com.um.uy.oficiosya.config.AuthenticatedUser;
 import com.um.uy.oficiosya.config.ViewerAccess;
 import com.um.uy.oficiosya.dto.request.ScheduleCreateRequest;
 import com.um.uy.oficiosya.dto.response.ScheduleResponse;
@@ -9,10 +10,8 @@ import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,7 +31,7 @@ public class ScheduleController {
     @PostMapping
     public ResponseEntity<ScheduleResponse> createSchedule(@Valid @RequestBody ScheduleCreateRequest scheduleRequest,
                                                             Authentication authentication) {
-        ScheduleResponse schedule = scheduleService.createSchedule(scheduleRequest, authenticatedProfessionalId(authentication));
+        ScheduleResponse schedule = scheduleService.createSchedule(scheduleRequest, AuthenticatedUser.id(authentication));
         return new ResponseEntity<>(schedule, HttpStatus.CREATED);
     }
 
@@ -40,13 +39,13 @@ public class ScheduleController {
     public ResponseEntity<ScheduleResponse> updateSchedule(@Valid @RequestBody ScheduleUpdateRequest scheduleRequest,
                                                             @PathVariable Long id,
                                                             Authentication authentication) {
-        ScheduleResponse schedule = scheduleService.updateSchedule(scheduleRequest, id, authenticatedProfessionalId(authentication));
+        ScheduleResponse schedule = scheduleService.updateSchedule(scheduleRequest, id, AuthenticatedUser.id(authentication));
         return ResponseEntity.ok(schedule);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSchedule(@PathVariable Long id, Authentication authentication) {
-        scheduleService.deleteSchedule(id, authenticatedProfessionalId(authentication));
+        scheduleService.deleteSchedule(id, AuthenticatedUser.id(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -58,19 +57,5 @@ public class ScheduleController {
             Authentication authentication) {
         boolean ownerOrAdmin = ViewerAccess.isOwnerOrAdmin(authentication, professionalId);
         return ResponseEntity.ok(scheduleService.getAgenda(professionalId, from, to, ownerOrAdmin));
-    }
-
-    private UUID authenticatedProfessionalId(Authentication authentication) {
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication instanceof AnonymousAuthenticationToken) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Debes de iniciar sesión");
-        }
-
-        try {
-            return UUID.fromString(authentication.getName());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "El token de autenticación es inválido");
-        }
     }
 }

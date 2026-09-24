@@ -13,11 +13,18 @@ jobs:
         working-directory: test
     steps:
     - uses: actions/checkout@v4
-    - name: Start the backend
+    - name: Start the backend and the test inbox
       working-directory: .
       run: |
         cp .env.example .env
-        docker compose up -d --build --wait app
+        # The suite registers dozens of accounts from one IP, each with an emailed code:
+        # lift the per-IP limit and shorten the resend cooldown so the resend cases can run.
+        for setting in RATE_LIMIT_AUTH_PER_MINUTE=100000 VERIFICATION_RESEND_COOLDOWN_SECONDS=3; do
+          sed -i "/^${setting%%=*}=/d" .env
+          echo "$setting" >> .env
+        done
+        # mailpit is the fake inbox the registration codes land in; the tests read them from it.
+        docker compose --profile dev up -d --build --wait app mailpit
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
@@ -30,7 +37,7 @@ jobs:
     - name: Backend logs
       if: failure()
       working-directory: .
-      run: docker compose logs --no-color app db
+      run: docker compose --profile dev logs --no-color app db mailpit
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:

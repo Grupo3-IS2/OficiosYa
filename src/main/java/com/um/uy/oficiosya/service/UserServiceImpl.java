@@ -3,6 +3,7 @@ package com.um.uy.oficiosya.service;
 import com.um.uy.oficiosya.dto.response.UserResponse;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
+import com.um.uy.oficiosya.entity.AuthProvider;
 import com.um.uy.oficiosya.entity.User;
 import com.um.uy.oficiosya.exception.UserAlreadyExists;
 import com.um.uy.oficiosya.exception.UserNotFoundException;
@@ -48,6 +49,8 @@ public class UserServiceImpl implements UserService {
     public UserResponse changeEmail(EmailUpdateRequest emailRequest, UUID id) {
         User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
 
+        requireOwnPassword(user);
+
         if (!passwordEncoder.matches(emailRequest.getCurrentPassword(), user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña actual es incorrecta");
         }
@@ -73,6 +76,8 @@ public class UserServiceImpl implements UserService {
     public void changePassword(PasswordUpdateRequest passwordRequest, UUID id){
         User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
 
+        requireOwnPassword(user);
+
         if (!passwordEncoder.matches(passwordRequest.getOldPassword(), user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña actual es incorrecta");
         }
@@ -87,6 +92,14 @@ public class UserServiceImpl implements UserService {
 
         user.setPassword(passwordEncoder.encode(passwordRequest.getNewPassword()));
         userRepository.save(user);
+    }
+
+    /** An account created with Google has no password to confirm or to change. */
+    private void requireOwnPassword(User user) {
+        if (user.getAuthProvider() == AuthProvider.GOOGLE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Tu cuenta usa Google para iniciar sesión, no tiene contraseña");
+        }
     }
 
     @Override

@@ -6,6 +6,7 @@ import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
 import type { PersonalData, ProfessionalData, ProfileSection, SecurityData } from './profileState'
 import type { Trade } from '../../types/Professional'
+import type { AccountAccess } from './components/GoogleAccountSection'
 
 function professionalDataFrom(response: ProfessionalResponse): ProfessionalData {
     return {
@@ -48,6 +49,8 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [tradesLoading, setTradesLoading] = useState(true)
     const [security, setSecurity] = useState<SecurityData>({ current: '', password: '', confirmation: '' })
     const [emailPassword, setEmailPassword] = useState('')
+    // Whether the account has a password and a linked Google: what the security section offers depends on it.
+    const [access, setAccess] = useState<AccountAccess>({ hasPassword: true, googleLinked: false })
     // The selected photo is only uploaded when the personal section is saved.
     const [photo, setPhoto] = useState<File | null>(null)
     const photoPreview = useRef('')
@@ -75,6 +78,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             // Sólo el profesional tiene teléfono en el servidor; el del cliente sigue siendo local.
             const phone = isProfessionalResponse(response) ? response.phoneNumber : null
             setIsProfessional(response.role === 'PROFESSIONAL')
+            setAccess({ hasPassword: response.hasPassword ?? true, googleLinked: response.googleLinked ?? false })
             setUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             updateStoredUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar }))
@@ -292,7 +296,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     }
 
     return {
-        user, isProfessional, personal, setPersonal, selectPhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
+        user, isProfessional, personal, setPersonal, selectPhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, access, setAccess, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
         busy, loadingProfile, profileLoadFailed, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),

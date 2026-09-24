@@ -4,10 +4,12 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
@@ -43,12 +45,27 @@ public class User {
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 
+    /** How the account came to be: with its own password, or through Google (which has none). */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'LOCAL'")
+    @Column(name = "auth_provider", nullable = false, length = 20)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    /** Google's stable id for the linked Google account (the {@code sub} claim); null if not linked. */
+    @Column(name = "google_subject", unique = true)
+    private String googleSubject;
+
     @Column(name = "profile_image")
     private String profileImageUrl;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public boolean isGoogleLinked() {
+        return googleSubject != null;
+    }
 
     @PrePersist
     @PreUpdate

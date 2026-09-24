@@ -3,7 +3,10 @@ package com.um.uy.oficiosya.controller;
 import com.um.uy.oficiosya.config.AuthenticatedUser;
 import com.um.uy.oficiosya.dto.response.UserResponse;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
+import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
+import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
+import com.um.uy.oficiosya.service.interfaces.GoogleAuthService;
 import com.um.uy.oficiosya.service.interfaces.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -18,8 +21,11 @@ public class UserController {
 
     private final UserService userService;
 
-    public UserController(UserService userService) {
+    private final GoogleAuthService googleAuthService;
+
+    public UserController(UserService userService, GoogleAuthService googleAuthService) {
         this.userService = userService;
+        this.googleAuthService = googleAuthService;
     }
 
     /**
@@ -43,6 +49,19 @@ public class UserController {
                                                Authentication authentication) {
         userService.changePassword(passwordRequest, AuthenticatedUser.id(authentication));
         return ResponseEntity.noContent().build();
+    }
+
+    /** Links a Google account so the user can sign in with it too. Needs the current password. */
+    @PutMapping("/me/google")
+    public ResponseEntity<UserResponse> linkGoogle(@Valid @RequestBody GoogleLinkUpdateRequest request,
+                                                   Authentication authentication) {
+        return ResponseEntity.ok(googleAuthService.linkToUser(AuthenticatedUser.id(authentication), request));
+    }
+
+    @DeleteMapping("/me/google")
+    public ResponseEntity<UserResponse> unlinkGoogle(@Valid @RequestBody GoogleUnlinkRequest request,
+                                                     Authentication authentication) {
+        return ResponseEntity.ok(googleAuthService.unlinkFromUser(AuthenticatedUser.id(authentication), request));
     }
 
     @PostMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

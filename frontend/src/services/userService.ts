@@ -8,6 +8,10 @@ export interface UserResponse {
   profileImageUrl: string | null
   role: 'CLIENT' | 'PROFESSIONAL'
   createdAt: string
+  /** False for an account created with Google: there is no password to change or confirm with. */
+  hasPassword: boolean
+  /** Whether a Google account is linked to this one. */
+  googleLinked: boolean
 }
 
 export interface ProfessionalResponse extends UserResponse {
@@ -48,6 +52,20 @@ export interface PasswordUpdateRequest {
 export interface EmailUpdateRequest {
   newEmail: string
   currentPassword: string
+}
+
+export function linkGoogle(credential: string, currentPassword: string): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/google', {
+    method: 'PUT',
+    body: JSON.stringify({ credential, currentPassword }),
+  })
+}
+
+export function unlinkGoogle(currentPassword: string): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/google', {
+    method: 'DELETE',
+    body: JSON.stringify({ currentPassword }),
+  })
 }
 
 export function getAuthenticatedUser(): Promise<AuthenticatedUserResponse> {

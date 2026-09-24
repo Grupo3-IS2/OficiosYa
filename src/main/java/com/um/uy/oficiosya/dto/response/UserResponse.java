@@ -23,4 +23,10 @@ public class UserResponse {
     private String profileImageUrl;
     private Role role;
     private LocalDateTime createdAt;
+
+    /** False for an account created with Google: it has no password to change or to confirm with. */
+    private boolean hasPassword;
+
+    /** Whether a Google account is linked, so the user can sign in with it. */
+    private boolean googleLinked;
 }

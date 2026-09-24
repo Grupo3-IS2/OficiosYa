@@ -1,8 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import Button from '../../components/Button/Button'
+import GoogleButton from '../../components/GoogleButton/GoogleButton'
 import Icon from '../../components/Icon/Icon'
-import { register } from '../../services/authService'
-import type { AccountType } from '../../types/Auth'
+import { googleRegister, register } from '../../services/authService'
+import { isGoogleEnabled } from '../../services/googleIdentity'
+import type { AccountType, PendingRegistration } from '../../types/Auth'
+import VerifyEmailStep from './VerifyEmailStep'
 import './Register.css'
 
 function Brand() {
@@ -30,6 +33,23 @@ function Register() {
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  // Set once the code was mailed: the form gives way to the code step until the user comes back.
+  const [pending, setPending] = useState<PendingRegistration | null>(null)
+
+  /** What a professional has to give besides the account data; empty when it is fine (or not a professional). */
+  const professionalFieldsError = (): string => {
+    if (accountType !== 'professional') return ''
+
+    if (!location.trim()) {
+      return 'Ingresá una ubicación para continuar como profesional.'
+    }
+
+    if (!/^(\+\d{1,3})?\d{9}$/.test(phoneNumber.trim())) {
+      return 'Ingresá un teléfono de 9 dígitos, con prefijo internacional opcional.'
+    }
+
+    return ''
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -45,23 +65,16 @@ function Register() {
       return
     }
 
-    if (accountType === 'professional' && !location.trim()) {
-      setErrorMessage('Ingresá una ubicación para continuar como profesional.')
-      return
-    }
-
-    if (
-      accountType === 'professional'
-      && !/^(\+\d{1,3})?\d{9}$/.test(phoneNumber.trim())
-    ) {
-      setErrorMessage('Ingresá un teléfono de 9 dígitos, con prefijo internacional opcional.')
+    const fieldsError = professionalFieldsError()
+    if (fieldsError) {
+      setErrorMessage(fieldsError)
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      await register(
+      const started = await register(
         { name: name.trim(), email: email.trim(), password },
         {
           email: email.trim(),
@@ -71,12 +84,50 @@ function Register() {
         },
       )
 
-      window.location.href = '/'
+      setPending(started)
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
           : 'No se pudo crear la cuenta. Intentá nuevamente.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  /** Registers with the Google account picked: no password or code, Google already vouches for the email. */
+  const handleGoogleCredential = async (credential: string) => {
+    setErrorMessage('')
+
+    if (!acceptedTerms) {
+      setErrorMessage('Aceptá los términos y condiciones para continuar.')
+      return
+    }
+
+    const fieldsError = professionalFieldsError()
+    if (fieldsError) {
+      setErrorMessage(fieldsError)
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      await googleRegister(
+        credential,
+        accountType,
+        accountType === 'professional'
+          ? { phoneNumber: phoneNumber.trim(), workingLocation: location.trim() }
+          : undefined,
+      )
+
+      window.location.href = '/'
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo crear la cuenta con Google. Intentá nuevamente.',
       )
     } finally {
       setIsSubmitting(false)
@@ -97,6 +148,15 @@ function Register() {
       </header>
 
       <section className="register-card" aria-labelledby="register-title">
+        {pending ? (
+          <VerifyEmailStep
+            pending={pending}
+            onResent={setPending}
+            onChangeEmail={() => setPending(null)}
+            onVerified={() => { window.location.href = '/' }}
+          />
+        ) : (
+        <>
         <p className="register-eyebrow">CREÁ TU CUENTA</p>
         <h1 id="register-title">Sumate a OficiosYa</h1>
         <p className="register-intro">
@@ -254,10 +314,24 @@ function Register() {
           )}
         </form>
 
+        {isGoogleEnabled() && (
+          <>
+            <div className="auth-divider"><span>o registrate con Google</span></div>
+            <GoogleButton text="signup_with" onCredential={handleGoogleCredential} />
+            <p className="register-google-hint">
+              {accountType === 'professional'
+                ? 'Completá teléfono y ubicación y aceptá los términos antes de continuar con Google.'
+                : 'Aceptá los términos antes de continuar con Google.'}
+            </p>
+          </>
+        )}
+
         <div className="register-divider" />
         <p className="register-login">
           ¿Ya tenés una cuenta? <a href="/login">Iniciar sesión</a>
         </p>
+        </>
+        )}
       </section>
     </main>
   )

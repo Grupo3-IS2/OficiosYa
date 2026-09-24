@@ -15,6 +15,12 @@ import java.util.UUID;
 
 public interface ProfessionalService {
     ProfessionalResponse createProfessional(ProfessionalCreateRequest professionalRequest);
+
+    /**
+     * Creates the professional with a password that is already hashed; the request's own password
+     * is ignored. For accounts whose data was validated and hashed earlier (a verified registration).
+     */
+    ProfessionalResponse createProfessional(ProfessionalCreateRequest professionalRequest, String encodedPassword);
     ProfessionalResponse updateProfessional(ProfessionalUpdateRequest professionalRequest, UUID id);
     /** The full profile, contact data included: only for the owner and admins. */
     ProfessionalResponse getProfessional(UUID id);

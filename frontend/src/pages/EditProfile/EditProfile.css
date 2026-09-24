@@ -96,3 +96,5 @@
     .profile-trade-picker .button { padding-inline: 12px; }
     .profile-actions .button { width: 100%; padding-inline: 12px; }
 }
+.profile-actions .button--ghost { background: #fff; border: 1px solid #0ba756; color: #07984c; }
+.profile-actions .button--ghost:hover { background: #effaf3; }

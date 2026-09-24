@@ -48,6 +48,25 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:-Administrador}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@oficiosya.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Mail, used to send the verification codes. "mailpit" is the catch-all inbox of the
+      # dev profile; anywhere else set SMTP_HOST (and the rest) to a real provider in .env.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@oficiosya.com}
+      # Google sign-in. Empty disables it (see GoogleTokenVerifierImpl); the frontend uses the same value.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # Verification codes. VERIFICATION_SECRET must be set outside local development.
+      VERIFICATION_SECRET: ${VERIFICATION_SECRET:-change-me-in-prod}
+      VERIFICATION_CODE_LENGTH: ${VERIFICATION_CODE_LENGTH:-6}
+      VERIFICATION_EXPIRATION_MINUTES: ${VERIFICATION_EXPIRATION_MINUTES:-15}
+      VERIFICATION_MAX_ATTEMPTS: ${VERIFICATION_MAX_ATTEMPTS:-5}
+      VERIFICATION_RESEND_COOLDOWN_SECONDS: ${VERIFICATION_RESEND_COOLDOWN_SECONDS:-60}
+      # Per client IP, per minute, on the endpoints that mail or check a code.
+      RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-10}
     volumes:
       # The .pem files must be readable by uid 1001 (the "spring" user).
       - ./keys:/app/keys:ro
@@ -80,6 +99,9 @@ services:
     environment:
       # Vite proxies /api and /ws to the backend container.
       BACKEND_URL: http://app:8080
+      # Vite only exposes VITE_* variables to the browser: same Client ID as the backend's
+      # GOOGLE_CLIENT_ID. Empty hides the Google buttons.
+      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     volumes:
       - ./frontend:/app
       # Keep the container's node_modules; do not let the host's leak in.
@@ -88,6 +110,32 @@ services:
       - "5173:5173"
     depends_on:
       - app
+    networks:
+      - backend
+
+  # Catch-all SMTP server for local development: the app "sends" its emails here and they
+  # are read in the web inbox instead of reaching anyone. Local development only:
+  #   docker compose --profile dev up
+  #   inbox: http://localhost:8025
+  # SMTP is also published on the host's 1025 so a backend run outside Docker can use it
+  # (that is the default SMTP_HOST/SMTP_PORT of application.properties).
+  #
+  # The "mail" profile starts just this service (the "dev" one also starts the Vite dev
+  # server). The shared dev server has no need for the rest of "dev": its clone's .env sets
+  #   COMPOSE_PROFILES=mail
+  #   MAILPIT_WEBROOT=mailpit
+  # so the deploy's plain `docker compose up` brings the inbox up too, and it is served under
+  # /mailpit/ by the host's nginx (see nginx/oficios-ya-dev.conf). Never in production.
+  mailpit:
+    image: axllent/mailpit
+    profiles: ["dev", "mail"]
+    restart: unless-stopped
+    environment:
+      # Path the inbox is served under. Empty (local development): at the root.
+      MP_WEBROOT: ${MAILPIT_WEBROOT:-}
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
     networks:
       - backend
 
@@ -101,6 +149,10 @@ services:
     profiles: ["build"]
     working_dir: /app
     command: sh -c "npm ci && npm run build"
+    environment:
+      # Baked into the build (Vite replaces it at build time): the same GOOGLE_CLIENT_ID as
+      # the backend's. Empty builds without the Google buttons.
+      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     volumes:
       - ./frontend:/app
       # Keep the container's node_modules; do not let the host's leak in.

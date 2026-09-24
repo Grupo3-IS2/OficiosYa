@@ -49,8 +49,8 @@ Se aceptará la historia si se cumplen estos criterios:
 
 | ID | Caso de prueba | Precondición | Pasos | Resultado esperado | Estado actual |
 | --- | --- | --- | --- | --- | --- |
-| REG-01 | Registro exitoso Cliente | Email y cédula inexistentes | 1. Ir a registro 2. Elegir Cliente 3. Completar campos válidos 4. Crear cuenta 5. Ingresar el código recibido por correo | Al enviar el formulario aún no existe la cuenta; con el código correcto se crea, muestra confirmación y redirige al flujo del cliente | Automatizado (`registro-pin.spec.ts`) |
-| REG-02 | Registro exitoso Profesional | Email y cédula inexistentes | 1. Ir a registro 2. Elegir Profesional 3. Completar campos válidos 4. Crear cuenta 5. Ingresar el código recibido por correo | La cuenta se crea con rol Profesional, con su teléfono y ubicación, confirma y permite continuar | Automatizado (`registro-pin.spec.ts`) |
+| REG-01 | Registro exitoso Cliente | Email y cédula inexistentes | 1. Ir a registro 2. Elegir Cliente 3. Completar campos válidos 4. Crear cuenta 5. Ingresar el código recibido por correo | Al enviar el formulario aún no existe la cuenta; con el código correcto se crea, muestra confirmación y redirige al flujo del cliente | Automatizado (`registration-pin.spec.ts`) |
+| REG-02 | Registro exitoso Profesional | Email y cédula inexistentes | 1. Ir a registro 2. Elegir Profesional 3. Completar campos válidos 4. Crear cuenta 5. Ingresar el código recibido por correo | La cuenta se crea con rol Profesional, con su teléfono y ubicación, confirma y permite continuar | Automatizado (`registration-pin.spec.ts`) |
 | REG-03 | Registro sin seleccionar tipo de usuario | Usuario en formulario | 1. Completar todos los campos 2. No elegir rol 3. Enviar | El sistema rechaza el formulario y muestra advertencia | Parcial |
 | REG-04 | Formulario con campos vacíos | Usuario en registro | 1. Elegir rol 2. Dejar campos vacíos 3. Enviar | No se envía la solicitud, se muestran errores por campo | Parcial |
 | REG-05 | Cédula inválida | Usuario en registro | 1. Completar formulario 2. Ingresar cédula inválida 3. Enviar | Se marca error y se bloquea registro | No implementado |
@@ -60,7 +60,7 @@ Se aceptará la historia si se cumplen estos criterios:
 | REG-09 | Contraseña con fortaleza visual | Usuario en registro | 1. Escribir contraseña 2. Observar indicador visual | El sistema muestra fortaleza real en tiempo real | No implementado |
 | REG-10 | Email duplicado | Cuenta existente | 1. Registrar email ya usado 2. Enviar | El sistema responde igual que con un email libre y no envía ningún correo (para no revelar qué emails están registrados); tampoco se crea una segunda cuenta | Automatizado (`oficiosya.spec.ts`) |
 | REG-11 | Cédula duplicada | Cuenta existente | 1. Registrar otra cuenta con la misma cédula 2. Enviar | El sistema rechaza con mensaje de duplicado | No implementado |
-| REG-12 | Registro exitoso con inicio inmediato | Cuenta nueva | 1. Completar registro correcto 2. Ingresar el código 3. Confirmar usuario autenticado | Al verificar el código el sistema deja la sesión iniciada, redirige al panel principal y permite acceso | Automatizado (`registro-pin.spec.ts`) |
+| REG-12 | Registro exitoso con inicio inmediato | Cuenta nueva | 1. Completar registro correcto 2. Ingresar el código 3. Confirmar usuario autenticado | Al verificar el código el sistema deja la sesión iniciada, redirige al panel principal y permite acceso | Automatizado (`registration-pin.spec.ts`) |
 
 ### 4.1.1 Verificación del correo (código)
 
@@ -114,7 +114,7 @@ El código tiene 6 dígitos, vence a los 15 minutos, se puede usar una sola vez,
 | LOG-04 | Correo no registrado | Usuario sin cuenta | 1. Ingresar correo inexistente 2. Contraseña válida 3. Enviar | Se muestra error de usuario no encontrado | Parcial |
 | LOG-05 | Formulario vacío | Usuario en login | 1. Dejar email y contraseña vacíos 2. Intentar enviar | El sistema no envía la request y muestra validación | Parcial |
 | LOG-06 | Email con formato inválido | Usuario en login | 1. Ingresar email mal escrito 2. Enviar | Error de formato o validación | Parcial |
-| LOG-07 | Correo con espacios extra | Usuario en login | 1. Escribir ` correo@ejemplo.com ` 2. Ingresar clave válida | La app limpia espacios y permite entrar | No implementado |
+| LOG-07 | Correo con espacios extra | Usuario en login | 1. Escribir ` correo@ejemplo.com ` 2. Ingresar clave válida | La app limpia espacios y permite entrar | Automatizado (unitario: el correo se recorta y pasa a minúsculas al llegar al backend) |
 | LOG-08 | Mostrar / ocultar contraseña | Usuario en login | 1. Escribir contraseña 2. Activar icono del ojo 3. Repetir | La contraseña se vuelve visible y luego oculta | Implementado |
 | LOG-09 | Botón deshabilitado durante carga | Login en curso | 1. Simular demora de red 2. Presionar iniciar sesión | El botón se deshabilita para evitar doble clic | Parcial |
 
@@ -133,9 +133,13 @@ El código tiene 6 dígitos, vence a los 15 minutos, se puede usar una sola vez,
 | ID | Caso de prueba | Precondición | Pasos | Resultado esperado | Estado actual |
 | --- | --- | --- | --- | --- | --- |
 | PERF-01 | Edición exitosa de datos básicos sin cambiar correo ni contraseña | Usuario autenticado | 1. Entrar a Editar Perfil 2. Modificar nombre y celular 3. Guardar | Se guardan cambios y se muestra confirmación | Parcial |
-| PERF-02 | Cambio exitoso de correo con contraseña actual | Usuario autenticado | 1. Cambiar email 2. Ingresar clave actual 3. Guardar | El correo cambia y se valida la contraseña actual | Parcial |
+| PERF-02 | Cambio exitoso de correo con contraseña actual y código | Usuario autenticado | 1. Cambiar email 2. Ingresar clave actual 3. Guardar 4. Ingresar el código que llega al correo nuevo | Al guardar solo se envía el código al correo nuevo y el correo sigue igual; con el código correcto el correo cambia, la sesión sigue activa y el correo viejo deja de servir para entrar | Automatizado (`email-change.spec.ts`) |
 | PERF-03 | Cambio exitoso de contraseña con confirmación | Usuario autenticado | 1. Ingresar contraseña actual 2. Nueva clave válida 3. Confirmar 4. Guardar | Se actualiza la contraseña | Parcial |
 | PERF-04 | Cambio de correo con clave actual incorrecta | Usuario autenticado | 1. Intentar cambiar email 2. Ingresar contraseña incorrecta | El sistema bloquea el cambio y muestra error | Parcial |
+| PERF-02b | Código incorrecto o bloqueado al cambiar el correo | Cambio de correo empezado | 1. Ingresar un código incorrecto 2. Repetir hasta 5 veces 3. Ingresar el correcto | 400 y el correo no cambia; tras 5 intentos el código queda bloqueado; un código correcto se usa una sola vez | Automatizado |
+| PERF-02c | Reenviar o cancelar el cambio de correo | Cambio de correo empezado | 1. Reenviar antes y después del cooldown 2. Cancelar el cambio | Antes del cooldown 429; después llega un código nuevo y el anterior deja de servir; al cancelar el campo vuelve al correo actual y no se manda nada más | Automatizado (el reenvío requiere `VERIFICATION_RESEND_COOLDOWN_SECONDS` bajo) |
+| PERF-02d | El código de un cambio es de quien lo empezó | Dos usuarios | 1. El usuario A empieza un cambio a un correo nuevo 2. El usuario B intenta verificar o reenviar ese correo | 400: B no puede usar el código de A, ni gastar sus intentos, ni mandar códigos a correos ajenos | Automatizado |
+| PERF-02e | El correo nuevo lo ganó otro mientras tanto | Cambio de correo empezado | 1. Otro usuario registra ese correo 2. Ingresar el código | 409 y el correo no cambia | Automatizado |
 | PERF-05 | Cambio de contraseña con contraseña actual vacía | Usuario autenticado | 1. Cambiar clave 2. Dejar clave actual vacía 3. Guardar | No se envía el formulario y se muestra error | Parcial |
 | PERF-06 | Cambio de correo a uno ya existente | Usuario autenticado | 1. Probar email usado por otro usuario 2. Guardar | El sistema rechaza el cambio | Parcial |
 | PERF-07 | Validación de formato en campos editados | Usuario autenticado | 1. Ingresar celular corto, email inválido, contraseña débil | Se muestran errores bajo cada campo afectado | Parcial |

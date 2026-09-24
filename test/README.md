@@ -78,7 +78,9 @@ starting the backend (CI does it in `.github/workflows/playwright.yml`):
 | `RATE_LIMIT_AUTH_PER_MINUTE=100000`    | The suite registers dozens of accounts from one IP; the default (10 a minute) would answer 429 to most of it. |
 | `VERIFICATION_RESEND_COOLDOWN_SECONDS=3` | The cases that resend a code wait out the cooldown. With the default (60 s) they skip, saying why. |
 
-- `tests/registro-pin.spec.ts`: the flow itself, through the API and through the page (Mailpit and the real backend).
+- `tests/registration-pin.spec.ts`: the flow itself, through the API and through the page (Mailpit and the real backend).
+- `tests/email-change.spec.ts`: changing the email from the profile, which works the same way (the code goes to the
+  new address). It also checks that another user can't use or burn someone else's code.
 - `tests/google.spec.ts`: sign-in with Google. A real Google account can't be driven from a test, so the API cases
   check what needs no Google (validation, "no session", an invalid token) and the page cases replace Google's script
   and the API answers with mocks. They need the frontend started with `VITE_GOOGLE_CLIENT_ID`; `playwright.config.ts` sets it

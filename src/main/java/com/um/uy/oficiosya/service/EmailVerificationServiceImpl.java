@@ -68,6 +68,11 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     }
 
     @Override
+    public VerificationTerms terms() {
+        return new VerificationTerms(codeLength, expirationMinutes * 60, resendCooldownSeconds);
+    }
+
+    @Override
     @Transactional
     public void sendCode(String email, VerificationPurpose purpose, UUID userId, String payload) {
         String normalizedEmail = normalize(email);

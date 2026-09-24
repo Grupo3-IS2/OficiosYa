@@ -6,7 +6,7 @@ import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.UserCreateRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
-import com.um.uy.oficiosya.dto.response.PendingRegistrationResponse;
+import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.dto.response.UserResponse;
 import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.entity.User;
@@ -67,16 +67,16 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     @Override
-    public PendingRegistrationResponse startRegistration(ClientCreateRequest request) {
+    public PendingVerificationResponse startRegistration(ClientCreateRequest request) {
         return start(request, Role.CLIENT, null, null);
     }
 
     @Override
-    public PendingRegistrationResponse startRegistration(ProfessionalCreateRequest request) {
+    public PendingVerificationResponse startRegistration(ProfessionalCreateRequest request) {
         return start(request, Role.PROFESSIONAL, request.getPhoneNumber(), request.getWorkingLocation());
     }
 
-    private PendingRegistrationResponse start(UserCreateRequest request, Role accountType,
+    private PendingVerificationResponse start(UserCreateRequest request, Role accountType,
                                               String phoneNumber, String workingLocation) {
         String email = normalize(request.getEmail());
 
@@ -139,7 +139,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     @Override
-    public PendingRegistrationResponse resendCode(ResendCodeRequest request) {
+    public PendingVerificationResponse resendCode(ResendCodeRequest request) {
         String email = normalize(request.getEmail());
 
         boolean hasAccount = userRepository.existsByEmailIgnoreCase(email);
@@ -153,8 +153,8 @@ public class RegistrationServiceImpl implements RegistrationService {
         return pendingResponse(email);
     }
 
-    private PendingRegistrationResponse pendingResponse(String email) {
-        return PendingRegistrationResponse.builder()
+    private PendingVerificationResponse pendingResponse(String email) {
+        return PendingVerificationResponse.builder()
                 .email(email)
                 .message(PENDING_MESSAGE)
                 .codeLength(codeLength)

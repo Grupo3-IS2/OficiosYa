@@ -6,6 +6,7 @@ import com.um.uy.oficiosya.entity.AuthProvider;
 import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.mapper.UserMapper;
 import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
 import com.um.uy.oficiosya.service.interfaces.ProfileImageStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,8 @@ class UserServiceImplGoogleAccountTest {
     private UserMapper userMapper;
     @Mock
     private ProfileImageStorage profileImageStorage;
+    @Mock
+    private EmailVerificationService emailVerificationService;
 
     private UserServiceImpl service;
     private final UUID id = UUID.randomUUID();
@@ -42,15 +45,15 @@ class UserServiceImplGoogleAccountTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new UserServiceImpl(userRepository, passwordEncoder, userMapper, profileImageStorage);
+        service = new UserServiceImpl(userRepository, passwordEncoder, userMapper, profileImageStorage, emailVerificationService);
         Client googleAccount = Client.builder().id(1L).publicId(id).name("Ana Pérez").email("ana@example.com")
                 .password("{argon2}random").authProvider(AuthProvider.GOOGLE).googleSubject("sub").build();
         when(userRepository.findByPublicId(id)).thenReturn(Optional.of(googleAccount));
     }
 
     @Test
-    void changeEmail_isRejected() {
-        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.changeEmail(
+    void startEmailChange_isRejected() {
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.startEmailChange(
                 EmailUpdateRequest.builder().newEmail("new@example.com").currentPassword("whatever").build(), id));
 
         assertEquals(400, e.getStatusCode().value());

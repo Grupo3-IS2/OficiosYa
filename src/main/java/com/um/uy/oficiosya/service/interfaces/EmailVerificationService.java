@@ -14,6 +14,12 @@ public interface EmailVerificationService {
     record VerificationResult(UUID userId, String payload) {
     }
 
+    /** How the codes work, for the callers that tell the user (and the frontend, which doesn't hardcode them). */
+    record VerificationTerms(int codeLength, long expiresInSeconds, long resendCooldownSeconds) {
+    }
+
+    VerificationTerms terms();
+
     /**
      * Generates a new code for {@code (email, purpose)}, mails it and stores it hashed,
      * replacing any code already pending for that same pair. Throws a 429 if the last one

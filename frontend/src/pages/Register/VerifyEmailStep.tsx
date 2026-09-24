@@ -1,14 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import Button from '../../components/Button/Button'
 import { resendCode, verifyEmail } from '../../services/authService'
-import type { PendingRegistration } from '../../types/Auth'
+import type { PendingVerification } from '../../types/Auth'
 import { useCountdown } from './useCountdown'
 import { formatCountdown, isCodeComplete, normalizeCode } from './verificationCode'
 
 interface VerifyEmailStepProps {
-  pending: PendingRegistration
+  pending: PendingVerification
   /** The mailed code was sent again: carries the new terms (cooldown, expiry). */
-  onResent: (pending: PendingRegistration) => void
+  onResent: (pending: PendingVerification) => void
   /** Back to the form, keeping what was typed, to fix the email. */
   onChangeEmail: () => void
   onVerified: () => void

@@ -5,7 +5,7 @@ import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
-import com.um.uy.oficiosya.dto.response.PendingRegistrationResponse;
+import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 
 /**
  * Registration in two steps: the data is validated and a code is mailed, and the account is
@@ -18,9 +18,9 @@ public interface RegistrationService {
      * belongs to an account it answers exactly the same and sends nothing, so this cannot be
      * used to find out which emails are registered.
      */
-    PendingRegistrationResponse startRegistration(ClientCreateRequest request);
+    PendingVerificationResponse startRegistration(ClientCreateRequest request);
 
-    PendingRegistrationResponse startRegistration(ProfessionalCreateRequest request);
+    PendingVerificationResponse startRegistration(ProfessionalCreateRequest request);
 
     /** Checks the code, creates the account and logs the user in. */
     LoginResponse verifyEmail(VerifyEmailRequest request);
@@ -30,5 +30,5 @@ public interface RegistrationService {
      * account already there) it answers the same and does nothing, for the same reason as
      * {@link #startRegistration(ClientCreateRequest)}.
      */
-    PendingRegistrationResponse resendCode(ResendCodeRequest request);
+    PendingVerificationResponse resendCode(ResendCodeRequest request);
 }

@@ -13,7 +13,7 @@ import type {
   AccountType,
   LoginRequest,
   LoginResponse,
-  PendingRegistration,
+  PendingVerification,
   RegisterRequest,
   RegistrationProfile,
   StoredUser,
@@ -52,7 +52,7 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
 export async function register(
   request: RegisterRequest,
   profile?: RegistrationProfile,
-): Promise<PendingRegistration> {
+): Promise<PendingVerification> {
   const isProfessional = profile?.accountType === 'professional'
   const endpoint = isProfessional
     ? '/auth/register-professional'
@@ -65,7 +65,7 @@ export async function register(
       }
     : request
 
-  return apiRequest<PendingRegistration>(endpoint, {
+  return apiRequest<PendingVerification>(endpoint, {
     method: 'POST',
     body: JSON.stringify(body),
   })
@@ -130,8 +130,8 @@ export async function googleRegister(
   return response
 }
 
-export async function resendCode(email: string): Promise<PendingRegistration> {
-  return apiRequest<PendingRegistration>('/auth/resend-code', {
+export async function resendCode(email: string): Promise<PendingVerification> {
+  return apiRequest<PendingVerification>('/auth/resend-code', {
     method: 'POST',
     body: JSON.stringify({ email }),
   })

@@ -79,6 +79,44 @@ class RequestRateLimiterTest {
     }
 
     @Test
+    void theConstructorSpringUses_countsWithTheSystemClock() {
+        RequestRateLimiter real = new RequestRateLimiter(2);
+        MockHttpServletRequest request = from("10.0.0.9");
+
+        real.check(request, "registration");
+        real.check(request, "registration");
+
+        assertThrows(ResponseStatusException.class, () -> real.check(request, "registration"));
+    }
+
+    @Test
+    void aBlankXRealIp_fallsBackToTheConnectionAddress() {
+        for (int i = 0; i < 3; i++) {
+            MockHttpServletRequest request = from("10.0.0.5");
+            request.addHeader("X-Real-IP", "   ");
+            limiter.check(request, "registration");
+        }
+
+        assertThrows(ResponseStatusException.class, () -> limiter.check(from("10.0.0.5"), "registration"));
+    }
+
+    @Test
+    void windowsThatAlreadyEnded_areDroppedOnceTooManyClientsAreTracked() {
+        // Enough different clients to pass the purge threshold, then time moves past their window.
+        for (int i = 0; i < 10_050; i++) {
+            limiter.check(from("10." + (i / 65536) + "." + ((i / 256) % 256) + "." + (i % 256)), "registration");
+        }
+        now.addAndGet(61_000);
+
+        // The next check purges the ended windows and still counts normally afterwards.
+        MockHttpServletRequest request = from("192.168.0.1");
+        for (int i = 0; i < 3; i++) {
+            assertDoesNotThrow(() -> limiter.check(request, "registration"));
+        }
+        assertThrows(ResponseStatusException.class, () -> limiter.check(request, "registration"));
+    }
+
+    @Test
     void behindTheProxy_theClientIsWhoNginxReportsInXRealIp() {
         for (int i = 0; i < 3; i++) {
             MockHttpServletRequest request = from("172.18.0.1");

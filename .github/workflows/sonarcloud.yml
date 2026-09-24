@@ -42,13 +42,14 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-      # Tests are skipped: the only backend test boots the whole Spring context
-      # and needs the database. Sonar only needs target/classes to analyse Java.
-      - name: Build and analyze
+      # The unit tests run so JaCoCo can measure coverage (Sonar reads
+      # target/site/jacoco/jacoco.xml); without them the coverage of new code is always 0%.
+      # OficiosYaTests is left out: it boots the whole Spring context and needs the database.
+      - name: Build, test and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
-          mvn -B -DskipTests clean compile
+          mvn -B clean test -Dtest='!OficiosYaTests'
           org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.projectKey=Grupo3-IS2_OficiosYa

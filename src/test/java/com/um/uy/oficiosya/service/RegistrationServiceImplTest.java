@@ -5,7 +5,7 @@ import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
-import com.um.uy.oficiosya.dto.response.PendingRegistrationResponse;
+import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.dto.response.UserResponse;
 import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.Professional;
@@ -98,7 +98,7 @@ class RegistrationServiceImplTest {
     void startRegistration_keepsTheDataPendingAndCreatesNoAccount() {
         when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
 
-        PendingRegistrationResponse response = service.startRegistration(clientRequest());
+        PendingVerificationResponse response = service.startRegistration(clientRequest());
 
         ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
         verify(emailVerificationService).sendCode(
@@ -146,10 +146,10 @@ class RegistrationServiceImplTest {
     void startRegistration_withAnEmailThatHasAnAccount_answersTheSameAndSendsNothing() {
         when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(true);
 
-        PendingRegistrationResponse taken = service.startRegistration(clientRequest());
+        PendingVerificationResponse taken = service.startRegistration(clientRequest());
 
         when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
-        PendingRegistrationResponse free = service.startRegistration(clientRequest());
+        PendingVerificationResponse free = service.startRegistration(clientRequest());
 
         assertEquals(free, taken);
         // Only the second call sent a code.
@@ -260,7 +260,7 @@ class RegistrationServiceImplTest {
         when(emailVerificationService.findPending(EMAIL, VerificationPurpose.REGISTER))
                 .thenReturn(Optional.empty());
 
-        PendingRegistrationResponse response = service.resendCode(ResendCodeRequest.builder().email(EMAIL).build());
+        PendingVerificationResponse response = service.resendCode(ResendCodeRequest.builder().email(EMAIL).build());
 
         assertEquals(EMAIL, response.getEmail());
         verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());

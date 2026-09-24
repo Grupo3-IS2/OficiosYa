@@ -3,7 +3,8 @@ import {
   completeRegistration,
   expectMailCount,
   startClientRegistration,
-  startProfessionalRegistration
+  startProfessionalRegistration,
+  waitForVerificationCode
 } from './support/registration';
 import { blockGoogleIdentity, fakeJwt, mockHomeApi, mockVerifiedSession } from './support/ui';
 
@@ -1170,8 +1171,18 @@ test.describe('OficiosYa - QA suite expandida', () => {
       }
     });
 
-    expect(emailUpdate.status()).toBe(200);
-    const emailBody = await emailUpdate.json();
+    expect(emailUpdate.status()).toBe(202);
+    const emailVerified = await request.post(`${API_BASE}/api/v1/users/me/email/verify`, {
+      headers: {
+        Authorization: `Bearer ${auth.token}`
+      },
+      data: {
+        email: newEmail,
+        code: await waitForVerificationCode(request, newEmail)
+      }
+    });
+    expect(emailVerified.status()).toBe(200);
+    const emailBody = await emailVerified.json();
     expect(emailBody.email).toBe(newEmail);
 
     const nameUpdate = await request.patch(`${API_BASE}/api/v1/clients/me`, {
@@ -1230,7 +1241,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(response.status()).toBe(401);
   });
 
-  test('API: cambio de email con contraseña válida actualiza el email', async ({ request }) => {
+  test('API: cambio de email con contraseña válida manda un código al nuevo correo y lo actualiza al verificarlo', async ({ request }) => {
     const client = {
       name: 'Cliente Email OK',
       email: uniqueEmail('cliente.email.ok'),
@@ -1252,9 +1263,21 @@ test.describe('OficiosYa - QA suite expandida', () => {
       }
     });
 
-    expect(response.status()).toBe(200);
-    const body = await response.json();
-    expect(body.email).toBe(newEmail);
+    // Not changed yet: a code was mailed to the new address.
+    expect(response.status()).toBe(202);
+    expect((await response.json()).email).toBe(newEmail);
+
+    const verified = await request.post(`${API_BASE}/api/v1/users/me/email/verify`, {
+      headers: {
+        Authorization: `Bearer ${createdBody.token}`
+      },
+      data: {
+        email: newEmail,
+        code: await waitForVerificationCode(request, newEmail)
+      }
+    });
+    expect(verified.status()).toBe(200);
+    expect((await verified.json()).email).toBe(newEmail);
   });
 
   test('API: logout invalida la sesión y bloquea acceso al perfil', async ({ request }) => {

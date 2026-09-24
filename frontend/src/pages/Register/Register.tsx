@@ -4,7 +4,7 @@ import GoogleButton from '../../components/GoogleButton/GoogleButton'
 import Icon from '../../components/Icon/Icon'
 import { googleRegister, register } from '../../services/authService'
 import { isGoogleEnabled } from '../../services/googleIdentity'
-import type { AccountType, PendingRegistration } from '../../types/Auth'
+import type { AccountType, PendingVerification } from '../../types/Auth'
 import VerifyEmailStep from './VerifyEmailStep'
 import './Register.css'
 
@@ -34,7 +34,7 @@ function Register() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   // Set once the code was mailed: the form gives way to the code step until the user comes back.
-  const [pending, setPending] = useState<PendingRegistration | null>(null)
+  const [pending, setPending] = useState<PendingVerification | null>(null)
 
   /** What a professional has to give besides the account data; empty when it is fine (or not a professional). */
   const professionalFieldsError = (): string => {

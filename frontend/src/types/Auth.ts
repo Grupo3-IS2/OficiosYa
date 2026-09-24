@@ -16,8 +16,11 @@ export interface RegistrationProfile {
   phoneNumber: string | null
 }
 
-/** Registration started: the account does not exist until the mailed code is verified. */
-export interface PendingRegistration {
+/**
+ * Something started that a mailed code has to finish: a registration (the account does not exist
+ * until the code is verified) or an email change (the email stays as it is until then).
+ */
+export interface PendingVerification {
   email: string
   message: string
   codeLength: number

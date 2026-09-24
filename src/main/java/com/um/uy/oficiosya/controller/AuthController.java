@@ -12,7 +12,7 @@ import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.MessageResponse;
-import com.um.uy.oficiosya.dto.response.PendingRegistrationResponse;
+import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.dto.response.TokenResponse;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
 import com.um.uy.oficiosya.service.interfaces.GoogleAuthService;
@@ -58,7 +58,7 @@ public class AuthController {
 
     /** Doesn't create the account: it mails a code that {@code /verify-email} has to receive. */
     @PostMapping("/register-client")
-    public ResponseEntity<PendingRegistrationResponse> registerClient(
+    public ResponseEntity<PendingVerificationResponse> registerClient(
             @Valid @RequestBody ClientCreateRequest dto, HttpServletRequest request){
         rateLimiter.check(request, REGISTRATION_BUCKET);
         return ResponseEntity.accepted().body(registrationService.startRegistration(dto));
@@ -66,7 +66,7 @@ public class AuthController {
 
     /** Same as {@code /register-client}, for a professional. */
     @PostMapping("/register-professional")
-    public ResponseEntity<PendingRegistrationResponse> registerProfessional(
+    public ResponseEntity<PendingVerificationResponse> registerProfessional(
             @Valid @RequestBody ProfessionalCreateRequest dto, HttpServletRequest request){
         rateLimiter.check(request, REGISTRATION_BUCKET);
         return ResponseEntity.accepted().body(registrationService.startRegistration(dto));
@@ -81,7 +81,7 @@ public class AuthController {
     }
 
     @PostMapping("/resend-code")
-    public ResponseEntity<PendingRegistrationResponse> resendCode(
+    public ResponseEntity<PendingVerificationResponse> resendCode(
             @Valid @RequestBody ResendCodeRequest dto, HttpServletRequest request){
         rateLimiter.check(request, REGISTRATION_BUCKET);
         return ResponseEntity.accepted().body(registrationService.resendCode(dto));

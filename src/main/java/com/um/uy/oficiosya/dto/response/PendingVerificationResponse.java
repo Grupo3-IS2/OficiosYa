@@ -6,14 +6,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Answer to starting (or resending the code of) a registration: the account does not exist
- * yet, the user still has to enter the code that was mailed to {@code email}.
+ * Answer to starting (or resending the code of) a registration or an email change: it is not
+ * done yet, the user still has to enter the code that was mailed to {@code email}.
  */
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class PendingRegistrationResponse {
+public class PendingVerificationResponse {
     private String email;
 
     private String message;

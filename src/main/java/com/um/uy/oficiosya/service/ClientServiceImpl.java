@@ -39,13 +39,24 @@ public class ClientServiceImpl implements ClientService {
     @Override
     @Transactional
     public UserResponse createClient(ClientCreateRequest clientRequest) {
+        return persist(clientRequest, this.passwordEncoder.encode(clientRequest.getPassword()));
+    }
+
+    @Override
+    @Transactional
+    public UserResponse createClient(ClientCreateRequest clientRequest, String encodedPassword) {
+        return persist(clientRequest, encodedPassword);
+    }
+
+    /** What both public methods do: they only differ in where the password hash comes from. */
+    private UserResponse persist(ClientCreateRequest clientRequest, String encodedPassword) {
         if (this.userRepository.existsByEmail(clientRequest.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "No se pudo completar el registro. Verificá los datos e intentá nuevamente.");
         }
 
         Client client = clientMapper.toEntity(clientRequest);
-        client.setPassword(this.passwordEncoder.encode(clientRequest.getPassword()));
+        client.setPassword(encodedPassword);
 
         client = this.clientRepository.save(client);
 

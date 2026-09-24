@@ -30,5 +30,6 @@ public abstract class UserMapper {
 
     @Mapping(target = "id", source = "publicId")
     @Mapping(target = "role", expression = "java(com.um.uy.oficiosya.entity.Role.of(user))")
+    @Mapping(target = "hasPassword", expression = "java(user.getAuthProvider() == com.um.uy.oficiosya.entity.AuthProvider.LOCAL)")
     protected abstract UserResponse toUserResponse(User user);
 }

@@ -2,7 +2,7 @@
 
 Ruta: `/profile/edit`, enlazada desde el menú de perfil. Esta versión representa únicamente un perfil profesional habilitado. Sin sesión muestra datos de prueba que nunca se envían al servidor.
 
-- El correo se cambia con `PUT /api/v1/users/me/email`, que pide la contraseña actual. Al cambiarlo se cierra la sesión porque el token identifica el correo anterior. No existe un flujo de verificación integrado.
+- El correo se cambia en dos pasos. `PUT /api/v1/users/me/email` (con la contraseña actual) manda un código de 6 dígitos al **correo nuevo** y responde 202: la cuenta sigue con su correo hasta que se ingresa el código. Debajo del campo aparece `EmailChangeVerification`, que lo envía a `POST /api/v1/users/me/email/verify`; también puede reenviarlo (`/me/email/resend`, con cuenta regresiva) o cancelar el cambio. El token no cambia porque identifica al usuario por su `publicId`, no por el correo. Un cambio empezado no cuenta como cambio sin guardar. Las cuentas creadas con Google no pueden cambiar el correo.
 - Foto (JPG/PNG, hasta 5 MB) se sube con `POST /api/v1/users/me/profile-image` al guardar la sección; hasta entonces se muestra una vista previa cuya URL se libera al reemplazar la foto, guardarla, descartar los cambios o salir. La foto guardada llega en `profileImageUrl` de `/api/v1/users/me`.
 - El teléfono, la descripción y la ubicación del profesional llegan en `/api/v1/users/me`. El cliente no tiene teléfono en el servidor.
 - Nombre y teléfono se guardan en el endpoint del rol, `PATCH /api/v1/clients/me` o `PATCH /api/v1/professionals/me`; el backend toma la cuenta del token. El backend ignora los campos vacíos, así que la respuesta manda sobre lo que quedó guardado. El nombre todavía no es editable en el formulario.

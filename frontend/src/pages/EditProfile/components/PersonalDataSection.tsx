@@ -1,11 +1,18 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import Button from '../../../components/Button/Button'
 import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
+import type { PendingVerification } from '../../../types/Auth'
 import type { PersonalData } from '../profileState'
+import EmailChangeVerification from './EmailChangeVerification'
 
-export default function PersonalDataSection({ value, onChange, onPhotoChange, onSave, message, error, emailChanged, currentPassword, onCurrentPasswordChange, showPhone }: {
+export default function PersonalDataSection({ value, onChange, onPhotoChange, onSave, message, error, emailChanged, currentPassword, onCurrentPasswordChange, showPhone, emailEditable = true, emailChange, currentEmail, onConfirmEmailChange, onResendEmailChange, onCancelEmailChange }: {
     value: PersonalData; onChange: Dispatch<SetStateAction<PersonalData>>; onPhotoChange: (file: File) => void; onSave: () => Promise<boolean>; message?: string; error?: string
     emailChanged: boolean; currentPassword: string; onCurrentPasswordChange: (password: string) => void; showPhone: boolean
+    /** False for an account created with Google: its email can't be changed from here. */
+    emailEditable?: boolean
+    /** A change of email waiting for its code (mailed to the new address), if any. */
+    emailChange: PendingVerification | null; currentEmail: string
+    onConfirmEmailChange: (code: string) => Promise<void>; onResendEmailChange: () => Promise<PendingVerification>; onCancelEmailChange: () => void
 }) {
     const { name, email, phone, avatar } = value
     const setEmail = (email: string) => onChange(previous => ({ ...previous, email }))
@@ -36,8 +43,9 @@ export default function PersonalDataSection({ value, onChange, onPhotoChange, on
                 </div>
                 <div className="personal-fields">
                     <div className="profile-field"><label htmlFor="profile-name">Nombre</label><input id="profile-name" autoComplete="name" value={name} disabled /></div>
-                    <div className="profile-field"><label htmlFor="profile-email">Correo electrónico</label><input id="profile-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} aria-describedby="email-help" /><small id="email-help">Si cambias tu correo, tendrás que verificarlo.</small></div>
-                    {emailChanged && <div className="profile-field"><label htmlFor="profile-email-password">Contraseña actual</label><input id="profile-email-password" type="password" autoComplete="current-password" required value={currentPassword} onChange={event => onCurrentPasswordChange(event.target.value)} aria-describedby="email-password-help" /><small id="email-password-help">Necesaria para confirmar el cambio de correo.</small></div>}
+                    <div className="profile-field"><label htmlFor="profile-email">Correo electrónico</label><input id="profile-email" type="email" autoComplete="email" required value={email} readOnly={!emailEditable || emailChange !== null} onChange={event => setEmail(event.target.value)} aria-describedby="email-help" /><small id="email-help">{emailEditable ? 'Si cambias tu correo, tendrás que verificarlo.' : 'Tu cuenta usa Google: el correo no se puede cambiar.'}</small></div>
+                    {emailChange && <EmailChangeVerification key={emailChange.email} pending={emailChange} currentEmail={currentEmail} onConfirm={onConfirmEmailChange} onResend={onResendEmailChange} onCancel={onCancelEmailChange} />}
+                    {emailChanged && !emailChange && <div className="profile-field"><label htmlFor="profile-email-password">Contraseña actual</label><input id="profile-email-password" type="password" autoComplete="current-password" required value={currentPassword} onChange={event => onCurrentPasswordChange(event.target.value)} aria-describedby="email-password-help" /><small id="email-password-help">Necesaria para confirmar el cambio de correo.</small></div>}
                     {showPhone && <div className="profile-field"><label htmlFor="profile-phone">Número de teléfono</label><input id="profile-phone" type="tel" autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} /></div>}
                     <div className="profile-actions"><Button type="submit">Guardar cambios</Button></div>
                     {error && <p className="profile-error" role="alert">{error}</p>}

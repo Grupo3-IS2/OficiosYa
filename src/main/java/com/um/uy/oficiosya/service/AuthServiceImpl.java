@@ -1,8 +1,6 @@
 package com.um.uy.oficiosya.service;
 
-import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.LoginRequest;
-import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.MessageResponse;
 import com.um.uy.oficiosya.dto.response.TokenResponse;
@@ -10,9 +8,7 @@ import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.entity.User;
 import com.um.uy.oficiosya.repository.UserRepository;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
-import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.JwtService;
-import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import com.um.uy.oficiosya.service.interfaces.TokenRevocationService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,22 +33,15 @@ public class AuthServiceImpl implements AuthService {
 
     private final JwtService jwtService;
 
-    private final ClientService clientService;
-
-    private final ProfessionalService professionalService;
-
     private final TokenRevocationService tokenRevocationService;
 
     private final String dummyPasswordHash;
 
     public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
-                           ClientService clientService, ProfessionalService professionalService,
                            TokenRevocationService tokenRevocationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.clientService = clientService;
-        this.professionalService = professionalService;
         this.tokenRevocationService = tokenRevocationService;
         this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
@@ -81,35 +70,6 @@ public class AuthServiceImpl implements AuthService {
                 user.getName(),
                 Role.of(user),
                 "Usuario " + user.getEmail() + " inició sesión correctamente");
-    }
-
-    @Override
-    public LoginResponse register(ClientCreateRequest request) {
-        clientService.createClient(request);
-        return this.loginResponseFor(request.getEmail());
-    }
-
-    @Override
-    public LoginResponse register(ProfessionalCreateRequest request) {
-        professionalService.createProfessional(request);
-        return this.loginResponseFor(request.getEmail());
-    }
-
-    private LoginResponse loginResponseFor(String email) {
-        User user = userRepository.findByEmailIgnoreCase(email == null ? "" : email.trim().toLowerCase(Locale.ROOT))
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Usuario no encontrado")
-                );
-
-        String jwtToken = jwtService.generateToken(user);
-
-        return new LoginResponse(
-                user.getPublicId(),
-                jwtToken,
-                user.getEmail(),
-                user.getName(),
-                Role.of(user),
-                "Usuario " + user.getEmail() + " registrado correctamente");
     }
 
     @Override

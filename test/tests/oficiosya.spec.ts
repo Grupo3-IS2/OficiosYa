@@ -1,63 +1,18 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import {
+  completeRegistration,
+  expectMailCount,
+  startClientRegistration,
+  startProfessionalRegistration,
+  waitForVerificationCode
+} from './support/registration';
+import { blockGoogleIdentity, fakeJwt, mockHomeApi, mockVerifiedSession } from './support/ui';
 
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:8080';
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL ?? 'http://localhost:5173';
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}@qa.test`;
-}
-
-/**
- * Unsigned JWT for UI tests. The frontend only reads `exp` to decide if the session
- * looks alive; the backend rejects it, so pages that call the API need mockVerifiedSession.
- */
-function fakeJwt(expiresInSeconds = 3600) {
-  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
-  const now = Math.floor(Date.now() / 1000);
-  return `${encode({ alg: 'RS256' })}.${encode({ sub: 'qa-ui-user', iat: now, exp: now + expiresInSeconds })}.firma-invalida`;
-}
-
-/**
- * Home loads trades and professionals on mount. With a fakeJwt stored, the real backend answers
- * 401 to those calls and the frontend expires the session, so UI tests with a session mock them.
- */
-async function mockHomeApi(page: Page) {
-  await page.route('**/api/v1/trades', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: '[]'
-  }));
-  await page.route('**/api/v1/professionals/search**', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({ content: [], totalPages: 0 })
-  }));
-}
-
-async function mockVerifiedSession(page: Page, user: { name: string; email: string; role?: 'CLIENT' | 'PROFESSIONAL' }) {
-  await mockHomeApi(page);
-  await page.route('**/api/v1/auth/verify', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      verified: true,
-      emittedDate: new Date().toISOString(),
-      expirationDate: new Date(Date.now() + 3600_000).toISOString()
-    })
-  }));
-  await page.route('**/api/v1/users/me', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      id: '33333333-3333-3333-3333-333333333333',
-      name: user.name,
-      email: user.email,
-      phoneNumber: null,
-      profileImageUrl: null,
-      role: user.role ?? 'CLIENT',
-      createdAt: new Date().toISOString()
-    })
-  }));
 }
 
 async function postJson(request: APIRequestContext, url: string, payload: unknown) {
@@ -69,8 +24,13 @@ async function postJson(request: APIRequestContext, url: string, payload: unknow
   });
 }
 
+/**
+ * Registration is two steps now (the account exists only once the emailed code is verified).
+ * These do both and answer with the login the second one returns, so a test that just needs
+ * an account keeps working; a start that is refused (validation) is returned as is.
+ */
 async function registerClient(request: APIRequestContext, payload: { name: string; email: string; password: string }) {
-  return postJson(request, `${API_BASE}/api/v1/auth/register-client`, payload);
+  return completeRegistration(request, await startClientRegistration(request, payload), payload.email);
 }
 
 async function registerProfessional(request: APIRequestContext, payload: {
@@ -80,7 +40,7 @@ async function registerProfessional(request: APIRequestContext, payload: {
   phoneNumber: string;
   workingLocation?: string;
 }) {
-  return postJson(request, `${API_BASE}/api/v1/auth/register-professional`, payload);
+  return completeRegistration(request, await startProfessionalRegistration(request, payload), payload.email);
 }
 
 async function login(request: APIRequestContext, payload: { email: string; password: string }) {
@@ -96,6 +56,8 @@ async function getAuthenticatedUser(request: APIRequestContext, token: string) {
 }
 
 test.describe('OficiosYa - QA suite expandida', () => {
+  test.beforeEach(async ({ page }) => blockGoogleIdentity(page));
+
   test('SCRUM-9: Registro de nuevo usuario cliente exitoso', async ({ request }) => {
     const payload = {
       name: 'Cliente QA Scrum',
@@ -113,7 +75,8 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.token).toBeTruthy();
   });
 
-  test('API: registro de cliente rechaza email duplicado', async ({ request }) => {
+  test('API: registrar un email que ya tiene cuenta responde igual que uno libre y no envía correo', async ({ request }) => {
+    // Answering differently would reveal which emails are registered.
     const payload = {
       name: 'Cliente QA Duplicado',
       email: uniqueEmail('cliente.duplicado'),
@@ -123,10 +86,13 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const first = await registerClient(request, payload);
     expect(first.status()).toBe(200);
 
-    const second = await registerClient(request, payload);
-    expect(second.status()).toBe(400);
+    const second = await startClientRegistration(request, payload);
+    expect(second.status()).toBe(202);
     const body = await second.json();
-    expect(body.error).toMatch(/no se pudo completar el registro/i);
+    expect(body.email).toBe(payload.email);
+
+    // Only the code for the first registration was ever mailed.
+    await expectMailCount(request, payload.email, 1);
   });
 
   test('API: registro de cliente rechaza nombre inválido', async ({ request }) => {
@@ -197,7 +163,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.email).toBe(upperEmail.toLowerCase());
   });
 
-  test.fixme('API: registro rechaza email duplicado con distinta capitalización', async ({ request }) => {
+  test('API: un email duplicado con distinta capitalización se trata como el mismo', async ({ request }) => {
     const email = uniqueEmail('cliente.case.duplicado');
     const first = await registerClient(request, {
       name: 'Cliente Case Uno',
@@ -206,15 +172,14 @@ test.describe('OficiosYa - QA suite expandida', () => {
     });
     expect(first.status()).toBe(200);
 
-    const second = await registerClient(request, {
+    const second = await startClientRegistration(request, {
       name: 'Cliente Case Dos',
       email: email.toUpperCase(),
       password: 'ClaveSegura2026!'
     });
 
-    expect(second.status()).toBe(400);
-    const body = await second.json();
-    expect(body.error).toMatch(/no se pudo completar el registro/i);
+    expect(second.status()).toBe(202);
+    await expectMailCount(request, email, 1);
   });
 
   test('API: login acepta email con mayúsculas', async ({ request }) => {
@@ -236,7 +201,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.email).toBe(email.toLowerCase());
   });
 
-  test('API: login rechaza email con espacios extra (comportamiento actual del backend)', async ({ request }) => {
+  test('API: login acepta email con espacios extra y mayúsculas (se recortan y normalizan)', async ({ request }) => {
     const payload = {
       name: 'Cliente Espacios',
       email: uniqueEmail('cliente.spaces'),
@@ -247,13 +212,14 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
 
     const response = await login(request, {
-      email: `  ${payload.email}  `,
+      email: `  ${payload.email.toUpperCase()}  `,
       password: payload.password
     });
 
-    expect(response.status()).toBe(400);
+    expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body.error).toMatch(/incorrect|bad request|email|contraseña|user|validaci/i);
+    expect(body.email).toBe(payload.email);
+    expect(body.token).toBeTruthy();
   });
 
   test('API: login rechaza contraseña incorrecta', async ({ request }) => {
@@ -307,27 +273,6 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(response.status()).toBe(200);
     const body = await response.json();
     expect(body.email).toBe(rawEmail.toLowerCase());
-  });
-
-  test.fixme('API: registro rechaza email duplicado con distinta capitalización (dashboard real)', async ({ request }) => {
-    const email = uniqueEmail('cliente.case.duplicado');
-
-    const first = await registerClient(request, {
-      name: 'Cliente Case Uno',
-      email,
-      password: 'ClaveSegura2026!'
-    });
-    expect(first.status()).toBe(200);
-
-    const second = await registerClient(request, {
-      name: 'Cliente Case Dos',
-      email: email.toUpperCase(),
-      password: 'ClaveSegura2026!'
-    });
-
-    expect(second.status()).toBe(400);
-    const body = await second.json();
-    expect(body.error).toMatch(/no se pudo completar el registro/i);
   });
 
   test('API: contraseña con longitud mínima exacta (8) es válida cuando cumple requisitos', async ({ request }) => {
@@ -1227,8 +1172,18 @@ test.describe('OficiosYa - QA suite expandida', () => {
       }
     });
 
-    expect(emailUpdate.status()).toBe(200);
-    const emailBody = await emailUpdate.json();
+    expect(emailUpdate.status()).toBe(202);
+    const emailVerified = await request.post(`${API_BASE}/api/v1/users/me/email/verify`, {
+      headers: {
+        Authorization: `Bearer ${auth.token}`
+      },
+      data: {
+        email: newEmail,
+        code: await waitForVerificationCode(request, newEmail)
+      }
+    });
+    expect(emailVerified.status()).toBe(200);
+    const emailBody = await emailVerified.json();
     expect(emailBody.email).toBe(newEmail);
 
     const nameUpdate = await request.patch(`${API_BASE}/api/v1/clients/me`, {
@@ -1287,7 +1242,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(response.status()).toBe(401);
   });
 
-  test('API: cambio de email con contraseña válida actualiza el email', async ({ request }) => {
+  test('API: cambio de email con contraseña válida manda un código al nuevo correo y lo actualiza al verificarlo', async ({ request }) => {
     const client = {
       name: 'Cliente Email OK',
       email: uniqueEmail('cliente.email.ok'),
@@ -1309,9 +1264,21 @@ test.describe('OficiosYa - QA suite expandida', () => {
       }
     });
 
-    expect(response.status()).toBe(200);
-    const body = await response.json();
-    expect(body.email).toBe(newEmail);
+    // Not changed yet: a code was mailed to the new address.
+    expect(response.status()).toBe(202);
+    expect((await response.json()).email).toBe(newEmail);
+
+    const verified = await request.post(`${API_BASE}/api/v1/users/me/email/verify`, {
+      headers: {
+        Authorization: `Bearer ${createdBody.token}`
+      },
+      data: {
+        email: newEmail,
+        code: await waitForVerificationCode(request, newEmail)
+      }
+    });
+    expect(verified.status()).toBe(200);
+    expect((await verified.json()).email).toBe(newEmail);
   });
 
   test('API: logout invalida la sesión y bloquea acceso al perfil', async ({ request }) => {
@@ -1483,15 +1450,14 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await page.route('**/api/v1/auth/register-client', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 300));
       await route.fulfill({
-        status: 200,
+        status: 202,
         contentType: 'application/json',
         body: JSON.stringify({
-          id: '22222222-2222-2222-2222-222222222222',
-          token: 'dummy-token-2',
           email: 'registro.loading@qa.test',
-          name: 'Usuario Registro',
-          role: 'CLIENT',
-          message: 'OK'
+          message: 'OK',
+          codeLength: 6,
+          expiresInSeconds: 900,
+          resendCooldownSeconds: 60
         })
       });
     });

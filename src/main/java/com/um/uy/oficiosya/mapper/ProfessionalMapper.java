@@ -15,6 +15,7 @@ public interface ProfessionalMapper {
 
     @Mapping(target = "id", source = "publicId")
     @Mapping(target = "role", constant = "PROFESSIONAL")
+    @Mapping(target = "hasPassword", expression = "java(professional.getAuthProvider() == com.um.uy.oficiosya.entity.AuthProvider.LOCAL)")
     ProfessionalResponse toResponse(Professional professional);
 
     @Mapping(target = "id", source = "publicId")

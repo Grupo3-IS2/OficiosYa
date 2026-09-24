@@ -96,3 +96,9 @@
     .profile-trade-picker .button { padding-inline: 12px; }
     .profile-actions .button { width: 100%; padding-inline: 12px; }
 }
+.profile-actions .button--ghost { background: #fff; border: 1px solid #0ba756; color: #07984c; }
+.profile-actions .button--ghost:hover { background: #effaf3; }
+.email-change__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 4px; }
+.email-change__actions > button:not(.button) { padding: 6px 0; border: 0; background: none; color: #078747; font: inherit; font-size: 15px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.email-change__actions > button:not(.button):disabled { color: #829091; font-weight: 400; text-decoration: none; cursor: default; }
+@media (max-width: 680px) { .email-change__actions .button { width: 100%; } }

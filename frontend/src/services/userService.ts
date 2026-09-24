@@ -1,4 +1,5 @@
 import { apiRequest } from './api'
+import type { PendingVerification } from '../types/Auth'
 import type { ExpertiseTrade, Trade } from '../types/Professional'
 
 export interface UserResponse {
@@ -8,6 +9,10 @@ export interface UserResponse {
   profileImageUrl: string | null
   role: 'CLIENT' | 'PROFESSIONAL'
   createdAt: string
+  /** False for an account created with Google: there is no password to change or confirm with. */
+  hasPassword: boolean
+  /** Whether a Google account is linked to this one. */
+  googleLinked: boolean
 }
 
 export interface ProfessionalResponse extends UserResponse {
@@ -50,14 +55,47 @@ export interface EmailUpdateRequest {
   currentPassword: string
 }
 
+export function linkGoogle(credential: string, currentPassword: string): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/google', {
+    method: 'PUT',
+    body: JSON.stringify({ credential, currentPassword }),
+  })
+}
+
+export function unlinkGoogle(currentPassword: string): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/google', {
+    method: 'DELETE',
+    body: JSON.stringify({ currentPassword }),
+  })
+}
+
 export function getAuthenticatedUser(): Promise<AuthenticatedUserResponse> {
   return apiRequest<AuthenticatedUserResponse>('/users/me')
 }
 
-export function changeEmail(request: EmailUpdateRequest): Promise<AuthenticatedUserResponse> {
-  return apiRequest<AuthenticatedUserResponse>('/users/me/email', {
+/**
+ * First step of changing the email: mails a code to the NEW address and changes nothing yet.
+ * `verifyEmailChange` finishes it.
+ */
+export function startEmailChange(request: EmailUpdateRequest): Promise<PendingVerification> {
+  return apiRequest<PendingVerification>('/users/me/email', {
     method: 'PUT',
     body: JSON.stringify(request),
+  })
+}
+
+/** Second step: the code that reached the new address; the email changes and the user comes back updated. */
+export function verifyEmailChange(newEmail: string, code: string): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/email/verify', {
+    method: 'POST',
+    body: JSON.stringify({ email: newEmail, code }),
+  })
+}
+
+export function resendEmailChangeCode(newEmail: string): Promise<PendingVerification> {
+  return apiRequest<PendingVerification>('/users/me/email/resend', {
+    method: 'POST',
+    body: JSON.stringify({ email: newEmail }),
   })
 }
 

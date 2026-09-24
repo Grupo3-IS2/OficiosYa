@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import Button from '../../components/Button/Button'
+import GoogleButton from '../../components/GoogleButton/GoogleButton'
 import Icon from '../../components/Icon/Icon'
-import { login } from '../../services/authService'
+import { ApiError } from '../../services/api'
+import { googleLink, googleLogin, login } from '../../services/authService'
+import { emailFromCredential } from '../../services/googleCredential'
+import { isGoogleEnabled } from '../../services/googleIdentity'
+import LinkGoogleModal from './LinkGoogleModal'
 import './Login.css'
 
 function Brand() {
@@ -22,6 +27,9 @@ function Login() {
     const [showPassword, setShowPassword] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
+    // The Google token of someone whose email already has a password account: waiting for them
+    // to choose whether to link it.
+    const [credentialToLink, setCredentialToLink] = useState<string | null>(null)
     const [sessionExpired] = useState(
         () => new URLSearchParams(window.location.search).get('expired') === '1',
     )
@@ -42,6 +50,25 @@ function Login() {
             )
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const handleGoogleCredential = async (credential: string) => {
+        setErrorMessage('')
+
+        try {
+            await googleLogin(credential)
+            window.location.href = '/'
+        } catch (error) {
+            if (error instanceof ApiError && error.status === 409) {
+                setCredentialToLink(credential)
+                return
+            }
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : 'No se pudo iniciar sesión con Google.',
+            )
         }
     }
 
@@ -125,11 +152,29 @@ function Login() {
                     )}
                 </form>
 
+                {isGoogleEnabled() && (
+                    <>
+                        <div className="auth-divider"><span>o</span></div>
+                        <GoogleButton text="signin_with" onCredential={handleGoogleCredential} />
+                    </>
+                )}
+
                 <div className="login-divider" />
                 <p className="create-account">
                     ¿Todavía no tenés cuenta? <a href="/register">Crear cuenta</a>
                 </p>
             </section>
+
+            {credentialToLink && (
+                <LinkGoogleModal
+                    email={emailFromCredential(credentialToLink)}
+                    onLink={async (password) => {
+                        await googleLink(credentialToLink, password)
+                        window.location.href = '/'
+                    }}
+                    onCancel={() => setCredentialToLink(null)}
+                />
+            )}
         </main>
     )
 }

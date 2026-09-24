@@ -20,6 +20,7 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Optional;
@@ -80,7 +81,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(normalizedEmail, purpose)
                 .ifPresent(previous -> {
                     LocalDateTime cooldownEnds = previous.getLastSentAt().plusSeconds(resendCooldownSeconds);
-                    if (cooldownEnds.isAfter(LocalDateTime.now())) {
+                    if (cooldownEnds.isAfter(now())) {
                         throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                                 "Esperá unos segundos antes de pedir otro código");
                     }
@@ -99,8 +100,8 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
                 .payload(payload)
                 .codeHash(hash(code, salt))
                 .salt(salt)
-                .expiresAt(LocalDateTime.now().plusMinutes(expirationMinutes))
-                .lastSentAt(LocalDateTime.now())
+                .expiresAt(now().plusMinutes(expirationMinutes))
+                .lastSentAt(now())
                 .build();
 
         repository.save(verificationCode);
@@ -123,7 +124,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
                 .filter(candidate -> !candidate.isConsumed())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, WRONG_CODE_MESSAGE));
 
-        if (verificationCode.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (verificationCode.getExpiresAt().isBefore(now())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El código expiró, pedí uno nuevo");
         }
 
@@ -160,8 +161,14 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
     private String generateCode() {
         int bound = (int) Math.pow(10, codeLength);
-        int value = RANDOM.nextInt(bound);
-        return String.format("%0" + codeLength + "d", value);
+        String digits = Integer.toString(RANDOM.nextInt(bound));
+        // Leading zeros are part of the code: 000042 is a valid one.
+        return "0".repeat(codeLength - digits.length()).concat(digits);
+    }
+
+    /** The server's own zone, said out loud: the stored times and the expiry checks must agree on it. */
+    private static LocalDateTime now() {
+        return LocalDateTime.now(ZoneId.systemDefault());
     }
 
     private String generateSalt() {

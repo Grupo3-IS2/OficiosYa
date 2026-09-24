@@ -175,9 +175,10 @@ class GoogleAuthServiceImplTest {
     @Test
     void link_withNoAccount_answersLikeAWrongPasswordAndStillComparesAPassword() {
         when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
+        var request = linkRequest(PASSWORD);
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
-                () -> service.link(linkRequest(PASSWORD)));
+                () -> service.link(request));
 
         assertEquals(400, e.getStatusCode().value());
         assertEquals("Contraseña incorrecta", e.getReason());
@@ -314,9 +315,10 @@ class GoogleAuthServiceImplTest {
         Client account = localAccount();
         when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
         when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
+        var accountId = account.getPublicId();
+        var request = GoogleLinkUpdateRequest.builder().credential(CREDENTIAL).currentPassword(PASSWORD).build();
 
-        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.linkToUser(account.getPublicId(),
-                GoogleLinkUpdateRequest.builder().credential(CREDENTIAL).currentPassword(PASSWORD).build()));
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.linkToUser(accountId, request));
 
         assertEquals(400, e.getStatusCode().value());
         // Tells which email to use.

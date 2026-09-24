@@ -111,8 +111,10 @@ class UserServiceImplEmailChangeTest {
 
     @Test
     void startEmailChange_withAWrongPassword_sendsNothing() {
+        var request = change(NEW_EMAIL, "wrong");
+        var userId = user.getPublicId();
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
-                () -> service.startEmailChange(change(NEW_EMAIL, "wrong"), user.getPublicId()));
+                () -> service.startEmailChange(request, userId));
 
         assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
         verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());
@@ -120,8 +122,10 @@ class UserServiceImplEmailChangeTest {
 
     @Test
     void startEmailChange_toTheSameEmail_isRejected() {
+        var request = change("ANA@example.com", PASSWORD);
+        var userId = user.getPublicId();
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
-                () -> service.startEmailChange(change("ANA@example.com", PASSWORD), user.getPublicId()));
+                () -> service.startEmailChange(request, userId));
 
         assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
         verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());
@@ -130,8 +134,10 @@ class UserServiceImplEmailChangeTest {
     @Test
     void startEmailChange_toAnAddressThatHasAnAccount_isRejectedAndSendsNothing() {
         when(userRepository.existsByEmailIgnoreCase(NEW_EMAIL)).thenReturn(true);
+        var request = change(NEW_EMAIL, PASSWORD);
+        var userId = user.getPublicId();
 
-        assertThrows(UserAlreadyExists.class, () -> service.startEmailChange(change(NEW_EMAIL, PASSWORD), user.getPublicId()));
+        assertThrows(UserAlreadyExists.class, () -> service.startEmailChange(request, userId));
 
         verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());
     }
@@ -156,9 +162,10 @@ class UserServiceImplEmailChangeTest {
         givenPending(NEW_EMAIL, user.getPublicId());
         when(emailVerificationService.verifyCode(NEW_EMAIL, VerificationPurpose.EMAIL_CHANGE, "000000"))
                 .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Código incorrecto o vencido"));
+        var request = VerifyEmailRequest.builder().email(NEW_EMAIL).code("000000").build();
+        var userId = user.getPublicId();
 
-        assertThrows(ResponseStatusException.class, () -> service.verifyEmailChange(
-                VerifyEmailRequest.builder().email(NEW_EMAIL).code("000000").build(), user.getPublicId()));
+        assertThrows(ResponseStatusException.class, () -> service.verifyEmailChange(request, userId));
 
         assertEquals(OLD_EMAIL, user.getEmail());
         verify(userRepository, never()).save(any());
@@ -167,17 +174,19 @@ class UserServiceImplEmailChangeTest {
     @Test
     void verifyEmailChange_forACodeThatIsAnotherUsersOrNoOne_doesNotEvenTryIt() {
         givenPending(NEW_EMAIL, UUID.randomUUID());
+        var request = VerifyEmailRequest.builder().email(NEW_EMAIL).code("123456").build();
+        var userId = user.getPublicId();
 
-        assertThrows(ResponseStatusException.class, () -> service.verifyEmailChange(
-                VerifyEmailRequest.builder().email(NEW_EMAIL).code("123456").build(), user.getPublicId()));
+        assertThrows(ResponseStatusException.class, () -> service.verifyEmailChange(request, userId));
 
         // It must not use up somebody else's attempts.
         verify(emailVerificationService, never()).verifyCode(anyString(), any(), anyString());
         assertEquals(OLD_EMAIL, user.getEmail());
 
         when(emailVerificationService.findPending(NEW_EMAIL, VerificationPurpose.EMAIL_CHANGE)).thenReturn(Optional.empty());
-        assertThrows(ResponseStatusException.class, () -> service.verifyEmailChange(
-                VerifyEmailRequest.builder().email(NEW_EMAIL).code("123456").build(), user.getPublicId()));
+        var request2 = VerifyEmailRequest.builder().email(NEW_EMAIL).code("123456").build();
+        var userId2 = user.getPublicId();
+        assertThrows(ResponseStatusException.class, () -> service.verifyEmailChange(request2, userId2));
         verify(emailVerificationService, never()).verifyCode(anyString(), any(), anyString());
     }
 
@@ -185,9 +194,10 @@ class UserServiceImplEmailChangeTest {
     void verifyEmailChange_ifTheAddressWasTakenInTheMeantime_isRejected() {
         givenPending(NEW_EMAIL, user.getPublicId());
         when(userRepository.existsByEmailIgnoreCase(NEW_EMAIL)).thenReturn(true);
+        var request = VerifyEmailRequest.builder().email(NEW_EMAIL).code("123456").build();
+        var userId = user.getPublicId();
 
-        assertThrows(UserAlreadyExists.class, () -> service.verifyEmailChange(
-                VerifyEmailRequest.builder().email(NEW_EMAIL).code("123456").build(), user.getPublicId()));
+        assertThrows(UserAlreadyExists.class, () -> service.verifyEmailChange(request, userId));
 
         assertEquals(OLD_EMAIL, user.getEmail());
         verify(userRepository, never()).save(any());
@@ -217,9 +227,10 @@ class UserServiceImplEmailChangeTest {
     @Test
     void resendEmailChangeCode_cantBeUsedToMailCodesToAnyAddress() {
         when(emailVerificationService.findPending(anyString(), any())).thenReturn(Optional.empty());
+        var request = ResendCodeRequest.builder().email("victima@example.com").build();
+        var userId = user.getPublicId();
 
-        assertThrows(ResponseStatusException.class, () -> service.resendEmailChangeCode(
-                ResendCodeRequest.builder().email("victima@example.com").build(), user.getPublicId()));
+        assertThrows(ResponseStatusException.class, () -> service.resendEmailChangeCode(request, userId));
 
         verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());
         verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), isNull());

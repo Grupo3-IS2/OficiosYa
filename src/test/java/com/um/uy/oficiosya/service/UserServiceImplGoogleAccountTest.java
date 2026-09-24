@@ -53,8 +53,8 @@ class UserServiceImplGoogleAccountTest {
 
     @Test
     void startEmailChange_isRejected() {
-        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.startEmailChange(
-                EmailUpdateRequest.builder().newEmail("new@example.com").currentPassword("whatever").build(), id));
+        var request = EmailUpdateRequest.builder().newEmail("new@example.com").currentPassword("whatever").build();
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.startEmailChange(request, id));
 
         assertEquals(400, e.getStatusCode().value());
         verify(userRepository, never()).save(any());
@@ -62,9 +62,9 @@ class UserServiceImplGoogleAccountTest {
 
     @Test
     void changePassword_isRejected() {
-        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.changePassword(
-                PasswordUpdateRequest.builder().oldPassword("a").newPassword("B!1aaaaaaa")
-                        .newPasswordConfirmation("B!1aaaaaaa").build(), id));
+        var request = PasswordUpdateRequest.builder().oldPassword("a").newPassword("B!1aaaaaaa")
+                        .newPasswordConfirmation("B!1aaaaaaa").build();
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.changePassword(request, id));
 
         assertEquals(400, e.getStatusCode().value());
         verify(userRepository, never()).save(any());

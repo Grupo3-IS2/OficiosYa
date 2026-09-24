@@ -96,8 +96,9 @@ class RequestRateLimiterTest {
             request.addHeader("X-Real-IP", "   ");
             limiter.check(request, "registration");
         }
+        var client = from("10.0.0.5");
 
-        assertThrows(ResponseStatusException.class, () -> limiter.check(from("10.0.0.5"), "registration"));
+        assertThrows(ResponseStatusException.class, () -> limiter.check(client, "registration"));
     }
 
     @Test

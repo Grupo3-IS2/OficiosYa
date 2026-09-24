@@ -84,7 +84,7 @@ public class GoogleTokenVerifierImpl implements GoogleTokenVerifier {
     private GoogleIdToken parse(String credential) {
         try {
             return GoogleIdToken.parse(JSON_FACTORY, credential);
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException _) {
             throw invalid();
         }
     }

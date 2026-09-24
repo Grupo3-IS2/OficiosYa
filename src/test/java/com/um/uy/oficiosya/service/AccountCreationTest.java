@@ -103,9 +103,10 @@ class AccountCreationTest {
     @Test
     void createClient_withAnEmailThatHasAnAccount_isRejectedAndSavesNothing() {
         when(userRepository.existsByEmail(EMAIL)).thenReturn(true);
+        var request = clientRequest();
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
-                () -> clientService.createClient(clientRequest(), "{argon2}ready"));
+                () -> clientService.createClient(request, "{argon2}ready"));
 
         assertEquals(400, e.getStatusCode().value());
         verify(clientRepository, never()).save(any());
@@ -144,9 +145,10 @@ class AccountCreationTest {
     @Test
     void createProfessional_withAnEmailThatHasAnAccount_isRejectedAndSavesNothing() {
         when(userRepository.existsByEmail(EMAIL)).thenReturn(true);
+        var request = professionalRequest();
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
-                () -> professionalService.createProfessional(professionalRequest(), "{argon2}ready"));
+                () -> professionalService.createProfessional(request, "{argon2}ready"));
 
         assertEquals(400, e.getStatusCode().value());
         verify(professionalRepository, never()).save(any());

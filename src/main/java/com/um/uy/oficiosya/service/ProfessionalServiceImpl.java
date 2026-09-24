@@ -57,12 +57,17 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Override
     @Transactional
     public ProfessionalResponse createProfessional(ProfessionalCreateRequest professionalRequest) {
-        return createProfessional(professionalRequest, this.passwordEncoder.encode(professionalRequest.getPassword()));
+        return persist(professionalRequest, this.passwordEncoder.encode(professionalRequest.getPassword()));
     }
 
     @Override
     @Transactional
     public ProfessionalResponse createProfessional(ProfessionalCreateRequest professionalRequest, String encodedPassword) {
+        return persist(professionalRequest, encodedPassword);
+    }
+
+    /** What both public methods do: they only differ in where the password hash comes from. */
+    private ProfessionalResponse persist(ProfessionalCreateRequest professionalRequest, String encodedPassword) {
         if (this.userRepository.existsByEmail(professionalRequest.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "No se pudo completar el registro. Verificá los datos e intentá nuevamente.");

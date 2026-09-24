@@ -210,9 +210,9 @@ class RegistrationServiceImplTest {
     void verifyEmail_withABadCode_createsNothing() {
         when(emailVerificationService.verifyCode(EMAIL, VerificationPurpose.REGISTER, "000000"))
                 .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Código incorrecto o vencido"));
+        var request = VerifyEmailRequest.builder().email(EMAIL).code("000000").build();
 
-        assertThrows(ResponseStatusException.class, () -> service.verifyEmail(
-                VerifyEmailRequest.builder().email(EMAIL).code("000000").build()));
+        assertThrows(ResponseStatusException.class, () -> service.verifyEmail(request));
 
         verifyNoInteractions(clientService, professionalService, jwtService);
     }
@@ -221,9 +221,9 @@ class RegistrationServiceImplTest {
     void verifyEmail_withACodeThatCarriesNoRegistration_isRejected() {
         when(emailVerificationService.verifyCode(EMAIL, VerificationPurpose.REGISTER, "123456"))
                 .thenReturn(new VerificationResult(UUID.randomUUID(), null));
+        var request = VerifyEmailRequest.builder().email(EMAIL).code("123456").build();
 
-        assertThrows(ResponseStatusException.class, () -> service.verifyEmail(
-                VerifyEmailRequest.builder().email(EMAIL).code("123456").build()));
+        assertThrows(ResponseStatusException.class, () -> service.verifyEmail(request));
 
         verifyNoInteractions(clientService, professionalService);
     }
@@ -232,10 +232,10 @@ class RegistrationServiceImplTest {
     void verifyEmail_normalizesTheEmail() {
         when(emailVerificationService.verifyCode(EMAIL, VerificationPurpose.REGISTER, "123456"))
                 .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "x"));
+        var request = VerifyEmailRequest.builder().email("  Ana@Example.COM ").code("123456").build();
 
         // Built directly, so the setter that lowercases is not involved.
-        assertThrows(ResponseStatusException.class, () -> service.verifyEmail(
-                VerifyEmailRequest.builder().email("  Ana@Example.COM ").code("123456").build()));
+        assertThrows(ResponseStatusException.class, () -> service.verifyEmail(request));
 
         verify(emailVerificationService).verifyCode(EMAIL, VerificationPurpose.REGISTER, "123456");
     }

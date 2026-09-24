@@ -201,7 +201,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.email).toBe(email.toLowerCase());
   });
 
-  test('API: login rechaza email con espacios extra (comportamiento actual del backend)', async ({ request }) => {
+  test('API: login acepta email con espacios extra y mayúsculas (se recortan y normalizan)', async ({ request }) => {
     const payload = {
       name: 'Cliente Espacios',
       email: uniqueEmail('cliente.spaces'),
@@ -212,13 +212,14 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
 
     const response = await login(request, {
-      email: `  ${payload.email}  `,
+      email: `  ${payload.email.toUpperCase()}  `,
       password: payload.password
     });
 
-    expect(response.status()).toBe(400);
+    expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body.error).toMatch(/incorrect|bad request|email|contraseña|user|validaci/i);
+    expect(body.email).toBe(payload.email);
+    expect(body.token).toBeTruthy();
   });
 
   test('API: login rechaza contraseña incorrecta', async ({ request }) => {

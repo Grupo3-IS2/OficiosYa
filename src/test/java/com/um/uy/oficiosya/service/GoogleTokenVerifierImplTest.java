@@ -74,9 +74,10 @@ class GoogleTokenVerifierImplTest {
     @Test
     void aTokenTheLibraryRejects_is401() throws Exception {
         when(googleVerifier.verify(any(GoogleIdToken.class))).thenReturn(false);
+        var credential = token(
+                "{\"sub\":\"1234\",\"email\":\"ana@example.com\",\"email_verified\":true}");
 
-        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> verifier.verify(token(
-                "{\"sub\":\"1234\",\"email\":\"ana@example.com\",\"email_verified\":true}")));
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> verifier.verify(credential));
 
         assertEquals(401, statusOf(e));
     }
@@ -90,9 +91,10 @@ class GoogleTokenVerifierImplTest {
     @Test
     void anUnverifiedEmail_is400() throws Exception {
         when(googleVerifier.verify(any(GoogleIdToken.class))).thenReturn(true);
+        var credential = token(
+                "{\"sub\":\"1234\",\"email\":\"ana@example.com\",\"email_verified\":false}");
 
-        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> verifier.verify(token(
-                "{\"sub\":\"1234\",\"email\":\"ana@example.com\",\"email_verified\":false}")));
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> verifier.verify(credential));
 
         assertEquals(400, statusOf(e));
     }
@@ -100,11 +102,13 @@ class GoogleTokenVerifierImplTest {
     @Test
     void aTokenWithoutEmailOrSubject_is401() throws Exception {
         when(googleVerifier.verify(any(GoogleIdToken.class))).thenReturn(true);
+        var credential = token("{\"sub\":\"1234\",\"email_verified\":true}");
 
         assertEquals(401, statusOf(assertThrows(ResponseStatusException.class,
-                () -> verifier.verify(token("{\"sub\":\"1234\",\"email_verified\":true}")))));
+                () -> verifier.verify(credential))));
+        var credential2 = token("{\"email\":\"ana@example.com\",\"email_verified\":true}");
         assertEquals(401, statusOf(assertThrows(ResponseStatusException.class,
-                () -> verifier.verify(token("{\"email\":\"ana@example.com\",\"email_verified\":true}")))));
+                () -> verifier.verify(credential2))));
     }
 
     @Test
@@ -122,9 +126,10 @@ class GoogleTokenVerifierImplTest {
     void withoutAClientId_googleSignInIsOffAndAnswers503() {
         for (String clientId : new String[]{"", "  ", null}) {
             GoogleTokenVerifierImpl disabled = new GoogleTokenVerifierImpl(clientId);
+            var credential = token("{\"sub\":\"1\",\"email\":\"a@b.co\",\"email_verified\":true}");
 
             assertEquals(503, statusOf(assertThrows(ResponseStatusException.class,
-                    () -> disabled.verify(token("{\"sub\":\"1\",\"email\":\"a@b.co\",\"email_verified\":true}")))));
+                    () -> disabled.verify(credential))));
         }
     }
 }

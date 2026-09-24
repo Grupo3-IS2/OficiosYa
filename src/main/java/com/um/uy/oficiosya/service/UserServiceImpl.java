@@ -30,6 +30,8 @@ import java.util.UUID;
 @Service
 public class UserServiceImpl implements UserService {
 
+    private static final String USER_NOT_FOUND = "Usuario no encontrado.";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
@@ -48,14 +50,14 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse getUser(UUID id) {
-        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         return userMapper.toResponse(user);
     }
 
     @Override
     @Transactional
     public PendingVerificationResponse startEmailChange(EmailUpdateRequest emailRequest, UUID id) {
-        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
 
         requireOwnPassword(user);
 
@@ -85,7 +87,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public UserResponse verifyEmailChange(VerifyEmailRequest request, UUID id) {
-        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
 
         requireOwnPassword(user);
 
@@ -108,7 +110,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public PendingVerificationResponse resendEmailChangeCode(ResendCodeRequest request, UUID id) {
-        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
 
         requireOwnPassword(user);
 
@@ -152,7 +154,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void changePassword(PasswordUpdateRequest passwordRequest, UUID id){
-        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
 
         requireOwnPassword(user);
 
@@ -183,7 +185,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponse changeProfileImage(MultipartFile image, UUID id) {
-        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
 
         String previousImageUrl = user.getProfileImageUrl();
 
@@ -198,7 +200,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void deleteUser(UUID id){
-        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException("Usuario no encontrado."));
+        User user = userRepository.findByPublicId(id).orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         userRepository.delete(user);
     }
 

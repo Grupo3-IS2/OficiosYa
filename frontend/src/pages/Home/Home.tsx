@@ -96,7 +96,7 @@ function Home() {
                                     </div>}
                     </section>
 
-                    <section className="professionals">
+                    <section id="professionals" className="professionals">
                         <div className="section-heading">
                             <div>
                                 <h2>{selectedTrade?.name ?? 'Profesionales'}</h2>

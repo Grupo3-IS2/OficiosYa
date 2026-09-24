@@ -2,6 +2,7 @@ import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
 import type { Professional } from '../../../types/Professional'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
+import { getCurrentUser } from '../../../services/authService'
 import Rating from './Rating'
 import './ProfessionalCard.css'
 
@@ -11,6 +12,11 @@ interface ProfessionalCardProps {
 }
 
 function ProfessionalCard({ professional, selectedTradeId = null }: ProfessionalCardProps) {
+    const currentUser = getCurrentUser()
+    const isOwnProfile = currentUser?.id === professional.id
+    const profilePath = selectedTradeId === null
+        ? `/profesionales/${professional.id}`
+        : `/profesionales/${professional.id}?tradeId=${selectedTradeId}`
     const relevantTrades = selectedTradeId === null
         ? professional.expertiseTrades
         : professional.expertiseTrades.filter(trade => trade.tradeId === selectedTradeId)
@@ -44,7 +50,12 @@ function ProfessionalCard({ professional, selectedTradeId = null }: Professional
                     Desde / hora
                     <strong>${price.toLocaleString('es-UY')}</strong>
                 </span>}
-                <Button type="button" disabled title="Vista de perfil próximamente">Ver perfil</Button>
+                <Button
+                    type="button"
+                    onClick={() => { window.location.href = isOwnProfile ? '/profile/edit' : profilePath }}
+                >
+                    {isOwnProfile ? 'Ir a panel profesional' : 'Ver perfil'}
+                </Button>
             </div>
         </article>
     )

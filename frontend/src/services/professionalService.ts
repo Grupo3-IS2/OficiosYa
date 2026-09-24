@@ -20,3 +20,7 @@ export async function getProfessionals(): Promise<Professional[]> {
 
     return professionals
 }
+
+export function getProfessional(id: string): Promise<Professional> {
+    return apiRequest<Professional>(`/professional/${encodeURIComponent(id)}`)
+}

@@ -22,5 +22,5 @@ export async function getProfessionals(): Promise<Professional[]> {
 }
 
 export function getProfessional(id: string): Promise<Professional> {
-    return apiRequest<Professional>(`/professional/${encodeURIComponent(id)}`)
+    return apiRequest<Professional>(`/professionals/${encodeURIComponent(id)}`)
 }

@@ -40,5 +40,5 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
     if (status === 'unavailable') {
         return <p role="alert">No pudimos verificar tu sesión. Revisá tu conexión e intentá nuevamente.</p>
     }
-    return <p role="status">Verificando sesión...</p>
+    return <output>Verificando sesión...</output>
 }

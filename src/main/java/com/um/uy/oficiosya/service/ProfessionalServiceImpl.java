@@ -33,6 +33,8 @@ import java.util.UUID;
 @Service
 public class ProfessionalServiceImpl implements ProfessionalService {
 
+    private static final String PROFESSIONAL_NOT_FOUND = "Profesional no encontrado.";
+
     private final ProfessionalRepository professionalRepository;
     private final UserRepository userRepository;
     private final TradeRepository tradeRepository;
@@ -85,7 +87,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public ProfessionalResponse updateProfessional(ProfessionalUpdateRequest professionalRequest, UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
 
         if (professionalRequest.getName() != null && !professionalRequest.getName().isBlank()) {
             professional.setName(professionalRequest.getName());
@@ -111,7 +113,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional(readOnly = true)
     public ProfessionalResponse getProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
         return professionalMapper.toResponse(professional);
     }
 
@@ -120,7 +122,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     public ProfessionalPublicResponse getPublicProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
                 .filter(Professional::isPublished)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
         return professionalMapper.toPublicResponse(professional);
     }
 
@@ -128,7 +130,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public void deleteProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
         professionalRepository.delete(professional);
     }
 
@@ -144,7 +146,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public ProfessionalResponse publishProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
 
         if (professional.getDescription() == null || professional.getDescription().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -165,7 +167,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public ProfessionalResponse unpublishProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
 
         professional.setPublished(false);
         professional = professionalRepository.save(professional);
@@ -176,7 +178,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public ProfessionalResponse addExpertiseTrade(UUID professionalId, ExpertiseTradeCreateRequest request) {
         Professional professional = professionalRepository.findByPublicId(professionalId)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
 
         if (request.getMinimumHourlyWage().compareTo(request.getMaximumHourlyWage()) > 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,

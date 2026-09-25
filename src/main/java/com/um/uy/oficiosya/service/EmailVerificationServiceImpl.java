@@ -63,8 +63,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     @PostConstruct
     void warnIfSecretIsTheDefault() {
         if (secret == null || secret.isBlank() || DEFAULT_SECRET.equals(secret)) {
-            log.warn("app.verification.secret is not set: verification codes are hashed with the public default. "
-                    + "Set VERIFICATION_SECRET before deploying.");
+            log.warn("app.verification.secret is not set: codes are hashed with the public default, set VERIFICATION_SECRET");
         }
     }
 

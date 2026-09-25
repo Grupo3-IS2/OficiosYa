@@ -35,7 +35,7 @@ export default function SecuritySection({ value, onChange, onSave, message, erro
             </div>
             <div className="profile-actions"><Button type="submit">Actualizar contraseña</Button></div>
             {error && <p className="profile-error" role="alert">{error}</p>}
-            {message && <p className="profile-feedback" role="status">{message}</p>}
+            {message && <output className="profile-feedback">{message}</output>}
         </form>
     </section>
 }

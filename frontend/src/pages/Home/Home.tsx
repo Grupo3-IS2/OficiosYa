@@ -88,7 +88,7 @@ function Home() {
 
                 <div className="content">
                     <section className="categories" aria-label="Categorías">
-                        {loadingTrades ? <p role="status">Cargando rubros...</p>
+                        {loadingTrades ? <output>Cargando rubros...</output>
                             : tradesError ? <p role="alert">No pudimos cargar los rubros. Intentá de nuevo más tarde.</p>
                                 : trades.length === 0 ? <p>Todavía no hay rubros disponibles.</p>
                                     : <div className="category-list">
@@ -121,7 +121,7 @@ function Home() {
                             <button type="button" className="active-filters__clear" onClick={clearAllFilters}>Limpiar filtros</button>
                         </div>}
 
-                        {loadingProfessionals ? <p role="status">Cargando profesionales...</p>
+                        {loadingProfessionals ? <output>Cargando profesionales...</output>
                             : professionalsError ? <p role="alert">No pudimos cargar los profesionales. Intentá de nuevo más tarde.</p>
                                 : professionals.length === 0 ? <p>Todavía no hay profesionales publicados.</p>
                                     : orderedProfessionals.length === 0 ? <div className="professionals-empty"><h3>No encontramos profesionales con estos filtros</h3><p>Probá ampliar el rango o limpiar algún filtro.</p><button type="button" onClick={clearAllFilters}>Limpiar filtros</button></div>

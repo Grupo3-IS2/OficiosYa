@@ -85,4 +85,17 @@ starting the backend (CI does it in `.github/workflows/playwright.yml`):
   check what needs no Google (validation, "no session", an invalid token) and the page cases replace Google's script
   and the API answers with mocks. They need the frontend started with `VITE_GOOGLE_CLIENT_ID`; `playwright.config.ts` sets it
   when it starts the dev server, and against one started without it those cases skip.
-- The other specs replace Google's script with an inert one (`blockGoogleIdentity`), so the suite never reaches accounts.google.com.
+- `tests/work-zone-map.spec.ts`: the map of a professional's zone (OpenStreetMap, drawn with Leaflet). Nominatim, the map's
+  tiles and the profile are mocked, so it needs no backend and no internet: it checks what the page asks Nominatim for, how it
+  answers (a saved street falls back to the neighbourhood when OpenStreetMap doesn't know it), the mouse wheel zoom, and
+  that the map carries only the credit that OpenStreetMap's licence asks for.
+- `tests/work-zone-picker.spec.ts`: choosing the zone on the map when registering as a professional: the suggestions that
+  appear while typing (from Photon: after a pause, from three letters, one search per pause and not per key, nothing that
+  is not a zone), picking one, tapping the map, zoom with the buttons and the wheel, street-level names, the precision of
+  the address asked for according to the zoom, and what is sent when the account is registered. Also fully mocked.
+- `tests/work-zone-edit-profile.spec.ts`: the same picker in "Editar perfil": it opens on the saved zone, choosing another
+  fills the field, and saving sends it. Also fully mocked. The map publishes its zoom level in `data-zoom`, which these
+  specs read to check the zoom. `blockExternalMaps` (in `support/ui.ts`) answers Nominatim, Photon and the tiles with empty
+  responses in every spec that doesn't test the map, so none of them reaches the internet.
+- The other specs replace Google's script with an inert one (`blockGoogleIdentity`) and the map's tiles with a blank one
+  (`blockExternalMaps`), so the suite never reaches accounts.google.com nor OpenStreetMap.

@@ -31,7 +31,10 @@ export async function mailsTo(request: APIRequestContext, email: string): Promis
  */
 export async function waitForVerificationCode(request: APIRequestContext, email: string, messages = 1): Promise<string> {
   let inbox: MailSummary[] = [];
-  await expect.poll(async () => (inbox = await mailsTo(request, email)).length, {
+  await expect.poll(async () => {
+    inbox = await mailsTo(request, email);
+    return inbox.length;
+  }, {
     message: `no llegó el correo con el código a ${email}`,
     timeout: 15_000
   }).toBeGreaterThanOrEqual(messages);

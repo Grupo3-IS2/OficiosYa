@@ -59,9 +59,9 @@ function GoogleButton({ text, onCredential }: GoogleButtonProps) {
 
   if (failed) {
     return (
-      <p className="google-button-error" role="status">
+      <output className="google-button-error">
         No pudimos cargar el acceso con Google. Probá de nuevo más tarde o usá tu correo y contraseña.
-      </p>
+      </output>
     )
   }
 

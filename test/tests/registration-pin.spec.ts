@@ -10,7 +10,7 @@ import {
   verifyEmail,
   waitForVerificationCode
 } from './support/registration';
-import { blockGoogleIdentity } from './support/ui';
+import { blockExternalMaps, blockGoogleIdentity } from './support/ui';
 
 /**
  * Registration with an emailed code: the account does not exist until the code is verified.
@@ -30,7 +30,10 @@ async function login(request: APIRequestContext, email: string, password = PASSW
 }
 
 test.describe('Registro con código por correo', () => {
-  test.beforeEach(async ({ page }) => blockGoogleIdentity(page));
+  test.beforeEach(async ({ page }) => {
+    await blockGoogleIdentity(page);
+    await blockExternalMaps(page);
+  });
 
   test('API: registrar cliente responde 202, manda el código y NO crea la cuenta', async ({ request }) => {
     const email = uniqueEmail('pin.cliente');

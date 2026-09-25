@@ -6,7 +6,7 @@ import {
   startProfessionalRegistration,
   waitForVerificationCode
 } from './support/registration';
-import { blockGoogleIdentity, fakeJwt, mockHomeApi, mockVerifiedSession } from './support/ui';
+import { blockExternalMaps, blockGoogleIdentity, fakeJwt, mockHomeApi, mockVerifiedSession } from './support/ui';
 
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:8080';
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL ?? 'http://localhost:5173';
@@ -56,7 +56,10 @@ async function getAuthenticatedUser(request: APIRequestContext, token: string) {
 }
 
 test.describe('OficiosYa - QA suite expandida', () => {
-  test.beforeEach(async ({ page }) => blockGoogleIdentity(page));
+  test.beforeEach(async ({ page }) => {
+    await blockGoogleIdentity(page);
+    await blockExternalMaps(page);
+  });
 
   test('SCRUM-9: Registro de nuevo usuario cliente exitoso', async ({ request }) => {
     const payload = {

@@ -49,7 +49,7 @@ export default function PersonalDataSection({ value, onChange, onPhotoChange, on
                     {showPhone && <div className="profile-field"><label htmlFor="profile-phone">Número de teléfono</label><input id="profile-phone" type="tel" autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} /></div>}
                     <div className="profile-actions"><Button type="submit">Guardar cambios</Button></div>
                     {error && <p className="profile-error" role="alert">{error}</p>}
-                    {message && <p className="profile-feedback" role="status">{message}</p>}
+                    {message && <output className="profile-feedback">{message}</output>}
                 </div>
             </form>
         </section>

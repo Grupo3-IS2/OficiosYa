@@ -83,7 +83,7 @@ export default function GoogleAccountSection({ access, email, onChange }: {
                 </>
             )}
             {error && <p className="profile-error" role="alert">{error}</p>}
-            {message && <p className="profile-feedback" role="status">{message}</p>}
+            {message && <output className="profile-feedback">{message}</output>}
         </section>
     )
 }

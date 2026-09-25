@@ -26,6 +26,9 @@ import java.util.UUID;
 @Service
 public class ScheduleServiceImpl implements ScheduleService {
 
+    private static final String BLOCK_STARTS_AFTER_END = "El inicio del bloque debe ser anterior al fin";
+    private static final String BLOCK_OVERLAPS = "Ya existe un bloque de agenda en ese horario";
+
     private final ScheduleRepository scheduleRepository;
     private final ProfessionalRepository professionalRepository;
     private final ScheduleMapper scheduleMapper;
@@ -48,7 +51,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         if (!scheduleRequest.getStartTimestamp().isBefore(scheduleRequest.getEndTimestamp())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El inicio del bloque debe ser anterior al fin");
+                    BLOCK_STARTS_AFTER_END);
         }
 
         Professional professional = professionalRepository.findByPublicId(professionalId)
@@ -56,7 +59,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         if (scheduleRepository.existsOverlapping(professionalId, scheduleRequest.getStartTimestamp(),
                 scheduleRequest.getEndTimestamp(), 0L)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un bloque de agenda en ese horario");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
         }
 
         Schedule schedule = scheduleMapper.toEntity(scheduleRequest);
@@ -88,11 +91,11 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         if (!start.isBefore(end)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El inicio del bloque debe ser anterior al fin");
+                    BLOCK_STARTS_AFTER_END);
         }
 
         if (scheduleRepository.existsOverlapping(professionalId, start, end, id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un bloque de agenda en ese horario");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
         }
 
         schedule.setStartTimestamp(start);
@@ -107,13 +110,13 @@ public class ScheduleServiceImpl implements ScheduleService {
     public ScheduleResponse createJobSchedule(JobRequest jobRequest, LocalDateTime start, LocalDateTime end) {
         if (start == null || end == null || !start.isBefore(end)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El inicio del bloque debe ser anterior al fin");
+                    BLOCK_STARTS_AFTER_END);
         }
 
         Professional professional = jobRequest.getProfessional();
 
         if (scheduleRepository.existsOverlapping(professional.getPublicId(), start, end, 0L)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un bloque de agenda en ese horario");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
         }
 
         Schedule schedule = Schedule.builder()

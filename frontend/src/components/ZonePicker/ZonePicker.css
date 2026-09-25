@@ -1,0 +1,11 @@
+/* The map under the location field. */
+.zone-picker { margin: 4px 0 0; }
+
+.zone-picker__choices { margin: 0 0 8px; padding: 0; border: 1px solid #dce4e2; border-radius: 9px; list-style: none; overflow: hidden; }
+.zone-picker__choices li + li { border-top: 1px solid #edf0ef; }
+.zone-picker__choices button { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 9px 12px; border: 0; background: #fff; text-align: left; cursor: pointer; }
+.zone-picker__choices button:hover, .zone-picker__choices button:focus-visible { background: #eefaf2; outline: 0; }
+.zone-picker__choices strong { color: #1f2d40; font-size: 14px; }
+.zone-picker__choices small { color: #5b6a7d; font-size: 12px; }
+
+.zone-picker__note { margin: 8px 0 0; color: #5b6a7d; font-size: 13px; }

@@ -18,7 +18,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Date;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -77,16 +76,13 @@ public class AuthServiceImpl implements AuthService {
         String token = this.getToken(request);
         String subject = token.isEmpty() ? "" : this.jwtService.extractUsername(token);
 
-        boolean verified = false;
-        Date expirationDate = null;
-        Date emissionDate = null;
-        if (!token.isEmpty() && this.findByPublicId(subject).isPresent()) {
-            verified = !jwtService.isTokenExpired(token);
-            expirationDate = this.jwtService.extractExpiration(token);
-            emissionDate = this.jwtService.extractEmisionDate(token);
+        if (token.isEmpty() || this.findByPublicId(subject).isEmpty()) {
+            return new TokenResponse(false, null, null);
         }
-        return new TokenResponse(verified, emissionDate, expirationDate);
-
+        return new TokenResponse(
+                !jwtService.isTokenExpired(token),
+                this.jwtService.extractEmisionDate(token),
+                this.jwtService.extractExpiration(token));
     }
 
     /**
@@ -114,7 +110,7 @@ public class AuthServiceImpl implements AuthService {
     private String subjectOf(String token) {
         try {
             return jwtService.extractUsername(token);
-        } catch (JwtException e) {
+        } catch (JwtException _) {
             log.warn("Token with an unreadable subject on logout");
             return "";
         }
@@ -124,7 +120,7 @@ public class AuthServiceImpl implements AuthService {
     private Optional<User> findByPublicId(String subject) {
         try {
             return userRepository.findByPublicId(UUID.fromString(subject));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             log.warn("Token with an invalid subject: {}", subject);
             return Optional.empty();
         }

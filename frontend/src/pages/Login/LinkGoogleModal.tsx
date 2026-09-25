@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type SubmitEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../components/Button/Button'
 import './LinkGoogleModal.css'
@@ -32,7 +32,7 @@ function LinkGoogleModal({ email, onLink, onCancel }: LinkGoogleModalProps) {
     }
   }, [])
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
     setErrorMessage('')
     setIsLinking(true)

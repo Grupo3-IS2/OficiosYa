@@ -10,6 +10,6 @@ export default function BecomeProfessionalCard() {
         <p>Activa tu perfil profesional para crear publicaciones y comenzar a recibir solicitudes de clientes.</p>
         <Button type="button" onClick={() => setMessage('Próximamente podrás activar tu perfil profesional desde aquí.')}>Quiero ofrecer mis servicios</Button>
         <small>También podrás seguir contratando servicios.</small>
-        {message && <p className="profile-feedback" role="status">{message}</p>}
+        {message && <output className="profile-feedback">{message}</output>}
     </section>
 }

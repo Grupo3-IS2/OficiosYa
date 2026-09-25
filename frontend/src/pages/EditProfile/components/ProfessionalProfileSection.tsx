@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import Button from '../../../components/Button/Button'
+import ZonePicker from '../../../components/ZonePicker/ZonePicker'
 import type { Trade } from '../../../types/Professional'
 import type { ProfessionalData, ProfessionalTradeData } from '../profileState'
 
-export default function ProfessionalProfileSection({ value, onChange, onSave, message, error, trades, tradesLoading, tradesError }: {
+export default function ProfessionalProfileSection({ value, onChange, onSave, message, error, trades, tradesLoading, tradesError }: Readonly<{
     value: ProfessionalData; onChange: (value: ProfessionalData) => void; onSave: () => Promise<boolean>
     message?: string; error?: string; trades: Trade[]; tradesLoading: boolean; tradesError: string
-}) {
+}>) {
     const { description, workingLocation, published } = value
     const setDescription = (description: string) => onChange({ ...value, description })
     const setWorkingLocation = (workingLocation: string) => onChange({ ...value, workingLocation })
@@ -40,6 +41,7 @@ export default function ProfessionalProfileSection({ value, onChange, onSave, me
             <div className="profile-field">
                 <label htmlFor="profile-working-location">Ubicación de trabajo</label>
                 <input id="profile-working-location" value={workingLocation} onChange={event => setWorkingLocation(event.target.value)} />
+                <ZonePicker query={workingLocation} onChoose={setWorkingLocation} locateSaved />
             </div>
             <div className="profile-field">
                 <label htmlFor="profile-trade-select">Oficios que realizás</label>
@@ -69,7 +71,7 @@ export default function ProfessionalProfileSection({ value, onChange, onSave, me
             </label>
             <div className="profile-actions"><Button type="submit">Guardar cambios</Button></div>
             {error && <p className="profile-error" role="alert">{error}</p>}
-            {message && <p className="profile-feedback" role="status">{message}</p>}
+            {message && <output className="profile-feedback">{message}</output>}
         </form>
     </section>
 }

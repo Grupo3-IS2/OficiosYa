@@ -39,6 +39,26 @@ export async function blockGoogleIdentity(page: Page) {
   }));
 }
 
+/**
+ * The register form of a professional shows a map, which asks OpenStreetMap for its tiles. Cases that
+ * don't test the map answer them with a blank one, so the suite never depends on reaching it (nor
+ * loads its servers from CI).
+ */
+export async function blockExternalMaps(page: Page) {
+  const blank = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({ contentType: 'image/png', body: blank }));
+  await page.route('https://nominatim.openstreetmap.org/**', (route) => route.fulfill({
+    contentType: 'application/json',
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    body: '[]'
+  }));
+  await page.route('https://photon.komoot.io/**', (route) => route.fulfill({
+    contentType: 'application/json',
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify({ type: 'FeatureCollection', features: [] })
+  }));
+}
+
 export interface MockedUser {
   name: string;
   email: string;
@@ -56,7 +76,7 @@ export async function mockVerifiedSession(page: Page, user: MockedUser) {
     body: JSON.stringify({
       verified: true,
       emittedDate: new Date().toISOString(),
-      expirationDate: new Date(Date.now() + 3600_000).toISOString()
+      expirationDate: new Date(Date.now() + 3_600_000).toISOString()
     })
   }));
   await page.route('**/api/v1/users/me', (route) => route.fulfill({

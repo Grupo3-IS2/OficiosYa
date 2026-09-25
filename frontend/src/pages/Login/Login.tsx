@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SubmitEvent } from 'react'
 import Button from '../../components/Button/Button'
 import GoogleButton from '../../components/GoogleButton/GoogleButton'
 import Icon from '../../components/Icon/Icon'
@@ -34,7 +34,7 @@ function Login() {
         () => new URLSearchParams(window.location.search).get('expired') === '1',
     )
 
-    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
         event.preventDefault()
         setErrorMessage('')
         setIsSubmitting(true)
@@ -95,9 +95,9 @@ function Login() {
                 </div>
 
                 {sessionExpired && (
-                    <p className="login-notice" role="status">
+                    <output className="login-notice">
                         Tu sesión venció. Iniciá sesión nuevamente.
-                    </p>
+                    </output>
                 )}
 
                 <form className="login-form" onSubmit={handleSubmit}>

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SubmitEvent } from 'react'
 import Button from '../../components/Button/Button'
 import { resendCode, verifyEmail } from '../../services/authService'
 import type { PendingVerification } from '../../types/Auth'
@@ -26,7 +26,7 @@ function VerifyEmailStep({ pending, onResent, onChangeEmail, onVerified }: Verif
   const canVerify = isCodeComplete(code, pending.codeLength) && !isVerifying
   const canResend = secondsLeft === 0 && !isResending
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!canVerify) return
 
@@ -108,9 +108,9 @@ function VerifyEmailStep({ pending, onResent, onChangeEmail, onVerified }: Verif
           </p>
         )}
         {infoMessage && (
-          <p className="register-info" role="status">
+          <output className="register-info">
             {infoMessage}
-          </p>
+          </output>
         )}
       </form>
 

@@ -37,6 +37,8 @@ import java.util.UUID;
 @Service
 public class JobRequestServiceImpl implements JobRequestService {
 
+    private static final String JOB_NOT_FOUND = "Trabajo no encontrado.";
+
     private static final SecureRandom PIN_RANDOM = new SecureRandom();
 
     private final JobRequestRepository jobRequestRepository;
@@ -138,7 +140,7 @@ public class JobRequestServiceImpl implements JobRequestService {
     @Transactional
     public JobRequestResponse cancelJobRequest(Long id, UUID requesterId) {
         JobRequest jobRequest = jobRequestRepository.findById(id)
-                .orElseThrow(() -> new JobRequestNotFoundException("Trabajo no encontrado."));
+                .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!isParticipant(jobRequest, requesterId)) {
             throw new AccessDeniedException("No tenés permiso para cancelar este trabajo");
@@ -181,7 +183,7 @@ public class JobRequestServiceImpl implements JobRequestService {
     @Transactional
     public JobRequestResponse reviewJobRequest(Long id, JobRequestReviewRequest request, UUID clientId) {
         JobRequest jobRequest = jobRequestRepository.findById(id)
-                .orElseThrow(() -> new JobRequestNotFoundException("Trabajo no encontrado."));
+                .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!jobRequest.getClient().getPublicId().equals(clientId)) {
             throw new AccessDeniedException("No tenés permiso para calificar este trabajo");
@@ -212,7 +214,7 @@ public class JobRequestServiceImpl implements JobRequestService {
     @Transactional(readOnly = true)
     public JobRequestResponse getJobRequest(Long id, UUID requesterId) {
         JobRequest jobRequest = jobRequestRepository.findById(id)
-                .orElseThrow(() -> new JobRequestNotFoundException("Trabajo no encontrado."));
+                .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!isParticipant(jobRequest, requesterId)) {
             throw new AccessDeniedException("No tenés permiso para ver este trabajo");
@@ -239,7 +241,7 @@ public class JobRequestServiceImpl implements JobRequestService {
 
     private JobRequest findOwnedByProfessional(Long id, UUID professionalId, String action) {
         JobRequest jobRequest = jobRequestRepository.findById(id)
-                .orElseThrow(() -> new JobRequestNotFoundException("Trabajo no encontrado."));
+                .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!jobRequest.getProfessional().getPublicId().equals(professionalId)) {
             throw new AccessDeniedException("No tenés permiso para " + action + " este trabajo");

@@ -60,7 +60,7 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                     <span aria-hidden="true">←</span> Volver a profesionales
                 </button>
 
-                {loading && <div className="profile-status" role="status">Cargando perfil...</div>}
+                {loading && <output className="profile-status">Cargando perfil...</output>}
                 {!loading && error && (
                     <div className="profile-status profile-status--error" role="alert">
                         <h1>{error}</h1>

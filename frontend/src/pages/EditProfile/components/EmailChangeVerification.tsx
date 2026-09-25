@@ -75,6 +75,6 @@ export default function EmailChangeVerification({ pending, currentEmail, onConfi
             <button type="button" disabled={busy} onClick={onCancel}>Cancelar el cambio</button>
         </div>
         {error && <p className="profile-error" role="alert">{error}</p>}
-        {info && <p className="profile-feedback" role="status">{info}</p>}
+        {info && <output className="profile-feedback">{info}</output>}
     </div>
 }

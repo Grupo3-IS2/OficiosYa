@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SubmitEvent } from 'react'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
 import './SearchBar.css'
@@ -6,7 +6,7 @@ import './SearchBar.css'
 function SearchBar() {
     const [query, setQuery] = useState('')
 
-    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
         event.preventDefault()
     }
 

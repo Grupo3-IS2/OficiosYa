@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -84,9 +84,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                     "Un bloque de tipo SCHEDULED_JOB no se puede modificar manualmente");
         }
 
-        LocalDateTime start = scheduleRequest.getStartTimestamp() != null
+        OffsetDateTime start = scheduleRequest.getStartTimestamp() != null
                 ? scheduleRequest.getStartTimestamp() : schedule.getStartTimestamp();
-        LocalDateTime end = scheduleRequest.getEndTimestamp() != null
+        OffsetDateTime end = scheduleRequest.getEndTimestamp() != null
                 ? scheduleRequest.getEndTimestamp() : schedule.getEndTimestamp();
 
         if (!start.isBefore(end)) {
@@ -107,7 +107,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     @Transactional
-    public ScheduleResponse createJobSchedule(JobRequest jobRequest, LocalDateTime start, LocalDateTime end) {
+    public ScheduleResponse createJobSchedule(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
         if (start == null || end == null || !start.isBefore(end)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     BLOCK_STARTS_AFTER_END);
@@ -145,7 +145,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ScheduleResponse> getAgenda(UUID professionalId, LocalDateTime from, LocalDateTime to,
+    public List<ScheduleResponse> getAgenda(UUID professionalId, OffsetDateTime from, OffsetDateTime to,
                                             boolean ownerOrAdmin) {
         boolean visible = ownerOrAdmin
                 ? professionalRepository.existsByPublicId(professionalId)

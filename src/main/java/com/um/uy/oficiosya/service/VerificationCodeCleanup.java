@@ -6,8 +6,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.OffsetDateTime;
 
 /**
  * Drops verification codes that expired without being used (an abandoned registration, a
@@ -26,7 +25,7 @@ public class VerificationCodeCleanup {
     @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT5M")
     @Transactional
     public void purgeExpired() {
-        repository.deleteByExpiresAtBefore(LocalDateTime.now(ZoneId.systemDefault()));
+        repository.deleteByExpiresAtBefore(OffsetDateTime.now());
         log.debug("Expired verification codes purged");
     }
 }

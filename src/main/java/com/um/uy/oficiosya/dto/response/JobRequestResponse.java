@@ -8,7 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,15 +26,15 @@ public class JobRequestResponse {
     private List<TaskResponse> tasks;
 
     /** The timeframe the professional agreed to when accepting; null while PROPOSED, REJECTED or CANCELLED. */
-    private LocalDateTime scheduledStart;
-    private LocalDateTime scheduledEnd;
+    private OffsetDateTime scheduledStart;
+    private OffsetDateTime scheduledEnd;
 
     /** The client's review, left once the job is COMPLETED; null until then. */
     @Schema(minimum = "1", maximum = "10")
     private Integer rating;
     private String review;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
 
     /** Only populated in the response to the client that just created the job; shown on site to confirm completion. */
     private String confirmationPin;

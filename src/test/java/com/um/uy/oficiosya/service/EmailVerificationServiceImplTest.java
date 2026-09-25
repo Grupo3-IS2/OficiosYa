@@ -13,7 +13,7 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -80,7 +80,7 @@ class EmailVerificationServiceImplTest {
                 .email(EMAIL)
                 .purpose(VerificationPurpose.REGISTER)
                 .userId(USER_ID)
-                .lastSentAt(LocalDateTime.now())
+                .lastSentAt(OffsetDateTime.now())
                 .build();
 
         when(repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(EMAIL, VerificationPurpose.REGISTER))
@@ -138,8 +138,8 @@ class EmailVerificationServiceImplTest {
                 .userId(USER_ID)
                 .codeHash("irrelevant")
                 .salt("salt")
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
-                .lastSentAt(LocalDateTime.now())
+                .expiresAt(OffsetDateTime.now().plusMinutes(10))
+                .lastSentAt(OffsetDateTime.now())
                 .attempts(0)
                 .build();
 
@@ -161,8 +161,8 @@ class EmailVerificationServiceImplTest {
                 .userId(USER_ID)
                 .codeHash("irrelevant")
                 .salt("salt")
-                .expiresAt(LocalDateTime.now().minusMinutes(1))
-                .lastSentAt(LocalDateTime.now().minusMinutes(20))
+                .expiresAt(OffsetDateTime.now().minusMinutes(1))
+                .lastSentAt(OffsetDateTime.now().minusMinutes(20))
                 .build();
 
         when(repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(EMAIL, VerificationPurpose.REGISTER))
@@ -182,8 +182,8 @@ class EmailVerificationServiceImplTest {
                 .userId(USER_ID)
                 .codeHash("irrelevant")
                 .salt("salt")
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
-                .lastSentAt(LocalDateTime.now())
+                .expiresAt(OffsetDateTime.now().plusMinutes(10))
+                .lastSentAt(OffsetDateTime.now())
                 .attempts(5)
                 .build();
 
@@ -204,8 +204,8 @@ class EmailVerificationServiceImplTest {
                 .purpose(VerificationPurpose.REGISTER)
                 .codeHash("irrelevant")
                 .salt("salt")
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
-                .lastSentAt(LocalDateTime.now())
+                .expiresAt(OffsetDateTime.now().plusMinutes(10))
+                .lastSentAt(OffsetDateTime.now())
                 .build();
 
         when(repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(EMAIL, VerificationPurpose.REGISTER))
@@ -227,8 +227,8 @@ class EmailVerificationServiceImplTest {
                 .email(EMAIL)
                 .purpose(VerificationPurpose.REGISTER)
                 .payload(PAYLOAD)
-                .expiresAt(LocalDateTime.now().minusMinutes(1))
-                .lastSentAt(LocalDateTime.now().minusMinutes(20))
+                .expiresAt(OffsetDateTime.now().minusMinutes(1))
+                .lastSentAt(OffsetDateTime.now().minusMinutes(20))
                 .build();
 
         when(repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(EMAIL, VerificationPurpose.REGISTER))
@@ -245,8 +245,8 @@ class EmailVerificationServiceImplTest {
                 .email(EMAIL)
                 .purpose(VerificationPurpose.REGISTER)
                 .payload(PAYLOAD)
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
-                .lastSentAt(LocalDateTime.now())
+                .expiresAt(OffsetDateTime.now().plusMinutes(10))
+                .lastSentAt(OffsetDateTime.now())
                 .consumed(true)
                 .build();
 
@@ -273,8 +273,8 @@ class EmailVerificationServiceImplTest {
                 .userId(USER_ID)
                 .codeHash("irrelevant")
                 .salt("salt")
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
-                .lastSentAt(LocalDateTime.now())
+                .expiresAt(OffsetDateTime.now().plusMinutes(10))
+                .lastSentAt(OffsetDateTime.now())
                 .consumed(true)
                 .build();
 

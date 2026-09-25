@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -22,7 +22,7 @@ public class UserResponse {
     private String email;
     private String profileImageUrl;
     private Role role;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     /** False for an account created with Google: it has no password to change or to confirm with. */
     private boolean hasPassword;

@@ -4,14 +4,14 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Data
 @NoArgsConstructor
 public class JobRequestAcceptRequest {
     @NotNull(message = "El inicio del bloque es obligatorio")
-    private LocalDateTime startTimestamp;
+    private OffsetDateTime startTimestamp;
 
     @NotNull(message = "El fin del bloque es obligatorio")
-    private LocalDateTime endTimestamp;
+    private OffsetDateTime endTimestamp;
 }

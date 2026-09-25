@@ -19,8 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Optional;
@@ -79,7 +78,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
         repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(normalizedEmail, purpose)
                 .ifPresent(previous -> {
-                    LocalDateTime cooldownEnds = previous.getLastSentAt().plusSeconds(resendCooldownSeconds);
+                    OffsetDateTime cooldownEnds = previous.getLastSentAt().plusSeconds(resendCooldownSeconds);
                     if (cooldownEnds.isAfter(now())) {
                         throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                                 "Esperá unos segundos antes de pedir otro código");
@@ -165,9 +164,9 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         return "0".repeat(codeLength - digits.length()).concat(digits);
     }
 
-    /** The server's own zone, said out loud: the stored times and the expiry checks must agree on it. */
-    private static LocalDateTime now() {
-        return LocalDateTime.now(ZoneId.systemDefault());
+    /** Offset-aware, so comparing it with the stored times compares instants whatever the server zone. */
+    private static OffsetDateTime now() {
+        return OffsetDateTime.now();
     }
 
     private String generateSalt() {

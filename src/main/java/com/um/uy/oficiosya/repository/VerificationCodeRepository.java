@@ -4,7 +4,7 @@ import com.um.uy.oficiosya.entity.VerificationCode;
 import com.um.uy.oficiosya.entity.VerificationPurpose;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
 public interface VerificationCodeRepository extends JpaRepository<VerificationCode, Long> {
@@ -13,5 +13,5 @@ public interface VerificationCodeRepository extends JpaRepository<VerificationCo
 
     void deleteByEmailIgnoreCaseAndPurpose(String email, VerificationPurpose purpose);
 
-    void deleteByExpiresAtBefore(LocalDateTime cutoff);
+    void deleteByExpiresAtBefore(OffsetDateTime cutoff);
 }

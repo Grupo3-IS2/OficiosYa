@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
@@ -55,10 +55,10 @@ public class VerificationCode {
     private String salt;
 
     @Column(name = "expires_at", nullable = false)
-    private LocalDateTime expiresAt;
+    private OffsetDateTime expiresAt;
 
     @Column(name = "last_sent_at", nullable = false)
-    private LocalDateTime lastSentAt;
+    private OffsetDateTime lastSentAt;
 
     @Builder.Default
     @Column(nullable = false)
@@ -71,5 +71,5 @@ public class VerificationCode {
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }

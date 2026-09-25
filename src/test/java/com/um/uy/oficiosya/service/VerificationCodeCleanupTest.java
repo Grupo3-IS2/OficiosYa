@@ -6,8 +6,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -21,10 +20,9 @@ class VerificationCodeCleanupTest {
 
         new VerificationCodeCleanup(repository).purgeExpired();
 
-        ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<OffsetDateTime> cutoff = ArgumentCaptor.forClass(OffsetDateTime.class);
         verify(repository).deleteByExpiresAtBefore(cutoff.capture());
-        // Compared as instants: a LocalDateTime says nothing about its zone.
-        Instant cutoffInstant = cutoff.getValue().atZone(ZoneId.systemDefault()).toInstant();
+        Instant cutoffInstant = cutoff.getValue().toInstant();
         assertTrue(Duration.between(cutoffInstant, Instant.now()).abs().getSeconds() < 5,
                 "the cutoff is the current time, so only what already expired goes");
     }

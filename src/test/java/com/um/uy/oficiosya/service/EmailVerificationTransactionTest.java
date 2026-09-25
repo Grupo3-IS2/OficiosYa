@@ -17,7 +17,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -91,7 +91,7 @@ class EmailVerificationTransactionTest {
 
     @Test
     void verifyCode_withTheWrongCode_commitsTheAttemptInsteadOfRollingBack() {
-        givenAPendingCode(0, LocalDateTime.now().plusMinutes(10));
+        givenAPendingCode(0, OffsetDateTime.now().plusMinutes(10));
 
         assertThrows(ResponseStatusException.class,
                 () -> service.verifyCode(EMAIL, VerificationPurpose.REGISTER, "000000"));
@@ -100,14 +100,14 @@ class EmailVerificationTransactionTest {
         verify(transactionManager, never()).rollback(any());
     }
 
-    private void givenAPendingCode(int attempts, LocalDateTime expiresAt) {
+    private void givenAPendingCode(int attempts, OffsetDateTime expiresAt) {
         VerificationCode stored = VerificationCode.builder()
                 .email(EMAIL)
                 .purpose(VerificationPurpose.REGISTER)
                 .codeHash("irrelevant")
                 .salt("salt")
                 .expiresAt(expiresAt)
-                .lastSentAt(LocalDateTime.now())
+                .lastSentAt(OffsetDateTime.now())
                 .attempts(attempts)
                 .build();
 

@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import Button from '../Button/Button'
 import Icon from '../Icon/Icon'
-import ProfileMenu from '../ProfileMenu/ProfileMenu'
+import ProfileMenu from './ProfileMenu/ProfileMenu'
 import {
-    getRegistrationProfile,
     getCurrentUser,
     isAuthenticated,
     logout,
@@ -14,8 +13,7 @@ function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [authenticated, setAuthenticated] = useState(isAuthenticated)
     const user = getCurrentUser()
-    const profile = getRegistrationProfile()
-    const isProfessional = user?.role === 'PROFESSIONAL' || profile?.accountType === 'professional'
+    const isProfessional = user?.role === 'PROFESSIONAL'
     const professionalLabel = !authenticated
         ? 'Soy profesional'
         : isProfessional

@@ -85,11 +85,26 @@ public class SecurityConfig {
                         // Uploaded profile images are public
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 
-                        // Signing up cannot require an account
+                        // The caller's own profile; listed first so the public {id} rule below doesn't match it
+                        .requestMatchers(HttpMethod.GET, "/api/v1/professionals/me").authenticated()
+
+                        // Professional search, public profile and agenda. Contact data and which job each
+                        // agenda block belongs to are for the owner and admins only.
                         .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/client/create",
-                                "/api/v1/professional/create"
+                                HttpMethod.GET,
+                                "/api/v1/professionals/search",
+                                "/api/v1/professionals/{id}",
+                                "/api/v1/schedules"
+                        ).permitAll()
+
+                        // Where the container forwards unhandled errors; without this an anonymous
+                        // caller gets a 401 instead of the real error
+                        .requestMatchers("/error").permitAll()
+
+                        // Trade list
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/trades"
                         ).permitAll()
 
                         .anyRequest().authenticated()

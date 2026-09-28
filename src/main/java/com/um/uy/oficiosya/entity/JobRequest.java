@@ -7,7 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -64,7 +64,6 @@ public class JobRequest {
     @Column(nullable = false, length = 32)
     private JobStatus status = JobStatus.PROPOSED;
 
-    /** Review left by the client once the job is COMPLETED. */
     @Min(1)
     @Max(10)
     private Integer rating;
@@ -74,9 +73,9 @@ public class JobRequest {
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 }

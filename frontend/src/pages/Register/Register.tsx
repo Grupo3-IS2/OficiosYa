@@ -1,8 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SubmitEvent } from 'react'
 import Button from '../../components/Button/Button'
+import GoogleButton from '../../components/GoogleButton/GoogleButton'
+import ZonePicker from '../../components/ZonePicker/ZonePicker'
 import Icon from '../../components/Icon/Icon'
-import { register } from '../../services/authService'
-import type { AccountType } from '../../types/Auth'
+import { googleRegister, register } from '../../services/authService'
+import { isGoogleEnabled } from '../../services/googleIdentity'
+import type { AccountType, PendingVerification } from '../../types/Auth'
+import VerifyEmailStep from './VerifyEmailStep'
 import './Register.css'
 
 function Brand() {
@@ -14,6 +18,38 @@ function Brand() {
       <strong>Oficios</strong>
       <b>Ya</b>
     </a>
+  )
+}
+
+/** The message of an error, or the fallback when it is not one of ours. */
+const errorText = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback)
+
+/** What a professional has to give besides the account data; empty when it is fine (or not a professional). */
+function professionalFieldsError(accountType: AccountType, location: string, phoneNumber: string): string {
+  if (accountType !== 'professional') return ''
+  if (!location.trim()) return 'Ingresá una ubicación para continuar como profesional.'
+  if (!/^(\+\d{1,3})?\d{9}$/.test(phoneNumber.trim())) return 'Ingresá un teléfono de 9 dígitos, con prefijo internacional opcional.'
+  return ''
+}
+
+interface AccountTypeChoiceProps {
+  readonly selected: boolean
+  readonly icon: 'user' | 'wrench'
+  readonly title: string
+  readonly description: string
+  readonly onSelect: () => void
+}
+
+function AccountTypeChoice({ selected, icon, title, description, onSelect }: AccountTypeChoiceProps) {
+  return (
+    <button className={`account-type ${selected ? 'is-selected' : ''}`} type="button" onClick={onSelect}>
+      <span className="account-type__icon">
+        <Icon name={icon} />
+      </span>
+      <strong>{title}</strong>
+      <span>{description}</span>
+      {selected && <b className="account-type__check">✓</b>}
+    </button>
   )
 }
 
@@ -30,8 +66,12 @@ function Register() {
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  // Set once the code was mailed: the form gives way to the code step until the user comes back.
+  const [pending, setPending] = useState<PendingVerification | null>(null)
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const fieldsError = () => professionalFieldsError(accountType, location, phoneNumber)
+
+  const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
     setErrorMessage('')
 
@@ -45,23 +85,16 @@ function Register() {
       return
     }
 
-    if (accountType === 'professional' && !location.trim()) {
-      setErrorMessage('Ingresá una ubicación para continuar como profesional.')
-      return
-    }
-
-    if (
-      accountType === 'professional'
-      && !/^(\+\d{1,3})?\d{9}$/.test(phoneNumber.trim())
-    ) {
-      setErrorMessage('Ingresá un teléfono de 9 dígitos, con prefijo internacional opcional.')
+    const problem = fieldsError()
+    if (problem) {
+      setErrorMessage(problem)
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      await register(
+      const started = await register(
         { name: name.trim(), email: email.trim(), password },
         {
           email: email.trim(),
@@ -71,13 +104,43 @@ function Register() {
         },
       )
 
+      setPending(started)
+    } catch (error) {
+      setErrorMessage(errorText(error, 'No se pudo crear la cuenta. Intentá nuevamente.'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  /** Registers with the Google account picked: no password or code, Google already vouches for the email. */
+  const handleGoogleCredential = async (credential: string) => {
+    setErrorMessage('')
+
+    if (!acceptedTerms) {
+      setErrorMessage('Aceptá los términos y condiciones para continuar.')
+      return
+    }
+
+    const problem = fieldsError()
+    if (problem) {
+      setErrorMessage(problem)
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      await googleRegister(
+        credential,
+        accountType,
+        accountType === 'professional'
+          ? { phoneNumber: phoneNumber.trim(), workingLocation: location.trim() }
+          : undefined,
+      )
+
       window.location.href = '/'
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'No se pudo crear la cuenta. Intentá nuevamente.',
-      )
+      setErrorMessage(errorText(error, 'No se pudo crear la cuenta con Google. Intentá nuevamente.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -97,6 +160,15 @@ function Register() {
       </header>
 
       <section className="register-card" aria-labelledby="register-title">
+        {pending ? (
+          <VerifyEmailStep
+            pending={pending}
+            onResent={setPending}
+            onChangeEmail={() => setPending(null)}
+            onVerified={() => { window.location.href = '/' }}
+          />
+        ) : (
+        <>
         <p className="register-eyebrow">CREÁ TU CUENTA</p>
         <h1 id="register-title">Sumate a OficiosYa</h1>
         <p className="register-intro">
@@ -104,35 +176,20 @@ function Register() {
         </p>
 
         <div className="account-types" aria-label="Tipo de cuenta">
-          <button
-            className={`account-type ${accountType === 'client' ? 'is-selected' : ''}`}
-            type="button"
-            onClick={() => setAccountType('client')}
-          >
-            <span className="account-type__icon">
-              <Icon name="user" />
-            </span>
-            <strong>Cliente</strong>
-            <span>Quiero encontrar y contratar profesionales.</span>
-            {accountType === 'client' && (
-              <b className="account-type__check">✓</b>
-            )}
-          </button>
-
-          <button
-            className={`account-type ${accountType === 'professional' ? 'is-selected' : ''}`}
-            type="button"
-            onClick={() => setAccountType('professional')}
-          >
-            <span className="account-type__icon">
-              <Icon name="wrench" />
-            </span>
-            <strong>Profesional</strong>
-            <span>Quiero ofrecer mis servicios y conseguir clientes.</span>
-            {accountType === 'professional' && (
-              <b className="account-type__check">✓</b>
-            )}
-          </button>
+          <AccountTypeChoice
+            selected={accountType === 'client'}
+            icon="user"
+            title="Cliente"
+            description="Quiero encontrar y contratar profesionales."
+            onSelect={() => setAccountType('client')}
+          />
+          <AccountTypeChoice
+            selected={accountType === 'professional'}
+            icon="wrench"
+            title="Profesional"
+            description="Quiero ofrecer mis servicios y conseguir clientes."
+            onSelect={() => setAccountType('professional')}
+          />
         </div>
 
         <form className="register-form" onSubmit={handleSubmit}>
@@ -184,9 +241,10 @@ function Register() {
                   value={location}
                   onChange={(event) => setLocation(event.target.value)}
                   required
-                  placeholder="Ej. Montevideo"
+                  placeholder="Ej. Cordón, Montevideo"
                 />
               </div>
+              <ZonePicker query={location} onChoose={setLocation} />
             </>
           )}
 
@@ -254,10 +312,24 @@ function Register() {
           )}
         </form>
 
+        {isGoogleEnabled() && (
+          <>
+            <div className="auth-divider"><span>o registrate con Google</span></div>
+            <GoogleButton text="signup_with" onCredential={handleGoogleCredential} />
+            <p className="register-google-hint">
+              {accountType === 'professional'
+                ? 'Completá teléfono y ubicación y aceptá los términos antes de continuar con Google.'
+                : 'Aceptá los términos antes de continuar con Google.'}
+            </p>
+          </>
+        )}
+
         <div className="register-divider" />
         <p className="register-login">
           ¿Ya tenés una cuenta? <a href="/login">Iniciar sesión</a>
         </p>
+        </>
+        )}
       </section>
     </main>
   )

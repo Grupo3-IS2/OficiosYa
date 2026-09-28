@@ -19,6 +19,7 @@ docker compose --profile dev up --build
 
 - Frontend (Vite + hot reload): http://localhost:5173 (proxies /api, /ws and /uploads to the backend)
 - PostgreSQL and the Spring Boot API start too; without `--profile dev` only those two run.
+- Mailpit, a fake inbox where the emails the app sends land (registration verification codes): http://localhost:8025. Nothing reaches a real address.
 
 # API docs
 
@@ -39,11 +40,17 @@ To build the frontend by hand (what the deploy does):
 docker compose run --rm frontend-build
 ```
 
+## Email
+
+The app sends emails (verification codes) through SMTP. In local development the
+`mailpit` service (`--profile dev`) catches them, and the app container points at
+it by default. Anywhere else, set the `SMTP_*` and `MAIL_FROM` variables in `.env`
+to a real provider, or nothing will be delivered.
+
 ## Uploaded files
 
 Profile images are stored in the clone's `uploads/` directory, bind-mounted into
 the `app` container at `/app/uploads`, and nginx serves them at `/uploads/`.
-The directory is gitignored, so the deploy's `git reset --hard` never touches it.
 Create it once per clone, writable by the container's user:
 
 ```

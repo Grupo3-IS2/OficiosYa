@@ -1,0 +1,56 @@
+name: SonarQube Cloud analysis
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+  workflow_dispatch:
+
+permissions:
+  pull-requests: read # allows SonarQube Cloud to decorate PRs with analysis results
+
+jobs:
+  Analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Sonar needs the full history to assign issues to the right author
+          # and to work out what "new code" is.
+          fetch-depth: 0
+
+      # The scanner itself needs Java 21+; the project targets Java 25, so the
+      # same JDK builds and analyses.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Cache SonarQube Cloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # The unit tests run so JaCoCo can measure coverage (Sonar reads
+      # target/site/jacoco/jacoco.xml); without them the coverage of new code is always 0%.
+      # OficiosYaTests is left out: it boots the whole Spring context and needs the database.
+      - name: Build, test and analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn -B clean test -Dtest='!OficiosYaTests'
+          org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.projectKey=Grupo3-IS2_OficiosYa
+          -Dsonar.organization=grupo3-is2

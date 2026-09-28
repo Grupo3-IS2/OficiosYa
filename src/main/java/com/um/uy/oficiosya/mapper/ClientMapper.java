@@ -12,5 +12,6 @@ public interface ClientMapper {
 
     @Mapping(target = "id", source = "publicId")
     @Mapping(target = "role", constant = "CLIENT")
+    @Mapping(target = "hasPassword", expression = "java(client.getAuthProvider() == com.um.uy.oficiosya.entity.AuthProvider.LOCAL)")
     UserResponse toResponse(Client client);
 }

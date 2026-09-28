@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Entity
 @Getter
@@ -33,9 +33,9 @@ public class Schedule {
 
     @NotNull
     @Column(nullable = false)
-    private LocalDateTime startTimestamp;
+    private OffsetDateTime startTimestamp;
 
     @NotNull
     @Column(nullable = false)
-    private LocalDateTime endTimestamp;
+    private OffsetDateTime endTimestamp;
 }

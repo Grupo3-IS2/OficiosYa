@@ -1,0 +1,31 @@
+.google-button {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+}
+
+.google-button-error {
+  margin: 0;
+  color: #6c7988;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* "— o —" between the email form and the Google button. */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 16px;
+  color: #829091;
+  font-size: 13px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #edf0ef;
+}

@@ -9,10 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 public interface AuthService {
     LoginResponse login(LoginRequest request);
 
-    LoginResponse register(ClientCreateRequest request);
-
-    LoginResponse register(ProfessionalCreateRequest request);
-
     TokenResponse verifyUser(HttpServletRequest request);
 
     MessageResponse logout(HttpServletRequest request);

@@ -1,0 +1,30 @@
+import { useState, type SubmitEvent } from 'react'
+import Button from '../../../components/Button/Button'
+import Icon from '../../../components/Icon/Icon'
+import './SearchBar.css'
+
+function SearchBar() {
+    const [query, setQuery] = useState('')
+
+    const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
+        event.preventDefault()
+    }
+
+    return (
+        <form className="search-bar" onSubmit={handleSubmit}>
+            <Icon className="search-bar__icon" name="search" />
+            <input
+                className="search-bar__input"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="¿Qué necesitás resolver hoy?"
+                aria-label="Buscar un oficio"
+            />
+            <Button className="search-bar__button" type="submit">
+                Buscar
+            </Button>
+        </form>
+    )
+}
+
+export default SearchBar

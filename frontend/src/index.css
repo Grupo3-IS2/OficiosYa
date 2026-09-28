@@ -34,3 +34,9 @@ button {
 a {
   color: inherit;
 }
+
+/* Status messages are <output>: it lays out like the paragraph it replaced. */
+output {
+  display: block;
+  margin: 1em 0;
+}

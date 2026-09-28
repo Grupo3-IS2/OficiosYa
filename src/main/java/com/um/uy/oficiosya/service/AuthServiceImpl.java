@@ -1,8 +1,6 @@
 package com.um.uy.oficiosya.service;
 
-import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.LoginRequest;
-import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.MessageResponse;
 import com.um.uy.oficiosya.dto.response.TokenResponse;
@@ -10,9 +8,7 @@ import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.entity.User;
 import com.um.uy.oficiosya.repository.UserRepository;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
-import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.JwtService;
-import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import com.um.uy.oficiosya.service.interfaces.TokenRevocationService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +18,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Date;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,22 +32,15 @@ public class AuthServiceImpl implements AuthService {
 
     private final JwtService jwtService;
 
-    private final ClientService clientService;
-
-    private final ProfessionalService professionalService;
-
     private final TokenRevocationService tokenRevocationService;
 
     private final String dummyPasswordHash;
 
     public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
-                           ClientService clientService, ProfessionalService professionalService,
                            TokenRevocationService tokenRevocationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.clientService = clientService;
-        this.professionalService = professionalService;
         this.tokenRevocationService = tokenRevocationService;
         this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
@@ -84,49 +72,17 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public LoginResponse register(ClientCreateRequest request) {
-        clientService.createClient(request);
-        return this.loginResponseFor(request.getEmail());
-    }
-
-    @Override
-    public LoginResponse register(ProfessionalCreateRequest request) {
-        professionalService.createProfessional(request);
-        return this.loginResponseFor(request.getEmail());
-    }
-
-    private LoginResponse loginResponseFor(String email) {
-        User user = userRepository.findByEmailIgnoreCase(email == null ? "" : email.trim().toLowerCase(Locale.ROOT))
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Usuario no encontrado")
-                );
-
-        String jwtToken = jwtService.generateToken(user);
-
-        return new LoginResponse(
-                user.getPublicId(),
-                jwtToken,
-                user.getEmail(),
-                user.getName(),
-                Role.of(user),
-                "Usuario " + user.getEmail() + " registrado correctamente");
-    }
-
-    @Override
     public TokenResponse verifyUser(HttpServletRequest request) {
         String token = this.getToken(request);
         String subject = token.isEmpty() ? "" : this.jwtService.extractUsername(token);
 
-        boolean verified = false;
-        Date expirationDate = null;
-        Date emissionDate = null;
-        if (!token.isEmpty() && this.findByPublicId(subject).isPresent()) {
-            verified = !jwtService.isTokenExpired(token);
-            expirationDate = this.jwtService.extractExpiration(token);
-            emissionDate = this.jwtService.extractEmisionDate(token);
+        if (token.isEmpty() || this.findByPublicId(subject).isEmpty()) {
+            return new TokenResponse(false, null, null);
         }
-        return new TokenResponse(verified, emissionDate, expirationDate);
-
+        return new TokenResponse(
+                !jwtService.isTokenExpired(token),
+                this.jwtService.extractEmisionDate(token),
+                this.jwtService.extractExpiration(token));
     }
 
     /**
@@ -154,7 +110,7 @@ public class AuthServiceImpl implements AuthService {
     private String subjectOf(String token) {
         try {
             return jwtService.extractUsername(token);
-        } catch (JwtException e) {
+        } catch (JwtException _) {
             log.warn("Token with an unreadable subject on logout");
             return "";
         }
@@ -164,7 +120,7 @@ public class AuthServiceImpl implements AuthService {
     private Optional<User> findByPublicId(String subject) {
         try {
             return userRepository.findByPublicId(UUID.fromString(subject));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             log.warn("Token with an invalid subject: {}", subject);
             return Optional.empty();
         }

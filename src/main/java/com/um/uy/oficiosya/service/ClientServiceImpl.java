@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -38,13 +39,24 @@ public class ClientServiceImpl implements ClientService {
     @Override
     @Transactional
     public UserResponse createClient(ClientCreateRequest clientRequest) {
+        return persist(clientRequest, this.passwordEncoder.encode(clientRequest.getPassword()));
+    }
+
+    @Override
+    @Transactional
+    public UserResponse createClient(ClientCreateRequest clientRequest, String encodedPassword) {
+        return persist(clientRequest, encodedPassword);
+    }
+
+    /** What both public methods do: they only differ in where the password hash comes from. */
+    private UserResponse persist(ClientCreateRequest clientRequest, String encodedPassword) {
         if (this.userRepository.existsByEmail(clientRequest.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Ya existe un usuario con el email " + clientRequest.getEmail());
+                    "No se pudo completar el registro. Verificá los datos e intentá nuevamente.");
         }
 
         Client client = clientMapper.toEntity(clientRequest);
-        client.setPassword(this.passwordEncoder.encode(clientRequest.getPassword()));
+        client.setPassword(encodedPassword);
 
         client = this.clientRepository.save(client);
 
@@ -72,5 +84,13 @@ public class ClientServiceImpl implements ClientService {
         Client client = clientRepository.findByPublicId(id)
                 .orElseThrow(() -> new UserNotFoundException("Cliente no encontrado."));
         clientRepository.delete(client);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> listClients() {
+        return clientRepository.findAll().stream()
+                .map(clientMapper::toResponse)
+                .toList();
     }
 }

@@ -13,8 +13,17 @@ export interface SecurityData {
 
 export interface ProfessionalData {
     description: string
-    zones: string[]
-    accepting: boolean
+    workingLocation: string
+    trades: ProfessionalTradeData[]
+    published: boolean
+}
+
+export interface ProfessionalTradeData {
+    id: number | null
+    tradeId: number
+    tradeName: string
+    minimumHourlyWage: string
+    maximumHourlyWage: string
 }
 
 export type ProfileSection = 'personal' | 'security' | 'professional'
@@ -25,13 +34,49 @@ export function personalChanged(current: PersonalData, saved: PersonalData) {
 }
 
 export function professionalChanged(current: ProfessionalData, saved: ProfessionalData) {
-    return current.description !== saved.description || current.accepting !== saved.accepting
-        || current.zones.length !== saved.zones.length
-        || current.zones.some(zone => !saved.zones.includes(zone))
+    return current.description !== saved.description || current.workingLocation !== saved.workingLocation
+        || current.published !== saved.published
+        || current.trades.length !== saved.trades.length
+        || current.trades.some(trade => {
+            const original = saved.trades.find(item => item.tradeId === trade.tradeId)
+            return !original || trade.minimumHourlyWage !== original.minimumHourlyWage
+                || trade.maximumHourlyWage !== original.maximumHourlyWage
+        })
+}
+
+export function validateProfessional(current: ProfessionalData, saved: ProfessionalData): string {
+    const description = current.description.trim()
+    if (description !== saved.description && (description.length < 20 || description.length > 500)) {
+        return 'La descripción debe tener entre 20 y 500 caracteres.'
+    }
+    if (!current.workingLocation.trim()) return 'Ingresá una ubicación de trabajo.'
+    if (current.published && (description.length < 20 || current.trades.length === 0)) {
+        return 'Para ofrecer tus servicios, completá la descripción y elegí al menos un oficio.'
+    }
+    for (const trade of current.trades) {
+        const minimum = Number(trade.minimumHourlyWage)
+        const maximum = Number(trade.maximumHourlyWage)
+        if (!trade.minimumHourlyWage.trim() || !trade.maximumHourlyWage.trim()
+            || !Number.isFinite(minimum) || !Number.isFinite(maximum)
+            || minimum < 0 || maximum < minimum) {
+            return `Ingresá tarifas válidas para ${trade.tradeName}: la máxima debe ser mayor o igual a la mínima.`
+        }
+    }
+    return ''
 }
 
 export function securityChanged(value: SecurityData) {
     return Boolean(value.current || value.password || value.confirmation)
+}
+
+// La misma regla que PhoneNumberValidator en el backend, que un profesional tiene que cumplir.
+const PHONE_FORMAT = /^(\+\d{1,3})?\d{9}$/
+
+export function validatePhone(phone: string): string {
+    const value = phone.trim()
+    if (!value) return 'Ingresa tu número de teléfono.'
+    if (!PHONE_FORMAT.test(value)) return 'Ingresa un teléfono válido: 9 dígitos, con prefijo internacional opcional.'
+    return ''
 }
 
 export function validateSecurity(value: SecurityData): string {
@@ -44,30 +89,4 @@ export function validateSecurity(value: SecurityData): string {
     if (value.password !== value.confirmation) return 'Las contraseñas nuevas no coinciden.'
     if (value.password === value.current) return 'La nueva contraseña debe ser diferente de la actual.'
     return ''
-}
-
-// Temporary frontend persistence. Passwords must never be included here.
-export function readLocalProfile(account: string): { personal?: PersonalData; professional?: ProfessionalData } {
-    try {
-        const value = JSON.parse(sessionStorage.getItem(`oficiosya_edit_profile:${account}`) ?? '{}')
-        const personal = value?.personal
-        const professional = value?.professional
-        return {
-            personal: personal && ['name', 'email', 'phone', 'avatar'].every(key => typeof personal[key] === 'string')
-                ? personal : undefined,
-            professional: professional && typeof professional.description === 'string'
-                && typeof professional.accepting === 'boolean' && Array.isArray(professional.zones)
-                && professional.zones.every((zone: unknown) => typeof zone === 'string') ? professional : undefined,
-        }
-    } catch { return {} }
-}
-
-export function writeLocalProfile(account: string, section: 'personal', value: PersonalData): void
-export function writeLocalProfile(account: string, section: 'professional', value: ProfessionalData): void
-export function writeLocalProfile(account: string, section: 'personal' | 'professional', value: PersonalData | ProfessionalData) {
-    try {
-        sessionStorage.setItem(`oficiosya_edit_profile:${account}`, JSON.stringify({ ...readLocalProfile(account), [section]: value }))
-    } catch {
-        throw new Error('No se pudieron guardar los datos temporales en este navegador. Prueba con una foto más pequeña o habilita el almacenamiento local.')
-    }
 }

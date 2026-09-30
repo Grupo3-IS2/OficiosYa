@@ -1,5 +1,5 @@
 import type { Schedule } from '../types/Schedule'
-import { apiRequest } from './api'
+import { apiRequest, publicApiRequest } from './api'
 
 export function getProfessionalSchedule(
     professionalId: string,
@@ -10,7 +10,7 @@ export function getProfessionalSchedule(
     if (from) query.set('from', from.toISOString())
     if (to) query.set('to', to.toISOString())
 
-    return apiRequest<Schedule[]>(`/schedules?${query.toString()}`)
+    return publicApiRequest<Schedule[]>(`/schedules?${query.toString()}`)
 }
 
 export function createAvailability(start: Date, end: Date): Promise<Schedule> {

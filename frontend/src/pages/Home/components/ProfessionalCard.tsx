@@ -1,8 +1,12 @@
+import { useEffect, useState } from 'react'
 import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
 import type { Professional } from '../../../types/Professional'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
 import { getCurrentUser } from '../../../services/authService'
+import { getProfessionalSchedule } from '../../../services/scheduleService'
+import { currentWeek } from '../../ProfessionalProfile/scheduleCalendar'
+import { professionalAvailability } from '../professionalAvailability'
 import Rating from './Rating'
 import './ProfessionalCard.css'
 
@@ -12,6 +16,19 @@ interface ProfessionalCardProps {
 }
 
 function ProfessionalCard({ professional, selectedTradeId = null }: ProfessionalCardProps) {
+    const [availability, setAvailability] = useState('Cargando disponibilidad...')
+
+    useEffect(() => {
+        let active = true
+        const week = currentWeek()
+        void getProfessionalSchedule(professional.id, week.start, week.end).then(schedules => {
+            if (active) setAvailability(professionalAvailability(schedules))
+        }).catch(() => {
+            if (active) setAvailability('No pudimos cargar la disponibilidad')
+        })
+        return () => { active = false }
+    }, [professional.id])
+
     const currentUser = getCurrentUser()
     const isOwnProfile = currentUser?.id === professional.id
     const profilePath = selectedTradeId === null
@@ -42,11 +59,11 @@ function ProfessionalCard({ professional, selectedTradeId = null }: Professional
                 {professional.workingLocation && (
                     <p className="meta"><Icon name="location" /> {professional.workingLocation}</p>
                 )}
-                <p className="meta"><Icon name="calendar" /> Disponibilidad a confirmar</p>
+                <p className="meta"><Icon name="calendar" /> {availability}</p>
             </div>
 
-            <div className="professional-action">
-                {price !== null && <span>
+            <div className={`professional-action${isOwnProfile ? ' professional-action--own' : ''}`}>
+                {!isOwnProfile && price !== null && <span>
                     Desde / hora
                     <strong>${price.toLocaleString('es-UY')}</strong>
                 </span>}

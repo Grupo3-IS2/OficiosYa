@@ -96,6 +96,12 @@
   }
 }
 
+@media (max-width: 700px) {
+  .hero {
+    min-height: 0;
+  }
+}
+
 /* Category cards reflow naturally and expand the final row. */
 .filters button:disabled {
   cursor: not-allowed;

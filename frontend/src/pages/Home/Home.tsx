@@ -25,6 +25,7 @@ function Home() {
     const [professionals, setProfessionals] = useState<Professional[]>([])
     const [loadingProfessionals, setLoadingProfessionals] = useState(true)
     const [professionalsError, setProfessionalsError] = useState(false)
+    const [searchQuery, setSearchQuery] = useState('')
     const [selectedTradeId, setSelectedTradeId] = useState<number | null>(null)
     const [filters, setFilters] = useState<ProfessionalFilters>(emptyProfessionalFilters)
     const [filtersOpen, setFiltersOpen] = useState(false)
@@ -44,7 +45,7 @@ function Home() {
 
     useEffect(() => {
         let active = true
-        void getProfessionals().then(response => {
+        void getProfessionals(searchQuery).then(response => {
             if (active) setProfessionals(response)
         }).catch(() => {
             if (active) setProfessionalsError(true)
@@ -52,7 +53,7 @@ function Home() {
             if (active) setLoadingProfessionals(false)
         })
         return () => { active = false }
-    }, [])
+    }, [searchQuery])
 
     const heroStyle = { '--hero-image': `url(${heroImage})` } as CSSProperties
     const selectedTrade = trades.find(trade => trade.id === selectedTradeId)
@@ -62,6 +63,13 @@ function Home() {
     const appliedFilterCount = activeFilterCount(filters)
     const availableSearches = popularSearches.filter(search => trades.some(trade =>
         trade.name.localeCompare(search, 'es', { sensitivity: 'base' }) === 0))
+
+    function searchProfessionals(query: string) {
+        if (query === searchQuery) return
+        setLoadingProfessionals(true)
+        setProfessionalsError(false)
+        setSearchQuery(query)
+    }
 
     function selectTrade(tradeId: number | null) {
         setSelectedTradeId(tradeId)
@@ -78,7 +86,7 @@ function Home() {
             <main>
                 <section className="hero" style={heroStyle}>
                     <div className="hero-copy">
-                        <SearchBar />
+                        <SearchBar appliedQuery={searchQuery} onSearch={searchProfessionals} />
                         {availableSearches.length > 0 && <div className="popular-searches">
                             <span>Búsquedas populares:</span>
                             {availableSearches.map(search => <button key={search} type="button" onClick={() => selectTrade(trades.find(trade => trade.name.localeCompare(search, 'es', { sensitivity: 'base' }) === 0)?.id ?? null)}>{search}</button>)}
@@ -123,7 +131,7 @@ function Home() {
 
                         {loadingProfessionals ? <output>Cargando profesionales...</output>
                             : professionalsError ? <p role="alert">No pudimos cargar los profesionales. Intentá de nuevo más tarde.</p>
-                                : professionals.length === 0 ? <p>Todavía no hay profesionales publicados.</p>
+                                : professionals.length === 0 ? <p>{searchQuery ? 'No encontramos profesionales con ese nombre.' : 'Todavía no hay profesionales publicados.'}</p>
                                     : orderedProfessionals.length === 0 ? <div className="professionals-empty"><h3>No encontramos profesionales con estos filtros</h3><p>Probá ampliar el rango o limpiar algún filtro.</p><button type="button" onClick={clearAllFilters}>Limpiar filtros</button></div>
                                         : <div className="professional-grid">
                                             {orderedProfessionals.map(professional => <ProfessionalCard key={professional.id} professional={professional} selectedTradeId={selectedTradeId} />)}

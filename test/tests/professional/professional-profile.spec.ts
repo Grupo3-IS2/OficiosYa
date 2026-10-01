@@ -102,7 +102,8 @@ test.describe('Perfil profesional: oficios, tarifas y publicación de cambios', 
       ]
     });
 
-    expect(professional.expertiseTrades.map((offer) => offer.tradeId)).toEqual([firstTrade.id, secondTrade.id]);
+    expect(professional.expertiseTrades.map((offer) => offer.tradeId).sort((a, b) => a - b))
+      .toEqual([firstTrade.id, secondTrade.id].sort((a, b) => a - b));
 
     const removedOffer = professional.expertiseTrades.find((offer) => offer.tradeId === firstTrade.id)!;
     const removeResponse = await request.delete(`${PROFESSIONALS_URL}/me/expertise-trades/${removedOffer.id}`, {

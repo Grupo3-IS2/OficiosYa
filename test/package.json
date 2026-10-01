@@ -6,6 +6,11 @@
   "private": true,
   "scripts": {
     "test:e2e": "playwright test",
+    "test:e2e:all": "playwright test",
+    "test:e2e:scrum": "playwright test tests/scrum",
+    "test:e2e:auth": "playwright test tests/auth",
+    "test:e2e:professionals": "playwright test tests/professional",
+    "test:e2e:zones": "playwright test tests/work-zone",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report"

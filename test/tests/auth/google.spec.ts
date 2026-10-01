@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { API_BASE } from './support/registration';
-import { blockExternalMaps, fakeJwt, mockVerifiedSession, type MockedUser } from './support/ui';
+import { API_BASE } from '../support/registration';
+import { blockExternalMaps, fakeJwt, mockVerifiedSession, type MockedUser } from '../support/ui';
 
 /**
  * Sign-in with Google. A real Google account can't be driven from a test, so:

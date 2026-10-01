@@ -1,4 +1,6 @@
-import { test, expect, type APIRequestContext } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { waitForVerificationCode } from '../support/registration';
+import { fakeJwt, mockHomeApi, mockVerifiedSession } from '../support/ui';
 
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:8080';
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL ?? 'http://localhost:5173';
@@ -83,8 +85,16 @@ async function login(request: APIRequestContext, payload: { email: string; passw
   return postJson(request, `${API_BASE}/api/v1/auth/login`, payload);
 }
 
+async function verifyEmailChange(request: APIRequestContext, token: string, email: string) {
+  const code = await waitForVerificationCode(request, email);
+  return request.post(`${API_BASE}/api/v1/users/me/email/verify`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { email, code }
+  });
+}
+
 async function getAuthenticatedUser(request: APIRequestContext, token: string) {
-  return request.get(`${API_BASE}/api/v1/user/me`, {
+  return request.get(`${API_BASE}/api/v1/users/me`, {
     headers: {
       Authorization: `Bearer ${token}`
     }
@@ -98,6 +108,55 @@ async function getFirstTrade(request: APIRequestContext) {
   expect(Array.isArray(trades)).toBeTruthy();
   expect(trades.length).toBeGreaterThan(0);
   return trades[0];
+}
+
+async function blockProfileMapRequests(page: Page) {
+  await page.route('https://nominatim.openstreetmap.org/**', (route) => route.abort());
+  await page.route('https://tile.openstreetmap.org/**', (route) => route.abort());
+}
+
+async function mockHomeTradeResults(page: Page) {
+  await page.route('**/api/v1/trades', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify([
+      { id: 1, name: 'Electricista' },
+      { id: 2, name: 'Plomería' },
+      { id: 3, name: 'Carpintería' }
+    ])
+  }));
+  await page.route('**/api/v1/professionals/search**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      content: [
+        {
+          id: '44444444-4444-4444-8444-444444444444',
+          name: 'Ana Multioficio',
+          profileImageUrl: null,
+          workingLocation: 'Montevideo',
+          description: 'Electricidad y plomería.',
+          rating: 8.5,
+          expertiseTrades: [
+            { id: 41, tradeId: 1, tradeName: 'Electricista', minimumHourlyWage: 350, maximumHourlyWage: 600 },
+            { id: 42, tradeId: 2, tradeName: 'Plomería', minimumHourlyWage: 450, maximumHourlyWage: 700 }
+          ]
+        },
+        {
+          id: '55555555-5555-4555-8555-555555555555',
+          name: 'Bruno Plomero',
+          profileImageUrl: null,
+          workingLocation: 'Canelones',
+          description: 'Servicio de plomería.',
+          rating: null,
+          expertiseTrades: [
+            { id: 51, tradeId: 2, tradeName: 'Plomería', minimumHourlyWage: 500, maximumHourlyWage: 800 }
+          ]
+        }
+      ],
+      totalPages: 1
+    })
+  }));
 }
 
 async function createPublishedProfessional(request: APIRequestContext, payload: {
@@ -172,7 +231,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.token).toBeTruthy();
   });
 
-  test('API: registro de cliente rechaza email duplicado', async ({ request }) => {
+  test('API: registro de cliente no revela si el email ya existe', async ({ request }) => {
     const payload = {
       name: 'Cliente QA Duplicado',
       email: uniqueEmail('cliente.duplicado'),
@@ -182,10 +241,12 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const first = await registerClient(request, payload);
     expect(first.status()).toBe(200);
 
-    const second = await registerClient(request, payload);
-    expect(second.status()).toBe(400);
+    const second = await postJson(request, `${API_BASE}/api/v1/auth/register-client`, payload);
+    expect(second.status()).toBe(202);
     const body = await second.json();
-    expect(body.error).toMatch(/already exists|duplicate|bad request|ya existe/i);
+    expect(body.email).toBe(payload.email);
+    expect(body.token).toBeUndefined();
+    expect(body.message).toMatch(/correo es válido|código de verificación/i);
   });
 
   test('API: registro de cliente rechaza nombre inválido', async ({ request }) => {
@@ -256,7 +317,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.email).toBe(upperEmail.toLowerCase());
   });
 
-  test.fixme('API: registro rechaza email duplicado con distinta capitalización', async ({ request }) => {
+  test('API: registro con email duplicado y distinta capitalización no revela si existe', async ({ request }) => {
     const email = uniqueEmail('cliente.case.duplicado');
     const first = await registerClient(request, {
       name: 'Cliente Case Uno',
@@ -265,15 +326,17 @@ test.describe('OficiosYa - QA suite expandida', () => {
     });
     expect(first.status()).toBe(200);
 
-    const second = await registerClient(request, {
+    const second = await postJson(request, `${API_BASE}/api/v1/auth/register-client`, {
       name: 'Cliente Case Dos',
       email: email.toUpperCase(),
       password: 'ClaveSegura2026!'
     });
 
-    expect(second.status()).toBe(400);
+    expect(second.status()).toBe(202);
     const body = await second.json();
-    expect(body.error).toMatch(/already exists|duplicate|ya existe|email/i);
+    expect(body.email).toBe(email.toLowerCase());
+    expect(body.token).toBeUndefined();
+    expect(body.message).toMatch(/correo es válido|código de verificación/i);
   });
 
   test('API: login acepta email con mayúsculas', async ({ request }) => {
@@ -295,7 +358,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.email).toBe(email.toLowerCase());
   });
 
-  test('API: login rechaza email con espacios extra (comportamiento actual del backend)', async ({ request }) => {
+  test('API: login normaliza espacios extra en el email', async ({ request }) => {
     const payload = {
       name: 'Cliente Espacios',
       email: uniqueEmail('cliente.spaces'),
@@ -310,9 +373,10 @@ test.describe('OficiosYa - QA suite expandida', () => {
       password: payload.password
     });
 
-    expect(response.status()).toBe(400);
+    expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body.error).toMatch(/incorrect|bad request|email|contraseña|user|validaci/i);
+    expect(body.email).toBe(payload.email);
+    expect(body.token).toBeTruthy();
   });
 
   test('API: login rechaza contraseña incorrecta', async ({ request }) => {
@@ -368,7 +432,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.email).toBe(rawEmail.toLowerCase());
   });
 
-  test.fixme('API: registro rechaza email duplicado con distinta capitalización (dashboard real)', async ({ request }) => {
+  test('API: registro duplicado no revela existencia con distinta capitalización', async ({ request }) => {
     const email = uniqueEmail('cliente.case.duplicado');
 
     const first = await registerClient(request, {
@@ -378,15 +442,17 @@ test.describe('OficiosYa - QA suite expandida', () => {
     });
     expect(first.status()).toBe(200);
 
-    const second = await registerClient(request, {
+    const second = await postJson(request, `${API_BASE}/api/v1/auth/register-client`, {
       name: 'Cliente Case Dos',
       email: email.toUpperCase(),
       password: 'ClaveSegura2026!'
     });
 
-    expect(second.status()).toBe(400);
+    expect(second.status()).toBe(202);
     const body = await second.json();
-    expect(body.error).toMatch(/already exists|duplicate|ya existe|email|duplicado/i);
+    expect(body.email).toBe(email.toLowerCase());
+    expect(body.token).toBeUndefined();
+    expect(body.message).toMatch(/correo es válido|código de verificación/i);
   });
 
   test('API: contraseña con longitud mínima exacta (8) es válida cuando cumple requisitos', async ({ request }) => {
@@ -578,7 +644,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     });
     expect(logoutResponse.status()).toBe(200);
 
-    const profileResponse = await request.get(`${API_BASE}/api/v1/user/me`, {
+    const profileResponse = await request.get(`${API_BASE}/api/v1/users/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       }
@@ -623,7 +689,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('API: acceso directo a rutas protegidas sin token devuelve 401', async ({ request }) => {
-    const response = await request.get(`${API_BASE}/api/v1/user/me`);
+    const response = await request.get(`${API_BASE}/api/v1/users/me`);
     expect(response.status()).toBe(401);
   });
 
@@ -650,7 +716,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(professionalCreated.status()).toBe(200);
     const professionalAuth = await professionalCreated.json();
 
-    const forbidden = await request.put(`${API_BASE}/api/v1/professional/${professionalAuth.id}`, {
+    const forbidden = await request.patch(`${API_BASE}/api/v1/professionals/me`, {
       headers: {
         Authorization: `Bearer ${clientAuth.token}`
       },
@@ -739,7 +805,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const token = createdBody.token;
-    const updated = await request.put(`${API_BASE}/api/v1/client/${createdBody.id}`, {
+    const updated = await request.patch(`${API_BASE}/api/v1/clients/me`, {
       headers: {
         Authorization: `Bearer ${token}`
       },
@@ -764,7 +830,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -790,7 +856,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -817,7 +883,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -842,7 +908,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -869,7 +935,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -905,7 +971,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(secondCreated.status()).toBe(200);
     const secondAuth = await secondCreated.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${secondAuth.token}`
       },
@@ -921,7 +987,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('API: perfil sin autenticación devuelve 401 al intentar actualizar', async ({ request }) => {
-    const response = await request.put(`${API_BASE}/api/v1/client/00000000-0000-0000-0000-000000000001`, {
+    const response = await request.patch(`${API_BASE}/api/v1/clients/me`, {
       data: {
         name: 'Cliente no autenticado'
       }
@@ -941,7 +1007,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -966,7 +1032,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.post(`${API_BASE}/api/v1/user/me/profile-image`, {
+    const response = await request.post(`${API_BASE}/api/v1/users/me/profile-image`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -995,7 +1061,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const createdBody = await created.json();
 
-    const response = await request.post(`${API_BASE}/api/v1/user/me/profile-image`, {
+    const response = await request.post(`${API_BASE}/api/v1/users/me/profile-image`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -1025,7 +1091,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const hugeBuffer = Buffer.alloc(6 * 1024 * 1024, 0x41);
-    const response = await request.post(`${API_BASE}/api/v1/user/me/profile-image`, {
+    const response = await request.post(`${API_BASE}/api/v1/users/me/profile-image`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -1073,7 +1139,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const token = createdBody.token;
-    const updated = await request.put(`${API_BASE}/api/v1/professional/${createdBody.id}`, {
+    const updated = await request.patch(`${API_BASE}/api/v1/professionals/me`, {
       headers: {
         Authorization: `Bearer ${token}`
       },
@@ -1137,7 +1203,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(secondCreated.status()).toBe(200);
     const secondAuth = await secondCreated.json();
 
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${secondAuth.token}`
       },
@@ -1199,7 +1265,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const auth = await created.json();
 
-    const updated = await request.put(`${API_BASE}/api/v1/client/${auth.id}`, {
+    const updated = await request.patch(`${API_BASE}/api/v1/clients/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1229,7 +1295,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const auth = await created.json();
 
-    const changePassword = await request.put(`${API_BASE}/api/v1/user/me/password`, {
+    const changePassword = await request.put(`${API_BASE}/api/v1/users/me/password`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1276,7 +1342,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.name).toBe(professional.name);
   });
 
-  test('API: edición de nombre y email con caracteres Unicode acepta valores no ASCII', async ({ request }) => {
+  test('API: edición de nombre y cambio de email Unicode aceptan valores no ASCII', async ({ request }) => {
     const client = {
       name: 'Cliente QA Unicode',
       email: uniqueEmail('cliente.unicode'),
@@ -1288,7 +1354,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const auth = await created.json();
     const newEmail = `maria.ñandú.${Date.now()}@qa.test`;
 
-    const emailUpdate = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const emailUpdate = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1298,11 +1364,14 @@ test.describe('OficiosYa - QA suite expandida', () => {
       }
     });
 
-    expect(emailUpdate.status()).toBe(200);
-    const emailBody = await emailUpdate.json();
-    expect(emailBody.email).toBe(newEmail);
+    expect(emailUpdate.status()).toBe(202);
+    expect((await emailUpdate.json()).email).toBe(newEmail.toLowerCase());
 
-    const nameUpdate = await request.put(`${API_BASE}/api/v1/client/${auth.id}`, {
+    const emailVerified = await verifyEmailChange(request, auth.token, newEmail);
+    expect(emailVerified.status()).toBe(200);
+    expect((await emailVerified.json()).email).toBe(newEmail.toLowerCase());
+
+    const nameUpdate = await request.patch(`${API_BASE}/api/v1/clients/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1354,11 +1423,11 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('API: perfil requiere autenticación', async ({ request }) => {
-    const response = await request.get(`${API_BASE}/api/v1/user/me`);
+    const response = await request.get(`${API_BASE}/api/v1/users/me`);
     expect(response.status()).toBe(401);
   });
 
-  test('API: cambio de email con contraseña válida actualiza el email', async ({ request }) => {
+  test('API: cambio de email válido inicia verificación y luego actualiza el email', async ({ request }) => {
     const client = {
       name: 'Cliente Email OK',
       email: uniqueEmail('cliente.email.ok'),
@@ -1370,7 +1439,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const newEmail = uniqueEmail('cliente.email.nuevo');
-    const response = await request.put(`${API_BASE}/api/v1/user/me/email`, {
+    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
       headers: {
         Authorization: `Bearer ${createdBody.token}`
       },
@@ -1380,9 +1449,16 @@ test.describe('OficiosYa - QA suite expandida', () => {
       }
     });
 
-    expect(response.status()).toBe(200);
-    const body = await response.json();
-    expect(body.email).toBe(newEmail);
+    expect(response.status()).toBe(202);
+    expect((await response.json()).email).toBe(newEmail);
+
+    const beforeVerification = await getAuthenticatedUser(request, createdBody.token);
+    expect(beforeVerification.status()).toBe(200);
+    expect((await beforeVerification.json()).email).toBe(client.email);
+
+    const verified = await verifyEmailChange(request, createdBody.token, newEmail);
+    expect(verified.status()).toBe(200);
+    expect((await verified.json()).email).toBe(newEmail);
   });
 
   test('API: logout invalida la sesión y bloquea acceso al perfil', async ({ request }) => {
@@ -1403,7 +1479,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     });
     expect(logoutResponse.status()).toBe(200);
 
-    const profileResponse = await request.get(`${API_BASE}/api/v1/user/me`, {
+    const profileResponse = await request.get(`${API_BASE}/api/v1/users/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       }
@@ -1433,15 +1509,17 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test.fixme('UI: botón de logout deshabilitado mientras se procesa', async ({ page }) => {
+    const token = fakeJwt();
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((sessionToken) => {
+      localStorage.setItem('oficiosya_token', sessionToken);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Logout Busy',
         email: 'logout.busy@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, token);
     await page.reload();
 
     await page.locator('.profile-menu__trigger').click();
@@ -1450,15 +1528,17 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('UI: recarga de página mantiene sesión activa', async ({ page }) => {
+    const token = fakeJwt();
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((sessionToken) => {
+      localStorage.setItem('oficiosya_token', sessionToken);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Persistente',
         email: 'persistente.ui@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, token);
     await page.reload();
 
     await expect(page.locator('.profile-menu__trigger')).toBeVisible();
@@ -1473,15 +1553,17 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('UI: menú de perfil funciona en desktop y mobile', async ({ page }) => {
+    const token = fakeJwt();
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((sessionToken) => {
+      localStorage.setItem('oficiosya_token', sessionToken);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Mobile',
         email: 'mobile.ui@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, token);
     await page.reload();
 
     await expect(page.locator('.profile-menu__trigger')).toBeVisible();
@@ -1497,15 +1579,21 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('UI: teclado Tab, Enter y Escape controlan el menú y el modal de cambios sin guardar', async ({ page }) => {
+    const token = fakeJwt();
+    await mockVerifiedSession(page, {
+      name: 'Usuario Teclado',
+      email: 'teclado.ui@qa.test',
+      role: 'CLIENT'
+    });
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((sessionToken) => {
+      localStorage.setItem('oficiosya_token', sessionToken);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Teclado',
         email: 'teclado.ui@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, token);
     await page.reload();
 
     await page.locator('.profile-menu__trigger').click();
@@ -1575,15 +1663,21 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test.fixme('UI: guardar perfil muestra estado visual de loading mientras se guarda', async ({ page }) => {
+    const token = fakeJwt();
+    await mockVerifiedSession(page, {
+      name: 'Perfil Loading',
+      email: 'perfil.loading@qa.test',
+      role: 'CLIENT'
+    });
     await page.goto(`${FRONTEND_BASE}/profile/edit`);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((sessionToken) => {
+      localStorage.setItem('oficiosya_token', sessionToken);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Perfil Loading',
         email: 'perfil.loading@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, token);
     await page.reload();
     await page.locator('#profile-email').fill('perfil.loading.nuevo@qa.test');
     await page.getByRole('button', { name: /guardar cambios/i }).click();
@@ -1591,7 +1685,12 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('UI: edición de perfil muestra la vista autenticada cuando hay token persistido', async ({ page }) => {
-    const token = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJmY2JhOTYxZi0zOWQ4LTQwNTItOTU1Ny0xMmQ1ODk3M2RjYjEiLCJpYXQiOjE3ODkzOTEzMTAsImV4cCI6MTc4OTM5NDkxMH0.';
+    await mockVerifiedSession(page, {
+      name: 'Perfil UI QA',
+      email: 'perfil.ui.qa@qa.test',
+      role: 'CLIENT'
+    });
+    const token = fakeJwt();
     await page.addInitScript((value) => {
       localStorage.setItem('oficiosya_token', value);
       localStorage.setItem('oficiosya_user', JSON.stringify({
@@ -1607,15 +1706,17 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('UI: cerrar sesión remueve el token y redirige a la vista principal', async ({ page }) => {
+    const sessionToken = fakeJwt();
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((sessionToken) => {
+      localStorage.setItem('oficiosya_token', sessionToken);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Cierre',
         email: 'logout.ui@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, sessionToken);
     await page.reload();
 
     const profileTrigger = page.locator('.profile-menu__trigger').first();
@@ -1637,20 +1738,60 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await expect(page.locator('.category-card')).not.toHaveCount(0);
   });
 
+  test('SCRUM-17: cada categoría filtra por sus oficios y se puede quitar la selección', async ({ page }) => {
+    await mockHomeTradeResults(page);
+    await page.goto(FRONTEND_BASE);
+
+    const electrician = page.locator('.category-card').filter({ hasText: 'Electricista' });
+    const plumber = page.locator('.category-card').filter({ hasText: 'Plomería' });
+    await expect(page.locator('.professional-card')).toHaveCount(2);
+
+    await electrician.click();
+    await expect(electrician).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.professional-card')).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Ana Multioficio' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bruno Plomero' })).toHaveCount(0);
+
+    await plumber.click();
+    await expect(electrician).toHaveAttribute('aria-pressed', 'false');
+    await expect(plumber).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.professional-card')).toHaveCount(2);
+
+    await plumber.click();
+    await expect(plumber).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.professional-card')).toHaveCount(2);
+  });
+
+  test('SCRUM-17: una categoría sin profesionales muestra estado vacío y al quitarla restaura resultados', async ({ page }) => {
+    await mockHomeTradeResults(page);
+    await page.goto(FRONTEND_BASE);
+
+    const carpentry = page.locator('.category-card').filter({ hasText: 'Carpintería' });
+    await carpentry.click();
+
+    await expect(page.getByRole('heading', { name: 'No encontramos profesionales con estos filtros' })).toBeVisible();
+    await expect(page.locator('.professional-card')).toHaveCount(0);
+
+    await carpentry.click();
+    await expect(page.getByRole('heading', { name: 'No encontramos profesionales con estos filtros' })).toHaveCount(0);
+    await expect(page.locator('.professional-card')).toHaveCount(2);
+  });
+
   test('SCRUM-18: búsqueda de profesionales por oficio y rango de precio devuelve resultados publicados', async ({ request }) => {
+    const workingLocation = `QA Scrum Search ${Date.now()}`;
     const professional = await createPublishedProfessional(request, {
       name: 'Profesional Scrum Search',
       email: uniqueEmail('profesional.scrum.search'),
       password: 'ClaveSegura2026!',
       phoneNumber: '+598991234567',
-      workingLocation: 'Montevideo'
+      workingLocation
     });
 
     const tradeResponse = await request.get(`${API_BASE}/api/v1/trades`);
     expect(tradeResponse.status()).toBe(200);
     const trade = (await tradeResponse.json())[0];
 
-    const response = await request.get(`${API_BASE}/api/v1/professionals/search?tradeIds=${trade.id}&minPrice=300&maxPrice=700&page=0&size=20`);
+    const response = await request.get(`${API_BASE}/api/v1/professionals/search?tradeIds=${trade.id}&minPrice=300&maxPrice=700&location=${encodeURIComponent(workingLocation)}&page=0&size=20`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -1659,12 +1800,13 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('SCRUM-19: filtrar profesionales desde la home por categoría y precio', async ({ page, request }) => {
+    const workingLocation = `QA Scrum Filter ${Date.now()}`;
     const professional = await createPublishedProfessional(request, {
       name: 'Profesional Scrum Filtro',
       email: uniqueEmail('profesional.scrum.filter'),
       password: 'ClaveSegura2026!',
       phoneNumber: '+598991234568',
-      workingLocation: 'Montevideo'
+      workingLocation
     });
 
     await page.goto(FRONTEND_BASE);
@@ -1672,15 +1814,15 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await expect(tradeCard).toBeVisible();
     await tradeCard.click();
 
-    await expect(page.getByText(professional.name)).toBeVisible();
+    await expect(page.getByRole('heading', { name: professional.name }).first()).toBeVisible();
 
     await page.getByRole('button', { name: /filtros/i }).click();
-    await page.getByLabel('Ciudad o barrio').fill('Montevideo');
+    await page.getByLabel('Ciudad o barrio').fill(workingLocation);
     await page.getByLabel('Ingresar precio mínimo').fill('300');
     await page.getByLabel('Ingresar precio máximo').fill('700');
     await page.getByRole('button', { name: 'Aplicar filtros' }).click();
 
-    await expect(page.getByText(professional.name)).toBeVisible();
+    await expect(page.getByRole('heading', { name: professional.name }).first()).toBeVisible();
   });
 
   test('SCRUM-15: visualización del perfil profesional público', async ({ page, request }) => {
@@ -1700,6 +1842,133 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await expect(page.locator('body')).toContainText('Especialista en instalaciones');
   });
 
+  test('SCRUM-15: el perfil público muestra servicios y precios sin exponer datos de contacto', async ({ page, request }) => {
+    const professional = await createPublishedProfessional(request, {
+      name: 'Profesional Perfil Público Completo',
+      email: uniqueEmail('profesional.publico.privacidad'),
+      password: 'ClaveSegura2026!',
+      phoneNumber: '+598991234581',
+      workingLocation: 'Colonia del Sacramento'
+    }, 'Reparaciones e instalaciones para hogares y comercios.');
+
+    const apiResponse = await request.get(`${API_BASE}/api/v1/professionals/${professional.id}`);
+    expect(apiResponse.status()).toBe(200);
+    const publicProfile = await apiResponse.json();
+    expect(publicProfile.name).toBe('Profesional Perfil Público Completo');
+    expect(publicProfile.profileImageUrl).toBeNull();
+    expect(publicProfile.rating).toBeNull();
+    expect(publicProfile.expertiseTrades).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        tradeId: professional.tradeId,
+        tradeName: professional.tradeName,
+        minimumHourlyWage: 350,
+        maximumHourlyWage: 600
+      })
+    ]));
+    expect(publicProfile).not.toHaveProperty('email');
+    expect(publicProfile).not.toHaveProperty('phoneNumber');
+    expect(publicProfile).not.toHaveProperty('phone');
+
+    await blockProfileMapRequests(page);
+    await page.goto(`${FRONTEND_BASE}/profesionales/${professional.id}`);
+
+    await expect(page.getByRole('heading', { name: professional.name })).toBeVisible();
+    await expect(page.getByRole('button', { name: professional.tradeName })).toBeVisible();
+    await expect(page.locator('.profile-summary__price')).toContainText('$350');
+    await expect(page.getByText('Sin calificaciones')).toBeVisible();
+    await expect(page.getByText('Este profesional todavía no tiene calificaciones.')).toBeVisible();
+    await expect(page.getByRole('img', { name: `Foto de ${professional.name}` })).toHaveAttribute('src', /^data:image\/svg\+xml,/);
+    await expect(page.locator('body')).not.toContainText(professional.email);
+    await expect(page.locator('body')).not.toContainText('+598991234581');
+  });
+
+  test('SCRUM-15: el perfil representa una imagen y una calificación existentes', async ({ page }) => {
+    const professionalId = '11111111-1111-4111-8111-111111111111';
+    await blockProfileMapRequests(page);
+    await page.route(`**/api/v1/professionals/${professionalId}`, (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: professionalId,
+        name: 'Profesional con reputación',
+        profileImageUrl: '/uploads/profile-images/qa-profile.svg',
+        workingLocation: 'Montevideo',
+        description: 'Experiencia en trabajos eléctricos.',
+        rating: 8.7,
+        expertiseTrades: [
+          { id: 101, tradeId: 10, tradeName: 'Electricista', minimumHourlyWage: 350, maximumHourlyWage: 600 },
+          { id: 102, tradeId: 11, tradeName: 'Plomería', minimumHourlyWage: 500, maximumHourlyWage: 900 }
+        ]
+      })
+    }));
+    await page.route('**/uploads/profile-images/qa-profile.svg', (route) => route.fulfill({
+      status: 200,
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" />'
+    }));
+
+    await page.goto(`${FRONTEND_BASE}/profesionales/${professionalId}?tradeId=11`);
+
+    await expect(page.getByRole('heading', { name: 'Profesional con reputación' })).toBeVisible();
+    await expect(page.getByRole('img', { name: 'Foto de Profesional con reputación' })).toHaveAttribute('src', '/uploads/profile-images/qa-profile.svg');
+    await expect(page.locator('.profile-summary__rating')).toContainText('8.7');
+    await expect(page.getByRole('button', { name: 'Electricista' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Plomería' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.profile-summary__price')).toContainText('$500');
+    await expect(page.getByText('Este profesional todavía no tiene calificaciones.')).toHaveCount(0);
+  });
+
+  test('SCRUM-15: navegar a un perfil inexistente muestra el estado 404', async ({ page, request }) => {
+    const missingId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    const apiResponse = await request.get(`${API_BASE}/api/v1/professionals/${missingId}`);
+    expect(apiResponse.status()).toBe(404);
+
+    await page.goto(`${FRONTEND_BASE}/profesionales/${missingId}`);
+
+    await expect(page.getByRole('alert')).toContainText('No encontramos el perfil que buscás.');
+    await expect(page.getByRole('button', { name: 'Volver a profesionales' }).last()).toBeVisible();
+  });
+
+  test('SCRUM-15: muestra la carga mientras espera el perfil y luego renderiza el resultado', async ({ page }) => {
+    const professionalId = '22222222-2222-4222-8222-222222222222';
+    await blockProfileMapRequests(page);
+    await page.route(`**/api/v1/professionals/${professionalId}`, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: professionalId,
+          name: 'Perfil luego de cargar',
+          profileImageUrl: null,
+          workingLocation: '',
+          description: 'Perfil de prueba.',
+          rating: null,
+          expertiseTrades: []
+        })
+      });
+    });
+
+    await page.goto(`${FRONTEND_BASE}/profesionales/${professionalId}`);
+
+    await expect(page.getByText('Cargando perfil...')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Perfil luego de cargar' })).toBeVisible();
+  });
+
+  test('SCRUM-15: un error del servidor muestra un mensaje recuperable', async ({ page }) => {
+    const professionalId = '33333333-3333-4333-8333-333333333333';
+    await page.route(`**/api/v1/professionals/${professionalId}`, (route) => route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 500, error: 'Internal Server Error' })
+    }));
+
+    await page.goto(`${FRONTEND_BASE}/profesionales/${professionalId}`);
+
+    await expect(page.getByRole('alert')).toContainText('No pudimos cargar este perfil. Intentá de nuevo más tarde.');
+    await expect(page.getByRole('button', { name: 'Volver a profesionales' }).last()).toBeVisible();
+  });
+
   test('SCRUM-16: la disponibilidad semanal del profesional se presenta en la vista pública', async ({ page, request }) => {
     const professional = await createPublishedProfessional(request, {
       name: 'Profesional Scrum Agenda',
@@ -1716,15 +1985,17 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('SCRUM-11: cierre de sesión limpia sesión y redirige al home', async ({ page }) => {
+    const token = fakeJwt();
+    await mockHomeApi(page);
     await page.goto(FRONTEND_BASE);
-    await page.evaluate(() => {
-      localStorage.setItem('oficiosya_token', 'dummy-token-for-ui');
+    await page.evaluate((sessionToken) => {
+      localStorage.setItem('oficiosya_token', sessionToken);
       localStorage.setItem('oficiosya_user', JSON.stringify({
         name: 'Usuario Cierre Scrum',
         email: 'logout.scrum@qa.test',
         role: 'CLIENT'
       }));
-    });
+    }, token);
     await page.reload();
 
     await page.locator('.profile-menu__trigger').click();
@@ -1798,6 +2069,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await page.getByRole('button', { name: /filtros/i }).click();
     await page.getByRole('button', { name: /limpiar filtros/i }).click();
     await expect(page.locator('.active-filters')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Cerrar filtros' }).click();
 
     await page.locator('.category-card').first().click();
     await expect(page.getByText(String(titleBefore ?? '').trim())).toBeVisible();
@@ -1817,7 +2089,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     });
     expect(logout.status()).toBe(200);
 
-    const protectedRoute = await request.get(`${API_BASE}/api/v1/user/me`, {
+    const protectedRoute = await request.get(`${API_BASE}/api/v1/users/me`, {
       headers: { Authorization: `Bearer ${auth.token}` }
     });
     expect(protectedRoute.status()).toBe(401);
@@ -1825,41 +2097,52 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const secondLogout = await request.post(`${API_BASE}/api/v1/auth/logout`, {
       headers: { Authorization: `Bearer ${auth.token}` }
     });
-    expect(secondLogout.status()).toBe(401);
+    expect(secondLogout.status()).toBe(200);
+    expect((await request.get(`${API_BASE}/api/v1/users/me`, {
+      headers: { Authorization: `Bearer ${auth.token}` }
+    })).status()).toBe(401);
   });
 
   test('SCRUM-AGGRESSIVE-05: la búsqueda por query ignora espacios y distingue mayúsculas/minúsculas', async ({ request }) => {
+    const workingLocation = `QA Query ${Date.now()}`;
     const published = await createPublishedProfessional(request, {
       name: 'Ana Mendez Electricista',
       email: uniqueEmail('profesional.scrum.query.aggressive'),
       password: 'ClaveSegura2026!',
       phoneNumber: '+598991234571',
-      workingLocation: 'Durazno'
+      workingLocation
     }, 'Especialista en instalaciones eléctricas residenciales y comerciales.');
 
-    const response = await request.get(`${API_BASE}/api/v1/professionals/search?query=%20%20MENEDEZ%20%20&page=0&size=20`);
+    const publicProfileResponse = await request.get(`${API_BASE}/api/v1/professionals/${published.id}`);
+    expect(publicProfileResponse.status()).toBe(200);
+    const publicProfile = await publicProfileResponse.json();
+    expect(publicProfile.name).toBe('Ana Mendez Electricista');
+    expect(publicProfile.workingLocation).toBe(workingLocation);
+
+    const response = await request.get(`${API_BASE}/api/v1/professionals/search?query=%20%20MENEDEZ%20%20&location=${encodeURIComponent(workingLocation)}&page=0&size=20`);
     expect(response.status()).toBe(200);
     const body = await response.json();
     const ids = body.content.map((item: { id: string }) => item.id);
     expect(ids).toContain(published.id);
 
-    const secondResponse = await request.get(`${API_BASE}/api/v1/professionals/search?query=instalaciones%20ELÉCTRICAS&page=0&size=20`);
+    const secondResponse = await request.get(`${API_BASE}/api/v1/professionals/search?query=ANA%20MENDEZ&location=${encodeURIComponent(workingLocation)}&page=0&size=20`);
     expect(secondResponse.status()).toBe(200);
     const secondBody = await secondResponse.json();
-    expect(secondBody.content.length).toBeGreaterThan(0);
+    expect(secondBody.content.map((item: { id: string }) => item.id)).toContain(published.id);
   });
 
   test('SCRUM-AGGRESSIVE-06: combinando tradeIds, precio y ubicación devuelve solo perfiles coherentes', async ({ request }) => {
     const trade = await getFirstTrade(request);
+    const workingLocation = `QA Combo ${Date.now()}`;
     const published = await createPublishedProfessional(request, {
       name: 'Profesional Combo Filtro',
       email: uniqueEmail('profesional.scrum.combo.filter'),
       password: 'ClaveSegura2026!',
       phoneNumber: '+598991234572',
-      workingLocation: 'Montevideo'
+      workingLocation
     }, 'Soluciones rápidas y soporte técnico profesional.');
 
-    const response = await request.get(`${API_BASE}/api/v1/professionals/search?tradeIds=${trade.id}&minPrice=250&maxPrice=700&location=Montevideo&page=0&size=20`);
+    const response = await request.get(`${API_BASE}/api/v1/professionals/search?tradeIds=${trade.id}&minPrice=250&maxPrice=700&location=${encodeURIComponent(workingLocation)}&page=0&size=20`);
     expect(response.status()).toBe(200);
     const body = await response.json();
     expect(body.content.length).toBeGreaterThan(0);
@@ -1896,9 +2179,9 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const secondLogout = await request.post(`${API_BASE}/api/v1/auth/logout`, {
       headers: { Authorization: `Bearer ${auth.token}` }
     });
-    expect(secondLogout.status()).toBe(401);
+    expect(secondLogout.status()).toBe(200);
 
-    const profile = await request.get(`${API_BASE}/api/v1/user/me`, {
+    const profile = await request.get(`${API_BASE}/api/v1/users/me`, {
       headers: { Authorization: `Bearer ${auth.token}` }
     });
     expect(profile.status()).toBe(401);
@@ -1994,7 +2277,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
     expect(response.status()).toBe(200);
 
-    const profile = await request.get(`${API_BASE}/api/v1/user/me`, {
+    const profile = await request.get(`${API_BASE}/api/v1/users/me`, {
       headers: {
         Authorization: 'Bearer token.invalido.qa'
       }

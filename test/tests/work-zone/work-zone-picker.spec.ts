@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { blockGoogleIdentity } from './support/ui';
+import { blockGoogleIdentity } from '../support/ui';
 
 /**
  * Choosing the zone on the map while registering as a professional. Photon (the suggestions while typing),

@@ -7,8 +7,8 @@ import {
   otherCode,
   startClientRegistration,
   waitForVerificationCode
-} from './support/registration';
-import { blockGoogleIdentity } from './support/ui';
+} from '../support/registration';
+import { blockGoogleIdentity } from '../support/ui';
 
 /**
  * Changing the email from the profile: the current password starts it, a code mailed to the NEW

@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { fakeJwt, mockVerifiedSession } from './support/ui';
+import { fakeJwt, mockVerifiedSession } from '../support/ui';
 
 /**
  * The zone picker in "Editar perfil", for a professional: it opens on the zone that is saved, choosing another

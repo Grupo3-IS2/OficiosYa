@@ -9,8 +9,8 @@ import {
   startProfessionalRegistration,
   verifyEmail,
   waitForVerificationCode
-} from './support/registration';
-import { blockExternalMaps, blockGoogleIdentity } from './support/ui';
+} from '../support/registration';
+import { blockExternalMaps, blockGoogleIdentity } from '../support/ui';
 
 /**
  * Registration with an emailed code: the account does not exist until the code is verified.

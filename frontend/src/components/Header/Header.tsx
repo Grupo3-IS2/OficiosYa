@@ -24,8 +24,8 @@ function Header() {
         setIsMenuOpen((isOpen) => !isOpen)
     }
 
-    const handleLogout = () => {
-        logout()
+    const handleLogout = async () => {
+        await logout()
         setAuthenticated(false)
         window.location.href = '/'
     }

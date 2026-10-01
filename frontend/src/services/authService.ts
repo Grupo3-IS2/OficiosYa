@@ -141,8 +141,27 @@ export async function verifyToken(): Promise<TokenResponse> {
   return apiRequest<TokenResponse>('/auth/verify')
 }
 
-export function logout(): void {
+/**
+ * Revokes the token on the backend before dropping it here, so a copy of it stops working too.
+ * The local session is cleared even if that call fails: the user asked to leave.
+ */
+export async function logout(): Promise<void> {
+  if (isTokenUsable(getToken())) {
+    try {
+      await apiRequest<unknown>('/auth/logout', { method: 'POST' })
+    } catch { /* already invalid or backend unreachable: clearing locally is all that is left */ }
+  }
   clearSession()
+}
+
+/** Follows a logout done in another tab: localStorage changes there fire `storage` here. */
+export function watchSessionFromOtherTabs(): void {
+  window.addEventListener('storage', event => {
+    if (event.storageArea !== localStorage) return
+    if ((event.key === TOKEN_KEY || event.key === null) && event.oldValue !== null && !getToken()) {
+      window.location.href = '/login'
+    }
+  })
 }
 
 /** Ends the session on its own when the token expires, even if the tab is left open. */

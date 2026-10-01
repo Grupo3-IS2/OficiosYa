@@ -1724,10 +1724,10 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await profileTrigger.click();
     await page.getByRole('menuitem', { name: /cerrar sesión/i }).click();
 
-    await expect(page).toHaveURL(/\//);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('.profile-menu__trigger')).toHaveCount(0);
     await expect(page.locator('body')).toContainText(/iniciar sesión|OficiosYa/i);
-    const token = await page.evaluate(() => localStorage.getItem('oficiosya_token'));
-    expect(token).toBeNull();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('oficiosya_token'))).toBeNull();
   });
 
   test('SCRUM-17: visualización de categorías en la home', async ({ page }) => {
@@ -2103,7 +2103,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     })).status()).toBe(401);
   });
 
-  test('SCRUM-AGGRESSIVE-05: la búsqueda por query ignora espacios y distingue mayúsculas/minúsculas', async ({ request }) => {
+  test('SCRUM-AGGRESSIVE-05: la búsqueda por query ignora espacios y no distingue mayúsculas/minúsculas', async ({ request }) => {
     const workingLocation = `QA Query ${Date.now()}`;
     const published = await createPublishedProfessional(request, {
       name: 'Ana Mendez Electricista',
@@ -2119,7 +2119,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(publicProfile.name).toBe('Ana Mendez Electricista');
     expect(publicProfile.workingLocation).toBe(workingLocation);
 
-    const response = await request.get(`${API_BASE}/api/v1/professionals/search?query=%20%20MENEDEZ%20%20&location=${encodeURIComponent(workingLocation)}&page=0&size=20`);
+    const response = await request.get(`${API_BASE}/api/v1/professionals/search?query=%20%20MENDEZ%20%20&location=${encodeURIComponent(workingLocation)}&page=0&size=20`);
     expect(response.status()).toBe(200);
     const body = await response.json();
     const ids = body.content.map((item: { id: string }) => item.id);

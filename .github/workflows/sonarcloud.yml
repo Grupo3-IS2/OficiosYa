@@ -54,5 +54,5 @@ jobs:
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.projectKey=Grupo3-IS2_OficiosYa
           -Dsonar.organization=grupo3-is2
-          -Dsonar.qualitygate.wait=true
+          -Dsonar.qualitygate.wait=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           -Dsonar.qualitygate.timeout=600

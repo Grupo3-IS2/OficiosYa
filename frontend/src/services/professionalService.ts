@@ -6,13 +6,14 @@ interface ProfessionalPage {
     totalPages: number
 }
 
-export async function getProfessionals(): Promise<Professional[]> {
+export async function getProfessionals(query = ''): Promise<Professional[]> {
     const professionals: Professional[] = []
+    const searchQuery = query.trim() ? `&query=${encodeURIComponent(query.trim())}` : ''
     let pageNumber = 0
     let totalPages: number
 
     do {
-        const page = await apiRequest<ProfessionalPage>(`/professionals/search?page=${pageNumber}&size=20`)
+        const page = await apiRequest<ProfessionalPage>(`/professionals/search?page=${pageNumber}&size=20${searchQuery}`)
         professionals.push(...page.content)
         totalPages = page.totalPages
         pageNumber++

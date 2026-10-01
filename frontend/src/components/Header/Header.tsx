@@ -62,15 +62,12 @@ function Header() {
                 className={isMenuOpen ? 'is-open' : ''}
                 aria-label="Navegación principal"
             >
-                <button className="nav-item" type="button">
-                    <Icon name="location" />
-                    <span>Montevideo</span>
-                    <span className="nav-chevron" aria-hidden="true" />
-                </button>
-                <button className="nav-item" type="button">
-                    <Icon name="document" />
-                    <span>Mis solicitudes</span>
-                </button>
+                {authenticated && (
+                    <button className="nav-item" type="button">
+                        <Icon name="document" />
+                        <span>Mis solicitudes</span>
+                    </button>
+                )}
 
                 {authenticated ? (
                     <div className="profile-menu">

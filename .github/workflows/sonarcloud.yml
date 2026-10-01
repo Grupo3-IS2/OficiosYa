@@ -45,14 +45,23 @@ jobs:
       # The unit tests run so JaCoCo can measure coverage (Sonar reads
       # target/site/jacoco/jacoco.xml); without them the coverage of new code is always 0%.
       # OficiosYaTests is left out: it boots the whole Spring context and needs the database.
-      - name: Build, test and analyze
+      - name: Build and test
+        run: >
+          mvn -B clean test -Dtest='!OficiosYaTests'
+
+      - name: Analyze with SonarQube Cloud
+        if: ${{ secrets.SONAR_TOKEN != '' }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
-          mvn -B clean test -Dtest='!OficiosYaTests'
+          mvn -B
           org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.projectKey=Grupo3-IS2_OficiosYa
           -Dsonar.organization=grupo3-is2
           -Dsonar.qualitygate.wait=true
           -Dsonar.qualitygate.timeout=600
+
+      - name: SonarQube Cloud analysis skipped
+        if: ${{ secrets.SONAR_TOKEN == '' }}
+        run: echo "Skipping SonarQube Cloud analysis because SONAR_TOKEN is not configured for this workflow run."

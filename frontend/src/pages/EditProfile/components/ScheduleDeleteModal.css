@@ -1,0 +1,14 @@
+.schedule-delete-modal { width: min(430px, calc(100% - 32px)); margin: auto; padding: 0; border: 1px solid #eadeda; border-radius: 10px; background: #fff; color: #132238; }
+.schedule-delete-modal::backdrop { background: rgb(24 38 48 / 60%); }
+.schedule-delete-modal__body { padding: 26px 24px 22px; text-align: center; }
+.schedule-delete-modal__warning { display: grid; width: 58px; height: 58px; margin: 0 auto 14px; place-items: center; border-radius: 50%; color: #b42318; background: #fff0ed; font-size: 28px; font-weight: 700; }
+.schedule-delete-modal h2 { margin: 0 0 9px; font-size: 22px; line-height: 1.3; letter-spacing: -.5px; }
+.schedule-delete-modal p { margin: 0; color: #68758a; font-size: 14px; line-height: 1.55; }
+.schedule-delete-modal__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
+.schedule-delete-modal__actions > button { min-height: 44px; border-radius: 7px; font: inherit; font-weight: 600; }
+.schedule-delete-modal__actions > button:first-child { border: 1px solid #d6dfe0; background: #fff; color: #4f5e64; }
+.schedule-delete-modal .schedule-delete-modal__confirm { border: 0; background: #b42318; color: #fff; box-shadow: none; }
+.schedule-delete-modal .schedule-delete-modal__confirm:hover { background: #921d14; transform: none; }
+.schedule-delete-modal button:disabled { opacity: .55; cursor: wait; }
+.schedule-delete-modal button:focus-visible { outline: 2px solid #07984c; outline-offset: 2px; }
+@media (max-width: 420px) { .schedule-delete-modal__actions { grid-template-columns: 1fr; } }

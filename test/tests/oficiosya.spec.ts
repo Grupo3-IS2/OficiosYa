@@ -1712,7 +1712,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await page.goto(`${FRONTEND_BASE}/profesionales/${professional.id}`);
 
     await expect(page.getByRole('heading', { name: 'Disponibilidad semanal' })).toBeVisible();
-    await expect(page.getByText('Este profesional todavía no informó su disponibilidad semanal habitual.')).toBeVisible();
+    await expect(page.getByText('Este profesional no tiene bloques cargados para esta semana.')).toBeVisible();
   });
 
   test('SCRUM-11: cierre de sesión limpia sesión y redirige al home', async ({ page }) => {

@@ -3,6 +3,7 @@ import PersonalDataSection from './components/PersonalDataSection'
 import SecuritySection from './components/SecuritySection'
 import GoogleAccountSection from './components/GoogleAccountSection'
 import ProfessionalProfileSection from './components/ProfessionalProfileSection'
+import ScheduleSection from './components/ScheduleSection'
 import BecomeProfessionalCard from './components/BecomeProfessionalCard'
 import UnsavedChangesModal from './components/UnsavedChangesModal'
 import useProfileEditor from './useProfileEditor'
@@ -35,7 +36,10 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                     {/* Not before the profile says whether Google is linked: it would show the wrong state. */}
                     {!editor.loadingProfile && !editor.profileLoadFailed && <GoogleAccountSection access={editor.access} email={editor.savedPersonalEmail} onChange={editor.setAccess} />}
                     {editor.isProfessional
-                        ? <ProfessionalProfileSection value={editor.professional} onChange={editor.setProfessional} onSave={() => editor.saveSection('professional')} message={editor.messages.professional} error={editor.errorSection === 'professional' ? editor.error : ''} trades={editor.trades} tradesLoading={editor.tradesLoading} tradesError={editor.tradesError} />
+                        ? <>
+                            <ProfessionalProfileSection value={editor.professional} onChange={editor.setProfessional} onSave={() => editor.saveSection('professional')} message={editor.messages.professional} error={editor.errorSection === 'professional' ? editor.error : ''} trades={editor.trades} tradesLoading={editor.tradesLoading} tradesError={editor.tradesError} />
+                            {editor.user && <ScheduleSection professionalId={editor.user.id} />}
+                        </>
                         : <BecomeProfessionalCard />}
                 </fieldset>
             </main>

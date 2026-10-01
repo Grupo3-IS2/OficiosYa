@@ -37,11 +37,12 @@ function errorMessageFrom(body: unknown): string {
   return DEFAULT_ERROR_MESSAGE
 }
 
-export async function apiRequest<T>(
+async function request<T>(
   path: string,
   options: RequestInit = {},
+  useSession = true,
 ): Promise<T> {
-  const token = getToken()
+  const token = useSession ? getToken() : null
   const headers = new Headers(options.headers)
 
   // The browser has to set the multipart Content-Type itself, boundary included.
@@ -79,4 +80,22 @@ export async function apiRequest<T>(
   }
 
   return body as T
+}
+
+export function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return request<T>(path, options)
+}
+
+/**
+ * Calls an endpoint that is public by contract without attaching the current session.
+ * A failure in optional public data must not invalidate an otherwise valid login.
+ */
+export function publicApiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return request<T>(path, options, false)
 }

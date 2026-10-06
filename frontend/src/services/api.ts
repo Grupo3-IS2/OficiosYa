@@ -66,9 +66,8 @@ async function request<T>(
   }
 
   const contentType = response.headers.get('content-type') ?? ''
-  const body = contentType.includes('application/json')
-    ? await response.json()
-    : await response.text()
+  const isJson = contentType.includes('application/json')
+  const body = isJson ? await response.json() : await response.text()
 
   // A 401 on /auth/* means bad credentials, not a dead session, so it stays with the caller.
   if (response.status === 401 && token && !path.startsWith('/auth/')) {
@@ -77,6 +76,11 @@ async function request<T>(
 
   if (!response.ok) {
     throw new ApiError(errorMessageFrom(body), response.status)
+  }
+
+  // Every endpoint answers JSON or 204. Anything else is not the backend
+  if (!isJson) {
+    throw new ApiError(DEFAULT_ERROR_MESSAGE, response.status)
   }
 
   return body as T

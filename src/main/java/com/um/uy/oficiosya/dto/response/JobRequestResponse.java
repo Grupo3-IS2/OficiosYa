@@ -19,6 +19,8 @@ public class JobRequestResponse {
     private Long id;
     private UUID clientId;
     private UUID professionalId;
+    private String professionalName;
+    private String professionalProfileImageUrl;
     private String location;
     private BigDecimal paymentAmount;
     private PaymentState paymentState;

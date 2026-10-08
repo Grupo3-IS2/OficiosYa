@@ -138,6 +138,25 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Override
     @Transactional(readOnly = true)
     public void checkJobSlotAvailable(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
+        requireJobSlotFree(jobRequest, start, end);
+    }
+
+    @Override
+    @Transactional
+    public ScheduleResponse moveJobSchedule(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
+        lockAgenda(jobRequest.getProfessional().getPublicId());
+        requireJobSlotFree(jobRequest, start, end);
+
+        Schedule schedule = jobBlock(jobRequest);
+        schedule.setStartTimestamp(start);
+        schedule.setEndTimestamp(end);
+
+        schedule = scheduleRepository.save(schedule);
+        return scheduleMapper.toResponse(schedule);
+    }
+
+    /** The job's own block doesn't count as an overlap, since it's the one that would move. */
+    private void requireJobSlotFree(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
         if (start == null || end == null || !start.isBefore(end)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, BLOCK_STARTS_AFTER_END);
         }
@@ -146,20 +165,6 @@ public class ScheduleServiceImpl implements ScheduleService {
                 jobBlock(jobRequest).getId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
         }
-    }
-
-    @Override
-    @Transactional
-    public ScheduleResponse moveJobSchedule(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
-        lockAgenda(jobRequest.getProfessional().getPublicId());
-        checkJobSlotAvailable(jobRequest, start, end);
-
-        Schedule schedule = jobBlock(jobRequest);
-        schedule.setStartTimestamp(start);
-        schedule.setEndTimestamp(end);
-
-        schedule = scheduleRepository.save(schedule);
-        return scheduleMapper.toResponse(schedule);
     }
 
     @Override

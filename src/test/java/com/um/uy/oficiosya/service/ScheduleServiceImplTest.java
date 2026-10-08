@@ -256,9 +256,10 @@ class ScheduleServiceImplTest {
         JobRequest job = acceptedJob();
         when(scheduleRepository.existsOverlapping(eq(professionalId), any(), any(), eq(7L))).thenReturn(true);
         OffsetDateTime newStart = start.plusDays(1);
+        OffsetDateTime newEnd = newStart.plusHours(2);
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
-                () -> service.moveJobSchedule(job, newStart, newStart.plusHours(2)));
+                () -> service.moveJobSchedule(job, newStart, newEnd));
         assertEquals(409, e.getStatusCode().value());
         assertEquals(start, job.getSchedules().getFirst().getStartTimestamp());
     }

@@ -57,10 +57,27 @@
   background: transparent;
   font-size: 14px;
   transition: color 0.2s ease;
+  text-decoration: none;
 }
 
 .nav-item:hover {
   color: #c9f0d7;
+}
+
+.nav-item.is-active {
+  position: relative;
+  color: #fff;
+}
+
+.nav-item.is-active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -21px;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: #fff;
 }
 
 .auth-login-button {
@@ -202,6 +219,12 @@
     padding: 4px 6px;
     color: #fff;
     font-size: 11px;
+  }
+
+  .site-header nav .nav-item.is-active::after {
+    right: 24%;
+    bottom: -8px;
+    left: 24%;
   }
 
   .profile-menu {

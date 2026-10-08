@@ -3,6 +3,7 @@ package com.um.uy.oficiosya.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -64,6 +65,21 @@ public class JobRequest {
     @Column(nullable = false, length = 32)
     private JobStatus status = JobStatus.PROPOSED;
 
+    @Column(length = 500)
+    private String rejectionReason;
+
+    /** Which side cancelled the job; null unless it is CANCELLED. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 32)
+    private Role cancelledBy;
+
+    @Column(length = 500)
+    private String cancellationReason;
+
+    /** The timeframe the client asked to move the job to; only set while RESCHEDULE_REQUESTED. */
+    private OffsetDateTime rescheduleStart;
+    private OffsetDateTime rescheduleEnd;
+
     @Min(1)
     @Max(10)
     private Integer rating;
@@ -78,4 +94,17 @@ public class JobRequest {
     @UpdateTimestamp
     @Column(nullable = false)
     private OffsetDateTime updatedAt;
+
+    /**
+     * With this two actions on the same job at once (accept vs. cancel, say) can't both win.
+     */
+    @Version
+    @ColumnDefault("0")
+    @Column(nullable = false)
+    private Long version;
+
+    public void clearReschedule() {
+        this.rescheduleStart = null;
+        this.rescheduleEnd = null;
+    }
 }

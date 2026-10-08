@@ -1,9 +1,11 @@
 package com.um.uy.oficiosya.repository;
 
 import com.um.uy.oficiosya.entity.Professional;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +18,14 @@ public interface ProfessionalRepository extends JpaRepository<Professional, Long
     Optional<Professional> findByPublicId(UUID publicId);
     boolean existsByPublicId(UUID publicId);
     boolean existsByPublicIdAndPublishedTrue(UUID publicId);
+
+    /**
+     * Locks the professional's row until the transaction ends. Every change to their agenda takes
+     * this lock first, so two concurrent overlap checks can't both pass and book the same slot.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Professional p WHERE p.publicId = :publicId")
+    Optional<Professional> findByPublicIdForUpdate(@Param("publicId") UUID publicId);
 
     /**
      * Published professionals; every filter is optional and they combine (AND). tradeIds,

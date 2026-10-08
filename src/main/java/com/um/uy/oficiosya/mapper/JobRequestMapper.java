@@ -3,6 +3,7 @@ package com.um.uy.oficiosya.mapper;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.dto.response.TaskResponse;
 import com.um.uy.oficiosya.entity.JobRequest;
+import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.ScheduleType;
 import com.um.uy.oficiosya.entity.Task;
 import org.mapstruct.AfterMapping;
@@ -10,11 +11,23 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 @Mapper(componentModel = "spring")
 public interface JobRequestMapper {
 
+    /** Statuses in which both sides have committed to the job, so each can see how to reach the other. */
+    Set<JobStatus> CONTACT_VISIBLE = EnumSet.of(JobStatus.ACCEPTED, JobStatus.RESCHEDULE_REQUESTED, JobStatus.COMPLETED);
+
     @Mapping(target = "clientId", source = "client.publicId")
+    @Mapping(target = "clientName", source = "client.name")
+    @Mapping(target = "clientProfileImageUrl", source = "client.profileImageUrl")
     @Mapping(target = "professionalId", source = "professional.publicId")
+    @Mapping(target = "professionalName", source = "professional.name")
+    @Mapping(target = "professionalProfileImageUrl", source = "professional.profileImageUrl")
+    @Mapping(target = "clientEmail", ignore = true)
+    @Mapping(target = "professionalPhoneNumber", ignore = true)
     @Mapping(target = "confirmationPin", ignore = true)
     @Mapping(target = "scheduledStart", ignore = true)
     @Mapping(target = "scheduledEnd", ignore = true)
@@ -34,5 +47,13 @@ public interface JobRequestMapper {
                     response.setScheduledStart(schedule.getStartTimestamp());
                     response.setScheduledEnd(schedule.getEndTimestamp());
                 });
+    }
+
+    @AfterMapping
+    default void addContactDetails(JobRequest jobRequest, @MappingTarget JobRequestResponse response) {
+        if (CONTACT_VISIBLE.contains(jobRequest.getStatus())) {
+            response.setClientEmail(jobRequest.getClient().getEmail());
+            response.setProfessionalPhoneNumber(jobRequest.getProfessional().getPhoneNumber());
+        }
     }
 }

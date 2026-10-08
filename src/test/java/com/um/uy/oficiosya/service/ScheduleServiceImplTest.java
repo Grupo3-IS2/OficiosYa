@@ -76,7 +76,7 @@ class ScheduleServiceImplTest {
 
     @Test
     void createSchedule_savesTheBlockOnTheCallersAgenda() {
-        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
 
         ScheduleResponse response = service.createSchedule(
                 createRequest(ScheduleType.USER_RESERVED, start, end), professionalId);
@@ -102,7 +102,7 @@ class ScheduleServiceImplTest {
 
     @Test
     void createSchedule_unknownProfessional_isRejected() {
-        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.empty());
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.empty());
         ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
 
         assertThrows(UserNotFoundException.class, () -> service.createSchedule(request, professionalId));
@@ -110,7 +110,7 @@ class ScheduleServiceImplTest {
 
     @Test
     void createSchedule_overlapping_isAConflict() {
-        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
         when(scheduleRepository.existsOverlapping(professionalId, start, end, 0L)).thenReturn(true);
         ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
 
@@ -220,6 +220,62 @@ class ScheduleServiceImplTest {
         when(scheduleRepository.existsOverlapping(eq(professionalId), any(), any(), anyLong())).thenReturn(true);
 
         assertThrows(ResponseStatusException.class, () -> service.createJobSchedule(job, start, end));
+    }
+
+    @Test
+    void createJobSchedule_locksTheProfessionalsAgendaBeforeCheckingOverlaps() {
+        JobRequest job = JobRequest.builder().id(9L).professional(professional).build();
+
+        service.createJobSchedule(job, start, end);
+
+        verify(professionalRepository).findByPublicIdForUpdate(professionalId);
+    }
+
+    private JobRequest acceptedJob() {
+        JobRequest job = JobRequest.builder().id(9L).professional(professional).build();
+        job.getSchedules().add(Schedule.builder().id(7L).professional(professional).jobRequest(job)
+                .type(ScheduleType.SCHEDULED_JOB).startTimestamp(start).endTimestamp(end).build());
+        return job;
+    }
+
+    @Test
+    void moveJobSchedule_movesTheJobsBlock_ignoringItselfForOverlaps() {
+        JobRequest job = acceptedJob();
+        OffsetDateTime newStart = start.plusHours(1);
+
+        ScheduleResponse response = service.moveJobSchedule(job, newStart, newStart.plusHours(2));
+
+        verify(professionalRepository).findByPublicIdForUpdate(professionalId);
+        verify(scheduleRepository).existsOverlapping(professionalId, newStart, newStart.plusHours(2), 7L);
+        assertEquals(newStart, response.getStartTimestamp());
+        assertEquals(newStart, job.getSchedules().getFirst().getStartTimestamp());
+    }
+
+    @Test
+    void moveJobSchedule_overlapping_isAConflict() {
+        JobRequest job = acceptedJob();
+        when(scheduleRepository.existsOverlapping(eq(professionalId), any(), any(), eq(7L))).thenReturn(true);
+        OffsetDateTime newStart = start.plusDays(1);
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.moveJobSchedule(job, newStart, newStart.plusHours(2)));
+        assertEquals(409, e.getStatusCode().value());
+        assertEquals(start, job.getSchedules().getFirst().getStartTimestamp());
+    }
+
+    @Test
+    void moveJobSchedule_invertedTimes_areRejected() {
+        JobRequest job = acceptedJob();
+
+        assertThrows(ResponseStatusException.class, () -> service.moveJobSchedule(job, end, start));
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    void checkJobSlotAvailable_jobWithoutABlock_isNotFound() {
+        JobRequest job = JobRequest.builder().professional(professional).build();
+
+        assertThrows(ScheduleNotFoundException.class, () -> service.checkJobSlotAvailable(job, start, end));
     }
 
     @Test

@@ -25,6 +25,15 @@ public interface ScheduleService {
      */
     ScheduleResponse createJobSchedule(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end);
 
+    /**
+     * Checks that an accepted job's SCHEDULED_JOB block could move to the given timeframe without
+     * overlapping anything else on the agenda (its own block doesn't count).
+     */
+    void checkJobSlotAvailable(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end);
+
+    /** Moves an accepted job's SCHEDULED_JOB block to a new timeframe; used when a reschedule is approved. */
+    ScheduleResponse moveJobSchedule(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end);
+
     /** Frees the SCHEDULED_JOB block(s) tied to a job that was rejected or cancelled after acceptance. */
     void releaseJobSchedule(JobRequest jobRequest);
 

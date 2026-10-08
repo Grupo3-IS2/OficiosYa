@@ -54,7 +54,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                     BLOCK_STARTS_AFTER_END);
         }
 
-        Professional professional = professionalRepository.findByPublicId(professionalId)
+        Professional professional = professionalRepository.findByPublicIdForUpdate(professionalId)
                 .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
 
         if (scheduleRepository.existsOverlapping(professionalId, scheduleRequest.getStartTimestamp(),
@@ -94,6 +94,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                     BLOCK_STARTS_AFTER_END);
         }
 
+        lockAgenda(professionalId);
         if (scheduleRepository.existsOverlapping(professionalId, start, end, id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
         }
@@ -115,6 +116,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         Professional professional = jobRequest.getProfessional();
 
+        lockAgenda(professional.getPublicId());
         if (scheduleRepository.existsOverlapping(professional.getPublicId(), start, end, 0L)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
         }
@@ -130,6 +132,33 @@ public class ScheduleServiceImpl implements ScheduleService {
         schedule = scheduleRepository.save(schedule);
         // Keeps the in-memory job in sync, so the accept response already carries the timeframe.
         jobRequest.getSchedules().add(schedule);
+        return scheduleMapper.toResponse(schedule);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void checkJobSlotAvailable(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
+        if (start == null || end == null || !start.isBefore(end)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, BLOCK_STARTS_AFTER_END);
+        }
+
+        if (scheduleRepository.existsOverlapping(jobRequest.getProfessional().getPublicId(), start, end,
+                jobBlock(jobRequest).getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
+        }
+    }
+
+    @Override
+    @Transactional
+    public ScheduleResponse moveJobSchedule(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
+        lockAgenda(jobRequest.getProfessional().getPublicId());
+        checkJobSlotAvailable(jobRequest, start, end);
+
+        Schedule schedule = jobBlock(jobRequest);
+        schedule.setStartTimestamp(start);
+        schedule.setEndTimestamp(end);
+
+        schedule = scheduleRepository.save(schedule);
         return scheduleMapper.toResponse(schedule);
     }
 
@@ -189,5 +218,17 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         scheduleRepository.delete(schedule);
+    }
+
+    /** See {@link ProfessionalRepository#findByPublicIdForUpdate}: serializes overlap checks per professional. */
+    private void lockAgenda(UUID professionalId) {
+        professionalRepository.findByPublicIdForUpdate(professionalId);
+    }
+
+    private Schedule jobBlock(JobRequest jobRequest) {
+        return jobRequest.getSchedules().stream()
+                .filter(schedule -> schedule.getType() == ScheduleType.SCHEDULED_JOB)
+                .findFirst()
+                .orElseThrow(() -> new ScheduleNotFoundException("El trabajo no tiene un horario agendado."));
     }
 }

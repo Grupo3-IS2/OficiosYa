@@ -8,6 +8,7 @@ import type { Schedule } from '../../types/Schedule'
 import ProfessionalProfileHeader from './components/ProfessionalProfileHeader'
 import ProfessionalServices from './components/ProfessionalServices'
 import ReviewsSection from './components/ReviewsSection'
+import ServiceRequestModal from './components/ServiceRequestModal'
 import WorkZone from './components/WorkZone'
 import WeeklyAvailability from './components/WeeklyAvailability'
 import { currentWeek } from './scheduleCalendar'
@@ -29,6 +30,7 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
     const [selectedTradeId, setSelectedTradeId] = useState<number | null>(initialTradeId)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+    const [requestModalOpen, setRequestModalOpen] = useState(false)
     const [scheduleState, setScheduleState] = useState<ScheduleState>({
         professionalId,
         schedules: [],
@@ -98,7 +100,11 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                     </div>
                 )}
                 {!loading && professional && <>
-                    <ProfessionalProfileHeader professional={professional} selectedTrade={selectedTrade} />
+                    <ProfessionalProfileHeader
+                        professional={professional}
+                        selectedTrade={selectedTrade}
+                        onRequestService={() => setRequestModalOpen(true)}
+                    />
 
                     <section className="public-profile-section profile-about" aria-labelledby="about-heading">
                         <h2 id="about-heading">Sobre mí</h2>
@@ -117,6 +123,13 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                         error={scheduleState.professionalId === professionalId && scheduleState.status === 'error'}
                     />
                     <ReviewsSection rating={professional.rating} />
+                    {requestModalOpen && (
+                        <ServiceRequestModal
+                            professional={professional}
+                            preferredTradeId={selectedTrade?.tradeId ?? null}
+                            onClose={() => setRequestModalOpen(false)}
+                        />
+                    )}
                 </>}
             </main>
         </div>

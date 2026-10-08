@@ -3,6 +3,7 @@ package com.um.uy.oficiosya.mapper;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.dto.response.TaskResponse;
 import com.um.uy.oficiosya.entity.JobRequest;
+import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.ScheduleType;
 import com.um.uy.oficiosya.entity.Task;
 import org.mapstruct.AfterMapping;
@@ -14,9 +15,13 @@ import org.mapstruct.MappingTarget;
 public interface JobRequestMapper {
 
     @Mapping(target = "clientId", source = "client.publicId")
+    @Mapping(target = "clientName", source = "client.name")
+    @Mapping(target = "clientProfileImageUrl", source = "client.profileImageUrl")
     @Mapping(target = "professionalId", source = "professional.publicId")
     @Mapping(target = "professionalName", source = "professional.name")
     @Mapping(target = "professionalProfileImageUrl", source = "professional.profileImageUrl")
+    @Mapping(target = "clientEmail", ignore = true)
+    @Mapping(target = "professionalPhoneNumber", ignore = true)
     @Mapping(target = "confirmationPin", ignore = true)
     @Mapping(target = "scheduledStart", ignore = true)
     @Mapping(target = "scheduledEnd", ignore = true)
@@ -36,5 +41,20 @@ public interface JobRequestMapper {
                     response.setScheduledStart(schedule.getStartTimestamp());
                     response.setScheduledEnd(schedule.getEndTimestamp());
                 });
+    }
+
+    @AfterMapping
+    default void addContactDetails(JobRequest jobRequest, @MappingTarget JobRequestResponse response) {
+        if (isContactVisible(jobRequest.getStatus())) {
+            response.setClientEmail(jobRequest.getClient().getEmail());
+            response.setProfessionalPhoneNumber(jobRequest.getProfessional().getPhoneNumber());
+        }
+    }
+
+    /** Statuses in which both sides have committed to the job, so each can see how to reach the other. */
+    private static boolean isContactVisible(JobStatus status) {
+        return status == JobStatus.ACCEPTED
+                || status == JobStatus.RESCHEDULE_REQUESTED
+                || status == JobStatus.COMPLETED;
     }
 }

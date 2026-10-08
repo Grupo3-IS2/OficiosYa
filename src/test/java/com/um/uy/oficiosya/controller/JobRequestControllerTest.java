@@ -1,8 +1,11 @@
 package com.um.uy.oficiosya.controller;
 
 import com.um.uy.oficiosya.dto.request.JobRequestAcceptRequest;
+import com.um.uy.oficiosya.dto.request.JobRequestCancelRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCompleteRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCreateRequest;
+import com.um.uy.oficiosya.dto.request.JobRequestRejectRequest;
+import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.entity.JobStatus;
@@ -23,7 +26,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -100,8 +105,8 @@ class JobRequestControllerTest {
     }
 
     @Test
-    void rejectJobRequest() throws Exception {
-        when(jobRequestService.rejectJobRequest(10L, userId)).thenReturn(job(JobStatus.REJECTED));
+    void rejectJobRequest_withoutABody() throws Exception {
+        when(jobRequestService.rejectJobRequest(eq(10L), isNull(), eq(userId))).thenReturn(job(JobStatus.REJECTED));
 
         mvc.perform(signedIn(post(BASE + "/10/reject"), ""))
                 .andExpect(status().isOk())
@@ -109,12 +114,78 @@ class JobRequestControllerTest {
     }
 
     @Test
-    void cancelJobRequest() throws Exception {
-        when(jobRequestService.cancelJobRequest(10L, userId)).thenReturn(job(JobStatus.CANCELLED));
+    void rejectJobRequest_withAReason() throws Exception {
+        when(jobRequestService.rejectJobRequest(eq(10L),
+                argThat((JobRequestRejectRequest request) -> "Sin agenda".equals(request.getReason())), eq(userId)))
+                .thenReturn(job(JobStatus.REJECTED));
+
+        mvc.perform(signedIn(post(BASE + "/10/reject"), """
+                        {"reason":"Sin agenda"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+    }
+
+    @Test
+    void rejectJobRequest_tooLongAReason_is400() throws Exception {
+        mvc.perform(signedIn(post(BASE + "/10/reject"), """
+                        {"reason":"%s"}""".formatted("x".repeat(501))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void cancelJobRequest_withoutABody() throws Exception {
+        when(jobRequestService.cancelJobRequest(eq(10L), isNull(), eq(userId))).thenReturn(job(JobStatus.CANCELLED));
 
         mvc.perform(signedIn(post(BASE + "/10/cancel"), ""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void cancelJobRequest_withAReason() throws Exception {
+        when(jobRequestService.cancelJobRequest(eq(10L),
+                argThat((JobRequestCancelRequest request) -> "Viajo".equals(request.getReason())), eq(userId)))
+                .thenReturn(job(JobStatus.CANCELLED));
+
+        mvc.perform(signedIn(post(BASE + "/10/cancel"), """
+                        {"reason":"Viajo"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void requestReschedule() throws Exception {
+        when(jobRequestService.requestReschedule(eq(10L), any(JobRequestRescheduleRequest.class), eq(userId)))
+                .thenReturn(job(JobStatus.RESCHEDULE_REQUESTED));
+
+        mvc.perform(signedIn(post(BASE + "/10/reschedule"), """
+                        {"startTimestamp":"2030-01-02T10:00:00-03:00","endTimestamp":"2030-01-02T12:00:00-03:00"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESCHEDULE_REQUESTED"));
+    }
+
+    @Test
+    void requestReschedule_withoutTimes_is400() throws Exception {
+        mvc.perform(signedIn(post(BASE + "/10/reschedule"), "{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void acceptReschedule() throws Exception {
+        when(jobRequestService.acceptReschedule(10L, userId)).thenReturn(job(JobStatus.ACCEPTED));
+
+        mvc.perform(signedIn(post(BASE + "/10/reschedule/accept"), ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACCEPTED"));
+    }
+
+    @Test
+    void rejectReschedule() throws Exception {
+        when(jobRequestService.rejectReschedule(10L, userId)).thenReturn(job(JobStatus.ACCEPTED));
+
+        mvc.perform(signedIn(post(BASE + "/10/reschedule/reject"), ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACCEPTED"));
     }
 
     @Test
@@ -152,12 +223,27 @@ class JobRequestControllerTest {
 
     @Test
     void getMyJobRequests() throws Exception {
-        when(jobRequestService.getMyJobRequests(userId)).thenReturn(List.of(job(JobStatus.PROPOSED)));
+        when(jobRequestService.getMyJobRequests(userId, null)).thenReturn(List.of(job(JobStatus.PROPOSED)));
 
         mvc.perform(get(BASE + "/mine").principal(authentication))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].professionalName").value("Juan Pérez"))
                 .andExpect(jsonPath("$[0].professionalProfileImageUrl").value("/uploads/juan.jpg"));
+    }
+
+    @Test
+    void getMyJobRequests_filteredByStatus() throws Exception {
+        when(jobRequestService.getMyJobRequests(userId, JobStatus.PROPOSED)).thenReturn(List.of(job(JobStatus.PROPOSED)));
+
+        mvc.perform(get(BASE + "/mine").param("status", "PROPOSED").principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void getMyJobRequests_unknownStatus_is400() throws Exception {
+        mvc.perform(get(BASE + "/mine").param("status", "WHATEVER").principal(authentication))
+                .andExpect(status().isBadRequest());
     }
 }

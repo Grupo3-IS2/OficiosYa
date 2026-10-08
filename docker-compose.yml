@@ -67,6 +67,8 @@ services:
       VERIFICATION_RESEND_COOLDOWN_SECONDS: ${VERIFICATION_RESEND_COOLDOWN_SECONDS:-60}
       # Per client IP, per minute, on the endpoints that mail or check a code.
       RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-10}
+      # Hours of notice needed to cancel or reschedule an accepted job.
+      JOB_MIN_NOTICE_HOURS: ${JOB_MIN_NOTICE_HOURS:-24}
     volumes:
       # The .pem files must be readable by uid 1001 (the "spring" user).
       - ./keys:/app/keys:ro

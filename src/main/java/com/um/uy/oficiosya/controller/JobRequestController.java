@@ -2,10 +2,14 @@ package com.um.uy.oficiosya.controller;
 
 import com.um.uy.oficiosya.config.AuthenticatedUser;
 import com.um.uy.oficiosya.dto.request.JobRequestAcceptRequest;
+import com.um.uy.oficiosya.dto.request.JobRequestCancelRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCompleteRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCreateRequest;
+import com.um.uy.oficiosya.dto.request.JobRequestRejectRequest;
+import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +24,8 @@ import java.util.List;
 /**
  * Lifecycle: PROPOSED → accept → ACCEPTED → complete (PIN) → COMPLETED → review.
  * From PROPOSED it can also be rejected, and from PROPOSED or ACCEPTED cancelled.
+ * Once ACCEPTED the client can ask to reschedule (→ RESCHEDULE_REQUESTED); the professional's
+ * answer takes it back to ACCEPTED, at the new time or the original one.
  */
 @RestController
 @RequestMapping("/api/v1/job-requests")
@@ -51,15 +57,41 @@ public class JobRequestController {
         return ResponseEntity.ok(jobRequestService.acceptJobRequest(id, request, AuthenticatedUser.id(authentication)));
     }
 
+    /** The body, with an optional reason, can be left out. */
     @PostMapping("/{id}/reject")
-    public ResponseEntity<JobRequestResponse> rejectJobRequest(@PathVariable Long id, Authentication authentication) {
-        return ResponseEntity.ok(jobRequestService.rejectJobRequest(id, AuthenticatedUser.id(authentication)));
+    public ResponseEntity<JobRequestResponse> rejectJobRequest(@Valid @RequestBody(required = false) JobRequestRejectRequest request,
+                                                                 @PathVariable Long id,
+                                                                 Authentication authentication) {
+        return ResponseEntity.ok(jobRequestService.rejectJobRequest(id, request, AuthenticatedUser.id(authentication)));
     }
 
-    /** Either the client or the professional can cancel it while it hasn't been completed. */
+    /**
+     * Either the client or the professional can cancel it while it hasn't been completed; once accepted,
+     * only with enough notice. The body, with an optional reason, can be left out.
+     */
     @PostMapping("/{id}/cancel")
-    public ResponseEntity<JobRequestResponse> cancelJobRequest(@PathVariable Long id, Authentication authentication) {
-        return ResponseEntity.ok(jobRequestService.cancelJobRequest(id, AuthenticatedUser.id(authentication)));
+    public ResponseEntity<JobRequestResponse> cancelJobRequest(@Valid @RequestBody(required = false) JobRequestCancelRequest request,
+                                                                 @PathVariable Long id,
+                                                                 Authentication authentication) {
+        return ResponseEntity.ok(jobRequestService.cancelJobRequest(id, request, AuthenticatedUser.id(authentication)));
+    }
+
+    /** The client proposes a new timeframe for an accepted job; the professional has to approve it. */
+    @PostMapping("/{id}/reschedule")
+    public ResponseEntity<JobRequestResponse> requestReschedule(@Valid @RequestBody JobRequestRescheduleRequest request,
+                                                                  @PathVariable Long id,
+                                                                  Authentication authentication) {
+        return ResponseEntity.ok(jobRequestService.requestReschedule(id, request, AuthenticatedUser.id(authentication)));
+    }
+
+    @PostMapping("/{id}/reschedule/accept")
+    public ResponseEntity<JobRequestResponse> acceptReschedule(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(jobRequestService.acceptReschedule(id, AuthenticatedUser.id(authentication)));
+    }
+
+    @PostMapping("/{id}/reschedule/reject")
+    public ResponseEntity<JobRequestResponse> rejectReschedule(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(jobRequestService.rejectReschedule(id, AuthenticatedUser.id(authentication)));
     }
 
     /** The professional enters, on site, the PIN the client shows them; this moves the job to COMPLETED. */
@@ -85,9 +117,13 @@ public class JobRequestController {
         return ResponseEntity.ok(jobRequestService.getJobRequest(id, AuthenticatedUser.id(authentication)));
     }
 
-    /** The caller's jobs: the ones they requested if they are a client, the ones requested to them if a professional. */
+    /**
+     * The caller's jobs: the ones they requested if they are a client, the ones requested to them if a professional.
+     * Optionally only those in one status (e.g. ?status=PROPOSED for a professional's pending requests).
+     */
     @GetMapping("/mine")
-    public ResponseEntity<List<JobRequestResponse>> getMyJobRequests(Authentication authentication) {
-        return ResponseEntity.ok(jobRequestService.getMyJobRequests(AuthenticatedUser.id(authentication)));
+    public ResponseEntity<List<JobRequestResponse>> getMyJobRequests(@RequestParam(required = false) JobStatus status,
+                                                                     Authentication authentication) {
+        return ResponseEntity.ok(jobRequestService.getMyJobRequests(AuthenticatedUser.id(authentication), status));
     }
 }

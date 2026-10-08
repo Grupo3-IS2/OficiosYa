@@ -11,14 +11,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-import java.util.EnumSet;
-import java.util.Set;
-
 @Mapper(componentModel = "spring")
 public interface JobRequestMapper {
-
-    /** Statuses in which both sides have committed to the job, so each can see how to reach the other. */
-    Set<JobStatus> CONTACT_VISIBLE = EnumSet.of(JobStatus.ACCEPTED, JobStatus.RESCHEDULE_REQUESTED, JobStatus.COMPLETED);
 
     @Mapping(target = "clientId", source = "client.publicId")
     @Mapping(target = "clientName", source = "client.name")
@@ -51,9 +45,16 @@ public interface JobRequestMapper {
 
     @AfterMapping
     default void addContactDetails(JobRequest jobRequest, @MappingTarget JobRequestResponse response) {
-        if (CONTACT_VISIBLE.contains(jobRequest.getStatus())) {
+        if (isContactVisible(jobRequest.getStatus())) {
             response.setClientEmail(jobRequest.getClient().getEmail());
             response.setProfessionalPhoneNumber(jobRequest.getProfessional().getPhoneNumber());
         }
+    }
+
+    /** Statuses in which both sides have committed to the job, so each can see how to reach the other. */
+    private static boolean isContactVisible(JobStatus status) {
+        return status == JobStatus.ACCEPTED
+                || status == JobStatus.RESCHEDULE_REQUESTED
+                || status == JobStatus.COMPLETED;
     }
 }

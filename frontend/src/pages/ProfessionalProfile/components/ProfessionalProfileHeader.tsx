@@ -6,9 +6,10 @@ import type { ExpertiseTrade, Professional } from '../../../types/Professional'
 interface ProfessionalProfileHeaderProps {
     professional: Professional
     selectedTrade: ExpertiseTrade | null
+    onRequestService: () => void
 }
 
-function ProfessionalProfileHeader({ professional, selectedTrade }: ProfessionalProfileHeaderProps) {
+function ProfessionalProfileHeader({ professional, selectedTrade, onRequestService }: ProfessionalProfileHeaderProps) {
     const startingPrice = selectedTrade?.minimumHourlyWage ?? (professional.expertiseTrades.length > 0
         ? Math.min(...professional.expertiseTrades.map(trade => trade.minimumHourlyWage))
         : null)
@@ -40,8 +41,12 @@ function ProfessionalProfileHeader({ professional, selectedTrade }: Professional
                         <strong>${startingPrice.toLocaleString('es-UY')}</strong>
                     </span>
                 )}
-                <Button type="button" disabled={selectedTrade === null}>
-                    {selectedTrade === null ? 'Seleccione un rubro' : 'Solicitar servicio'}
+                <Button
+                    type="button"
+                    disabled={professional.expertiseTrades.length === 0}
+                    onClick={onRequestService}
+                >
+                    {professional.expertiseTrades.length === 0 ? 'Sin servicios disponibles' : 'Solicitar servicio'}
                 </Button>
             </div>
         </section>

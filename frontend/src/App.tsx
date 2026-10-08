@@ -18,10 +18,12 @@ function App() {
             : null
 
         return (
-            <ProfessionalProfilePage
-                professionalId={decodeURIComponent(professionalProfileMatch[1])}
-                initialTradeId={initialTradeId}
-            />
+            <RequireAuth>
+                <ProfessionalProfilePage
+                    professionalId={decodeURIComponent(professionalProfileMatch[1])}
+                    initialTradeId={initialTradeId}
+                />
+            </RequireAuth>
         )
     }
 

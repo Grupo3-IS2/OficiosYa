@@ -15,6 +15,8 @@ public interface JobRequestMapper {
 
     @Mapping(target = "clientId", source = "client.publicId")
     @Mapping(target = "professionalId", source = "professional.publicId")
+    @Mapping(target = "professionalName", source = "professional.name")
+    @Mapping(target = "professionalProfileImageUrl", source = "professional.profileImageUrl")
     @Mapping(target = "confirmationPin", ignore = true)
     @Mapping(target = "scheduledStart", ignore = true)
     @Mapping(target = "scheduledEnd", ignore = true)

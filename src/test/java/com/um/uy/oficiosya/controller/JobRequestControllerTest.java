@@ -66,6 +66,8 @@ class JobRequestControllerTest {
         JobRequestResponse response = new JobRequestResponse();
         response.setId(10L);
         response.setStatus(status);
+        response.setProfessionalName("Juan Pérez");
+        response.setProfessionalProfileImageUrl("/uploads/juan.jpg");
         return response;
     }
 
@@ -225,7 +227,9 @@ class JobRequestControllerTest {
 
         mvc.perform(get(BASE + "/mine").principal(authentication))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1));
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].professionalName").value("Juan Pérez"))
+                .andExpect(jsonPath("$[0].professionalProfileImageUrl").value("/uploads/juan.jpg"));
     }
 
     @Test

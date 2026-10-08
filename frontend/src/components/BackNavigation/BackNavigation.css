@@ -1,0 +1,15 @@
+.back-navigation {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 34px;
+  padding: 0;
+  border: 0;
+  color: #6e7c8e;
+  background: transparent;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.back-navigation:hover { color: #435166; }
+.back-navigation:focus-visible { outline: 3px solid rgba(7, 152, 76, .25); outline-offset: 4px; }

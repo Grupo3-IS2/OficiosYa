@@ -26,20 +26,6 @@
   padding: 28px 0 64px;
 }
 
-.profile-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 0 34px;
-  padding: 0;
-  border: 0;
-  color: #3d69bd;
-  background: transparent;
-  font-size: 14px;
-}
-
-.profile-back:hover { color: #234f9d; }
-.profile-back:focus-visible,
 .availability-scroll:focus-visible { outline: 3px solid rgba(7, 152, 76, .25); outline-offset: 4px; }
 
 .profile-summary {
@@ -315,7 +301,7 @@
   }
 
   .profile-content { width: min(100% - 36px, 680px); padding-top: 24px; }
-  .profile-back { margin-bottom: 28px; }
+  .back-navigation { margin-bottom: 28px; }
   .profile-summary { grid-template-columns: 132px minmax(0, 1fr); gap: 24px; }
   .profile-summary__avatar { width: 132px; }
   .profile-summary__identity h1 { font-size: 36px; letter-spacing: -1px; }

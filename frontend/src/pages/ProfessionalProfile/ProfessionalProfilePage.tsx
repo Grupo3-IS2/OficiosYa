@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import BackNavigation from '../../components/BackNavigation/BackNavigation'
 import Header from '../../components/Header/Header'
 import { ApiError } from '../../services/api'
 import { getProfessional } from '../../services/professionalService'
@@ -86,9 +87,7 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
         <div id="top" className="professional-profile-page">
             <Header />
             <main className="profile-content">
-                <button className="profile-back" type="button" onClick={goBack}>
-                    <span aria-hidden="true">←</span> Volver a profesionales
-                </button>
+                <BackNavigation onClick={goBack}>Volver a profesionales</BackNavigation>
 
                 {loading && <output className="profile-status">Cargando perfil...</output>}
                 {!loading && error && (

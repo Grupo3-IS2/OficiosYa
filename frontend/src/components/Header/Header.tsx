@@ -19,6 +19,7 @@ function Header() {
         : isProfessional
             ? 'Panel profesional'
             : 'Convertirse en profesional'
+    const requestsActive = window.location.pathname === '/mis-solicitudes'
 
     const toggleMenu = () => {
         setIsMenuOpen((isOpen) => !isOpen)
@@ -32,7 +33,7 @@ function Header() {
 
     return (
         <header className="site-header">
-            <a className="brand" href="#top" aria-label="OficiosYa inicio">
+            <a className="brand" href="/" aria-label="OficiosYa inicio">
                 <span className="brand-mark">
                     <Icon name="wrench" />
                 </span>
@@ -63,10 +64,14 @@ function Header() {
                 aria-label="Navegación principal"
             >
                 {authenticated && (
-                    <button className="nav-item" type="button">
+                    <a
+                        className={`nav-item${requestsActive ? ' is-active' : ''}`}
+                        href="/mis-solicitudes"
+                        aria-current={requestsActive ? 'page' : undefined}
+                    >
                         <Icon name="document" />
                         <span>Mis solicitudes</span>
-                    </button>
+                    </a>
                 )}
 
                 {authenticated ? (

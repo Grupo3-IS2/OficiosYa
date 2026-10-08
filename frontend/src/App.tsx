@@ -4,6 +4,7 @@ import Register from './pages/Register/Register'
 import EditProfilePage from './pages/EditProfile/EditProfilePage'
 import RequireAuth from './components/RequireAuth/RequireAuth'
 import ProfessionalProfilePage from './pages/ProfessionalProfile/ProfessionalProfilePage'
+import RequestsPage from './pages/Requests/RequestsPage'
 
 function App() {
     const currentPath = window.location.pathname
@@ -28,6 +29,14 @@ function App() {
         return (
             <RequireAuth>
                 <EditProfilePage />
+            </RequireAuth>
+        )
+    }
+
+    if (currentPath === '/mis-solicitudes') {
+        return (
+            <RequireAuth>
+                <RequestsPage />
             </RequireAuth>
         )
     }

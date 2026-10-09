@@ -48,14 +48,14 @@ public class GlobalExceptionHandler {
     }
 
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
+    @ExceptionHandler(ClientNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleClientNotFound(ClientNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), null);
     }
 
     @ResponseStatus(HttpStatus.CONFLICT)
-    @ExceptionHandler(UserAlreadyExists.class)
-    public ResponseEntity<ErrorResponse> handleUserAlreadyExists(UserAlreadyExists ex) {
+    @ExceptionHandler(ClientAlreadyExists.class)
+    public ResponseEntity<ErrorResponse> handleClientAlreadyExists(ClientAlreadyExists ex) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), null);
     }
 

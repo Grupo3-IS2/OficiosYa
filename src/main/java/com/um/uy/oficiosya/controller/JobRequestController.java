@@ -37,7 +37,11 @@ public class JobRequestController {
         this.jobRequestService = jobRequestService;
     }
 
-    /** Only a client can request a job. The response is the only place the confirmation PIN ever appears. */
+    /**
+     * Any client can request a job, professionals included (to someone else). The response is the only
+     * place the confirmation PIN ever appears.
+     */
+    @PreAuthorize("hasRole('CLIENT')")
     @PostMapping
     public ResponseEntity<JobRequestResponse> createJobRequest(@Valid @RequestBody JobRequestCreateRequest request,
                                                                  Authentication authentication) {
@@ -102,7 +106,10 @@ public class JobRequestController {
         return ResponseEntity.ok(jobRequestService.completeJobRequest(id, request, AuthenticatedUser.id(authentication)));
     }
 
-    /** The client rates a COMPLETED job, once. The professional's rating is recalculated from these reviews. */
+    /**
+     * The client rates a COMPLETED job, once. The professional's rating is recalculated from these reviews.
+     * A professional who requested the job is its client here too (PROFESSIONAL implies CLIENT).
+     */
     @PreAuthorize("hasRole('CLIENT')")
     @PostMapping("/{id}/review")
     public ResponseEntity<JobRequestResponse> reviewJobRequest(@Valid @RequestBody JobRequestReviewRequest request,
@@ -118,7 +125,7 @@ public class JobRequestController {
     }
 
     /**
-     * The caller's jobs: the ones they requested if they are a client, the ones requested to them if a professional.
+     * The caller's jobs: the ones they requested and, for a professional, also the ones requested to them.
      * Optionally only those in one status (e.g. ?status=PROPOSED for a professional's pending requests).
      */
     @GetMapping("/mine")

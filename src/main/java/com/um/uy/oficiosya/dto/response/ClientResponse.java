@@ -15,7 +15,7 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserResponse {
+public class ClientResponse {
     /** The entity's publicId, the internal numeric id is not exposed. */
     private UUID id;
     private String name;

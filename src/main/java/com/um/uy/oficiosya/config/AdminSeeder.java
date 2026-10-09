@@ -2,7 +2,7 @@ package com.um.uy.oficiosya.config;
 
 import com.um.uy.oficiosya.entity.Admin;
 import com.um.uy.oficiosya.repository.AdminRepository;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 public class AdminSeeder implements CommandLineRunner {
 
     private final AdminRepository adminRepository;
-    private final UserRepository userRepository;
+    private final ClientRepository clientRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.admin.name}")
@@ -31,9 +31,9 @@ public class AdminSeeder implements CommandLineRunner {
     @Value("${app.admin.password}")
     private String adminPassword;
 
-    public AdminSeeder(AdminRepository adminRepository, UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AdminSeeder(AdminRepository adminRepository, ClientRepository clientRepository, PasswordEncoder passwordEncoder) {
         this.adminRepository = adminRepository;
-        this.userRepository = userRepository;
+        this.clientRepository = clientRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -45,7 +45,7 @@ public class AdminSeeder implements CommandLineRunner {
         }
 
         String email = adminEmail.trim().toLowerCase();
-        if (userRepository.existsByEmailIgnoreCase(email)) {
+        if (clientRepository.existsByEmailIgnoreCase(email)) {
             return;
         }
 

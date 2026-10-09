@@ -11,7 +11,7 @@ import lombok.experimental.SuperBuilder;
 @Data
 @SuperBuilder
 @NoArgsConstructor
-public class ProfessionalUpdateRequest extends UserUpdateRequest {
+public class ProfessionalUpdateRequest extends ClientUpdateRequest {
     @PhoneNumber
     private String phoneNumber;
 

@@ -6,12 +6,12 @@ import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
-import com.um.uy.oficiosya.dto.response.UserResponse;
+import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.entity.VerificationPurpose;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService.VerificationResult;
@@ -54,7 +54,7 @@ class RegistrationServiceImplTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     @Mock
-    private UserRepository userRepository;
+    private ClientRepository clientRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -71,7 +71,7 @@ class RegistrationServiceImplTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new RegistrationServiceImpl(userRepository, passwordEncoder, emailVerificationService,
+        service = new RegistrationServiceImpl(clientRepository, passwordEncoder, emailVerificationService,
                 clientService, professionalService, jwtService);
         ReflectionTestUtils.setField(service, "codeLength", 6);
         ReflectionTestUtils.setField(service, "expirationMinutes", 15L);
@@ -96,15 +96,14 @@ class RegistrationServiceImplTest {
 
     @Test
     void startRegistration_keepsTheDataPendingAndCreatesNoAccount() {
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
 
         PendingVerificationResponse response = service.startRegistration(clientRequest());
 
         ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
         verify(emailVerificationService).sendCode(
                 eq(EMAIL), eq(VerificationPurpose.REGISTER), isNull(), payload.capture());
-        verify(clientService, never()).createClient(any(), anyString());
-        verify(clientService, never()).createClient(any());
+        verify(clientService, never()).createUser(any(), anyString());
 
         assertEquals(EMAIL, response.getEmail());
         assertEquals(6, response.getCodeLength());
@@ -119,7 +118,7 @@ class RegistrationServiceImplTest {
 
     @Test
     void startRegistration_neverStoresThePlainPassword() {
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
 
         service.startRegistration(clientRequest());
 
@@ -130,7 +129,7 @@ class RegistrationServiceImplTest {
 
     @Test
     void startRegistration_forAProfessional_carriesPhoneAndLocation() {
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
 
         service.startRegistration(professionalRequest());
 
@@ -144,11 +143,11 @@ class RegistrationServiceImplTest {
 
     @Test
     void startRegistration_withAnEmailThatHasAnAccount_answersTheSameAndSendsNothing() {
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(true);
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(true);
 
         PendingVerificationResponse taken = service.startRegistration(clientRequest());
 
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
         PendingVerificationResponse free = service.startRegistration(clientRequest());
 
         assertEquals(free, taken);
@@ -165,15 +164,15 @@ class RegistrationServiceImplTest {
 
         when(emailVerificationService.verifyCode(EMAIL, VerificationPurpose.REGISTER, "123456"))
                 .thenReturn(new VerificationResult(null, payloadOf(Role.CLIENT, null, null)));
-        when(clientService.createClient(any(), eq(HASH))).thenReturn(userResponse(publicId, Role.CLIENT));
-        when(userRepository.findByPublicId(publicId)).thenReturn(Optional.of(client));
+        when(clientService.createUser(any(), eq(HASH))).thenReturn(clientResponse(publicId, Role.CLIENT));
+        when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(client));
         when(jwtService.generateToken(client)).thenReturn("jwt-token");
 
         LoginResponse response = service.verifyEmail(
                 VerifyEmailRequest.builder().email(EMAIL).code("123456").build());
 
         ArgumentCaptor<ClientCreateRequest> created = ArgumentCaptor.forClass(ClientCreateRequest.class);
-        verify(clientService).createClient(created.capture(), eq(HASH));
+        verify(clientService).createUser(created.capture(), eq(HASH));
         assertEquals(EMAIL, created.getValue().getEmail());
         assertEquals(NAME, created.getValue().getName());
 
@@ -193,7 +192,7 @@ class RegistrationServiceImplTest {
                 .thenReturn(new VerificationResult(null, payloadOf(Role.PROFESSIONAL, "+59899123456", "Montevideo")));
         when(professionalService.createProfessional(any(), eq(HASH)))
                 .thenReturn(professionalResponse(publicId));
-        when(userRepository.findByPublicId(publicId)).thenReturn(Optional.of(professional));
+        when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(professional));
         when(jwtService.generateToken(professional)).thenReturn("jwt-token");
 
         LoginResponse response = service.verifyEmail(
@@ -245,7 +244,7 @@ class RegistrationServiceImplTest {
     @Test
     void resendCode_sendsANewCodeWithTheSameData() {
         String payload = payloadOf(Role.CLIENT, null, null);
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
         when(emailVerificationService.findPending(EMAIL, VerificationPurpose.REGISTER))
                 .thenReturn(Optional.of(new VerificationResult(null, payload)));
 
@@ -256,7 +255,7 @@ class RegistrationServiceImplTest {
 
     @Test
     void resendCode_withNothingPending_answersTheSameAndSendsNothing() {
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
         when(emailVerificationService.findPending(EMAIL, VerificationPurpose.REGISTER))
                 .thenReturn(Optional.empty());
 
@@ -268,7 +267,7 @@ class RegistrationServiceImplTest {
 
     @Test
     void resendCode_whenTheAccountAlreadyExists_sendsNothing() {
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(true);
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(true);
 
         service.resendCode(ResendCodeRequest.builder().email(EMAIL).build());
 
@@ -276,8 +275,8 @@ class RegistrationServiceImplTest {
         verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());
     }
 
-    private UserResponse userResponse(UUID publicId, Role role) {
-        UserResponse response = new UserResponse();
+    private ClientResponse clientResponse(UUID publicId, Role role) {
+        ClientResponse response = new ClientResponse();
         response.setId(publicId);
         response.setEmail(EMAIL);
         response.setName(NAME);

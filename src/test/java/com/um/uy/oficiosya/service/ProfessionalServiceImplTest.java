@@ -11,12 +11,12 @@ import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.entity.Trade;
 import com.um.uy.oficiosya.exception.ExpertiseTradeNotFoundException;
 import com.um.uy.oficiosya.exception.TradeNotFoundException;
-import com.um.uy.oficiosya.exception.UserNotFoundException;
+import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.mapper.ProfessionalMapper;
 import com.um.uy.oficiosya.repository.ExpertiseTradeRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.TradeRepository;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -52,7 +52,7 @@ class ProfessionalServiceImplTest {
     @Mock
     private ProfessionalRepository professionalRepository;
     @Mock
-    private UserRepository userRepository;
+    private ClientRepository clientRepository;
     @Mock
     private TradeRepository tradeRepository;
     @Mock
@@ -71,7 +71,7 @@ class ProfessionalServiceImplTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new ProfessionalServiceImpl(professionalRepository, userRepository, tradeRepository,
+        service = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
                 expertiseTradeRepository, professionalMapper, passwordEncoder);
         professional = Professional.builder().id(1L).publicId(id).name("Beto Gómez").email("beto@example.com")
                 .phoneNumber("099123456").workingLocation("Montevideo").build();
@@ -118,7 +118,7 @@ class ProfessionalServiceImplTest {
     @Test
     void createProfessional_takenEmail_isRejected() {
         ProfessionalCreateRequest request = createRequest();
-        when(userRepository.existsByEmail("beto@example.com")).thenReturn(true);
+        when(clientRepository.existsByEmail("beto@example.com")).thenReturn(true);
 
         assertThrows(ResponseStatusException.class, () -> service.createProfessional(request, "x"));
         verify(professionalRepository, never()).save(any());
@@ -161,7 +161,7 @@ class ProfessionalServiceImplTest {
         missing();
         ProfessionalUpdateRequest request = new ProfessionalUpdateRequest();
 
-        assertThrows(UserNotFoundException.class, () -> service.updateProfessional(request, id));
+        assertThrows(ClientNotFoundException.class, () -> service.updateProfessional(request, id));
     }
 
     // --- read / delete / list ---
@@ -177,7 +177,7 @@ class ProfessionalServiceImplTest {
     void getProfessional_unknown_isNotFound() {
         missing();
 
-        assertThrows(UserNotFoundException.class, () -> service.getProfessional(id));
+        assertThrows(ClientNotFoundException.class, () -> service.getProfessional(id));
     }
 
     @Test
@@ -194,7 +194,7 @@ class ProfessionalServiceImplTest {
     void getPublicProfessional_unpublished_isNotFound() {
         found();
 
-        assertThrows(UserNotFoundException.class, () -> service.getPublicProfessional(id));
+        assertThrows(ClientNotFoundException.class, () -> service.getPublicProfessional(id));
     }
 
     @Test
@@ -210,7 +210,7 @@ class ProfessionalServiceImplTest {
     void deleteProfessional_unknown_isNotFound() {
         missing();
 
-        assertThrows(UserNotFoundException.class, () -> service.deleteProfessional(id));
+        assertThrows(ClientNotFoundException.class, () -> service.deleteProfessional(id));
     }
 
     @Test
@@ -262,7 +262,7 @@ class ProfessionalServiceImplTest {
     void publishProfessional_unknown_isNotFound() {
         missing();
 
-        assertThrows(UserNotFoundException.class, () -> service.publishProfessional(id));
+        assertThrows(ClientNotFoundException.class, () -> service.publishProfessional(id));
     }
 
     @Test
@@ -279,7 +279,7 @@ class ProfessionalServiceImplTest {
     void unpublishProfessional_unknown_isNotFound() {
         missing();
 
-        assertThrows(UserNotFoundException.class, () -> service.unpublishProfessional(id));
+        assertThrows(ClientNotFoundException.class, () -> service.unpublishProfessional(id));
     }
 
     // --- expertise trades ---
@@ -310,7 +310,7 @@ class ProfessionalServiceImplTest {
         missing();
         ExpertiseTradeCreateRequest request = addRequest(100, 200);
 
-        assertThrows(UserNotFoundException.class, () -> service.addExpertiseTrade(id, request));
+        assertThrows(ClientNotFoundException.class, () -> service.addExpertiseTrade(id, request));
     }
 
     @Test

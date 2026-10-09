@@ -5,13 +5,12 @@ import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.response.ScheduleResponse;
 import com.um.uy.oficiosya.dto.response.TradeResponse;
-import com.um.uy.oficiosya.dto.response.UserResponse;
-import com.um.uy.oficiosya.service.interfaces.ClientService;
+import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import com.um.uy.oficiosya.service.interfaces.ScheduleService;
 import com.um.uy.oficiosya.service.interfaces.TradeService;
-import com.um.uy.oficiosya.service.interfaces.UserService;
+import com.um.uy.oficiosya.service.interfaces.ClientService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,20 +28,17 @@ import java.util.List;
 @RequestMapping("/api/v1/admin")
 public class AdminController {
 
-    private final UserService userService;
     private final ClientService clientService;
     private final ProfessionalService professionalService;
     private final TradeService tradeService;
     private final JobRequestService jobRequestService;
     private final ScheduleService scheduleService;
 
-    public AdminController(UserService userService,
-                            ClientService clientService,
-                            ProfessionalService professionalService,
-                            TradeService tradeService,
-                            JobRequestService jobRequestService,
-                            ScheduleService scheduleService) {
-        this.userService = userService;
+    public AdminController(ClientService clientService,
+                           ProfessionalService professionalService,
+                           TradeService tradeService,
+                           JobRequestService jobRequestService,
+                           ScheduleService scheduleService) {
         this.clientService = clientService;
         this.professionalService = professionalService;
         this.tradeService = tradeService;
@@ -52,13 +48,13 @@ public class AdminController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/users")
-    public ResponseEntity<List<UserResponse>> listUsers() {
-        return ResponseEntity.ok(userService.listUsers());
+    public ResponseEntity<List<ClientResponse>> listUsers() {
+        return ResponseEntity.ok(clientService.listUsers());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/clients")
-    public ResponseEntity<List<UserResponse>> listClients() {
+    public ResponseEntity<List<ClientResponse>> listClients() {
         return ResponseEntity.ok(clientService.listClients());
     }
 

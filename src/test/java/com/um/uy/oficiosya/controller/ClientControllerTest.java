@@ -4,13 +4,13 @@ import com.um.uy.oficiosya.config.RequestRateLimiter;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
-import com.um.uy.oficiosya.dto.response.UserResponse;
+import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
 import com.um.uy.oficiosya.service.interfaces.GoogleAuthService;
-import com.um.uy.oficiosya.service.interfaces.UserService;
+import com.um.uy.oficiosya.service.interfaces.ClientService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -40,12 +40,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** The /me endpoints for changing the email and linking Google: what the browser sends and gets back. */
-class UserControllerTest {
+class ClientControllerTest {
 
     private static final String BASE = "/api/v1/users/me";
 
     @Mock
-    private UserService userService;
+    private ClientService clientService;
     @Mock
     private GoogleAuthService googleAuthService;
     @Mock
@@ -63,7 +63,7 @@ class UserControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         mvc = MockMvcBuilders
-                .standaloneSetup(new UserController(userService, googleAuthService, rateLimiter))
+                .standaloneSetup(new ClientController(clientService, googleAuthService, rateLimiter))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -72,8 +72,8 @@ class UserControllerTest {
         return request.principal(authentication).contentType(MediaType.APPLICATION_JSON).content(body);
     }
 
-    private UserResponse updatedUser() {
-        UserResponse response = new UserResponse();
+    private ClientResponse updatedUser() {
+        ClientResponse response = new ClientResponse();
         response.setEmail("nueva@example.com");
         response.setGoogleLinked(true);
         return response;
@@ -83,7 +83,7 @@ class UserControllerTest {
 
     @Test
     void changeEmail_startsTheChangeForTheCallerAndAnswers202() throws Exception {
-        when(userService.startEmailChange(any(EmailUpdateRequest.class), eq(userId))).thenReturn(pending);
+        when(clientService.startEmailChange(any(EmailUpdateRequest.class), eq(userId))).thenReturn(pending);
 
         mvc.perform(signedIn(put(BASE + "/email"), """
                         {"newEmail":"nueva@example.com","currentPassword":"ClaveSegura2026!"}"""))
@@ -100,12 +100,12 @@ class UserControllerTest {
                         {"newEmail":"nueva@example.com"}"""))
                 .andExpect(status().isBadRequest());
 
-        verifyNoInteractions(userService);
+        verifyNoInteractions(clientService);
     }
 
     @Test
     void verifyEmailChange_answersTheUpdatedUser() throws Exception {
-        when(userService.verifyEmailChange(any(VerifyEmailRequest.class), eq(userId))).thenReturn(updatedUser());
+        when(clientService.verifyEmailChange(any(VerifyEmailRequest.class), eq(userId))).thenReturn(updatedUser());
 
         mvc.perform(signedIn(post(BASE + "/email/verify"), """
                         {"email":"Nueva@Example.com","code":"123456"}"""))
@@ -117,7 +117,7 @@ class UserControllerTest {
 
     @Test
     void resendEmailChangeCode_answers202() throws Exception {
-        when(userService.resendEmailChangeCode(any(ResendCodeRequest.class), eq(userId))).thenReturn(pending);
+        when(clientService.resendEmailChangeCode(any(ResendCodeRequest.class), eq(userId))).thenReturn(pending);
 
         mvc.perform(signedIn(post(BASE + "/email/resend"), """
                         {"email":"nueva@example.com"}"""))
@@ -140,7 +140,7 @@ class UserControllerTest {
                         {"email":"nueva@example.com"}"""))
                 .andExpect(status().isTooManyRequests());
 
-        verifyNoInteractions(userService);
+        verifyNoInteractions(clientService);
     }
 
     @Test
@@ -149,7 +149,7 @@ class UserControllerTest {
                         {"email":"nueva@example.com","code":"123456"}"""))
                 .andExpect(status().isUnauthorized());
 
-        verifyNoInteractions(userService);
+        verifyNoInteractions(clientService);
     }
 
     // --- Google, from the profile ---
@@ -175,7 +175,7 @@ class UserControllerTest {
 
     @Test
     void unlinkGoogle_takesThePasswordInTheBody() throws Exception {
-        UserResponse unlinked = updatedUser();
+        ClientResponse unlinked = updatedUser();
         unlinked.setGoogleLinked(false);
         when(googleAuthService.unlinkFromUser(eq(userId), any(GoogleUnlinkRequest.class))).thenReturn(unlinked);
 

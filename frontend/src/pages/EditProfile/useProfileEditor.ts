@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCurrentUser, isAuthenticated, updateStoredUser } from '../../services/authService'
-import { addExpertiseTrade, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, resendEmailChangeCode, setProfessionalPublished, startEmailChange, updateClient, updateExpertiseTrade, updateProfessional, uploadProfileImage, verifyEmailChange } from '../../services/userService'
+import { addExpertiseTrade, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, resendEmailChangeCode, setProfessionalPublished, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, uploadProfileImage, verifyEmailChange } from '../../services/userService'
 import type { ProfessionalResponse } from '../../services/userService'
 import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
@@ -265,7 +265,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                                 ...(nameChanged && { name: saved.name }),
                                 ...(phoneChanged && { phoneNumber: saved.phone }),
                             })
-                            : await updateClient({ name: saved.name })
+                            : await updateUser({ name: saved.name })
                         // El servidor manda: ignora un teléfono en blanco, así que devuelve el vigente.
                         const phone = isProfessionalResponse(response) ? response.phoneNumber : saved.phone
                         saved = { ...saved, name: response.name, phone }

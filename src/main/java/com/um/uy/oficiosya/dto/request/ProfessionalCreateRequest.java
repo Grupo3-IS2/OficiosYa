@@ -11,7 +11,7 @@ import lombok.experimental.SuperBuilder;
 @Data
 @SuperBuilder
 @NoArgsConstructor
-public class ProfessionalCreateRequest extends UserCreateRequest {
+public class ProfessionalCreateRequest extends ClientCreateRequest {
     @NotBlank(message = "El teléfono es obligatorio")
     @PhoneNumber
     private String phoneNumber;

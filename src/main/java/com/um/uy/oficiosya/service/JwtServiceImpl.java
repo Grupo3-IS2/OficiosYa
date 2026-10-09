@@ -1,6 +1,6 @@
 package com.um.uy.oficiosya.service;
 
-import com.um.uy.oficiosya.entity.User;
+import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.service.interfaces.JwtService;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
@@ -59,7 +59,7 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public String generateToken(User user) {
+    public String generateToken(Client user) {
         // The subject is the publicId and not the email, because the email is mutable.
         return this.generateToken(new HashMap<>(), user.getPublicId().toString());
     }

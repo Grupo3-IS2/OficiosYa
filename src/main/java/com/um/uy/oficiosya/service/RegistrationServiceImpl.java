@@ -1,22 +1,21 @@
 package com.um.uy.oficiosya.service;
 
-import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
-import com.um.uy.oficiosya.dto.request.UserCreateRequest;
+import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
-import com.um.uy.oficiosya.dto.response.UserResponse;
+import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.entity.Role;
-import com.um.uy.oficiosya.entity.User;
+import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.VerificationPurpose;
-import com.um.uy.oficiosya.repository.UserRepository;
-import com.um.uy.oficiosya.service.interfaces.ClientService;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService.VerificationResult;
 import com.um.uy.oficiosya.service.interfaces.JwtService;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
+import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.RegistrationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,7 +37,7 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    private final UserRepository userRepository;
+    private final ClientRepository clientRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
     private final ClientService clientService;
@@ -54,11 +53,11 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Value("${app.verification.resend-cooldown-seconds}")
     private long resendCooldownSeconds;
 
-    public RegistrationServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder,
+    public RegistrationServiceImpl(ClientRepository clientRepository, PasswordEncoder passwordEncoder,
                                    EmailVerificationService emailVerificationService,
                                    ClientService clientService, ProfessionalService professionalService,
                                    JwtService jwtService) {
-        this.userRepository = userRepository;
+        this.clientRepository = clientRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailVerificationService = emailVerificationService;
         this.clientService = clientService;
@@ -76,14 +75,14 @@ public class RegistrationServiceImpl implements RegistrationService {
         return start(request, Role.PROFESSIONAL, request.getPhoneNumber(), request.getWorkingLocation());
     }
 
-    private PendingVerificationResponse start(UserCreateRequest request, Role accountType,
+    private PendingVerificationResponse start(ClientCreateRequest request, Role accountType,
                                               String phoneNumber, String workingLocation) {
         String email = normalize(request.getEmail());
 
         // Hashed before looking at the email so an existing one doesn't answer any faster.
         String passwordHash = passwordEncoder.encode(request.getPassword());
 
-        if (userRepository.existsByEmailIgnoreCase(email)) {
+        if (clientRepository.existsByEmailIgnoreCase(email)) {
             log.info("Registration started for an email that already has an account, nothing sent");
             return pendingResponse(email);
         }
@@ -111,8 +110,8 @@ public class RegistrationServiceImpl implements RegistrationService {
 
         // The unique constraint on users.email is the last line of defense if another
         // registration with this email won the race while the code was being entered.
-        UserResponse created = switch (pending.accountType()) {
-            case CLIENT -> clientService.createClient(
+        ClientResponse created = switch (pending.accountType()) {
+            case CLIENT -> clientService.createUser(
                     ClientCreateRequest.builder().name(pending.name()).email(email).build(),
                     pending.passwordHash());
             case PROFESSIONAL -> professionalService.createProfessional(
@@ -126,7 +125,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             case ADMIN -> throw new IllegalStateException("An admin cannot register through the public flow");
         };
 
-        User user = userRepository.findByPublicId(created.getId())
+        Client user = clientRepository.findByPublicId(created.getId())
                 .orElseThrow(() -> new IllegalStateException("The account just created is missing"));
 
         return new LoginResponse(
@@ -142,7 +141,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     public PendingVerificationResponse resendCode(ResendCodeRequest request) {
         String email = normalize(request.getEmail());
 
-        boolean hasAccount = userRepository.existsByEmailIgnoreCase(email);
+        boolean hasAccount = clientRepository.existsByEmailIgnoreCase(email);
 
         if (!hasAccount) {
             emailVerificationService.findPending(email, VerificationPurpose.REGISTER)

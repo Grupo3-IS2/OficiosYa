@@ -1,18 +1,19 @@
 package com.um.uy.oficiosya.service;
 
-import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
-import com.um.uy.oficiosya.dto.response.UserResponse;
-import com.um.uy.oficiosya.entity.Client;
+import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.entity.Professional;
-import com.um.uy.oficiosya.mapper.ClientMapper;
+import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.mapper.ProfessionalMapper;
-import com.um.uy.oficiosya.repository.ClientRepository;
+import com.um.uy.oficiosya.mapper.ClientMapper;
 import com.um.uy.oficiosya.repository.ExpertiseTradeRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.TradeRepository;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.repository.ClientRepository;
+import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
+import com.um.uy.oficiosya.service.interfaces.ProfileImageStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -35,13 +36,15 @@ class AccountCreationTest {
     private static final String EMAIL = "ana@example.com";
 
     @Mock
-    private UserRepository userRepository;
+    private ClientRepository clientRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
-    private ClientRepository clientRepository;
-    @Mock
     private ClientMapper clientMapper;
+    @Mock
+    private ProfileImageStorage profileImageStorage;
+    @Mock
+    private EmailVerificationService emailVerificationService;
     @Mock
     private ProfessionalRepository professionalRepository;
     @Mock
@@ -57,8 +60,9 @@ class AccountCreationTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        clientService = new ClientServiceImpl(clientRepository, userRepository, clientMapper, passwordEncoder);
-        professionalService = new ProfessionalServiceImpl(professionalRepository, userRepository, tradeRepository,
+        clientService = new ClientServiceImpl(clientRepository, passwordEncoder, clientMapper, profileImageStorage,
+                emailVerificationService);
+        professionalService = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
                 expertiseTradeRepository, professionalMapper, passwordEncoder);
         when(passwordEncoder.encode("ClaveSegura2026!")).thenReturn("{argon2}fresh");
     }
@@ -75,14 +79,14 @@ class AccountCreationTest {
     // --- client ---
 
     @Test
-    void createClient_withAReadyHash_storesThatHashAndDoesNotHashAgain() {
+    void createUser_withAReadyHash_storesThatHashAndDoesNotHashAgain() {
         Client entity = Client.builder().name("Ana Perez").email(EMAIL).build();
-        UserResponse response = new UserResponse();
+        ClientResponse response = new ClientResponse();
         when(clientMapper.toEntity(any())).thenReturn(entity);
         when(clientRepository.save(entity)).thenReturn(entity);
         when(clientMapper.toResponse(entity)).thenReturn(response);
 
-        UserResponse created = clientService.createClient(clientRequest(), "{argon2}ready");
+        ClientResponse created = clientService.createUser(clientRequest(), "{argon2}ready");
 
         assertSame(response, created);
         assertEquals("{argon2}ready", entity.getPassword());
@@ -90,23 +94,12 @@ class AccountCreationTest {
     }
 
     @Test
-    void createClient_withThePlainPassword_hashesItFirst() {
-        Client entity = Client.builder().name("Ana Perez").email(EMAIL).build();
-        when(clientMapper.toEntity(any())).thenReturn(entity);
-        when(clientRepository.save(entity)).thenReturn(entity);
-
-        clientService.createClient(clientRequest());
-
-        assertEquals("{argon2}fresh", entity.getPassword());
-    }
-
-    @Test
-    void createClient_withAnEmailThatHasAnAccount_isRejectedAndSavesNothing() {
-        when(userRepository.existsByEmail(EMAIL)).thenReturn(true);
+    void createUser_withAnEmailThatHasAnAccount_isRejectedAndSavesNothing() {
+        when(clientRepository.existsByEmail(EMAIL)).thenReturn(true);
         var request = clientRequest();
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
-                () -> clientService.createClient(request, "{argon2}ready"));
+                () -> clientService.createUser(request, "{argon2}ready"));
 
         assertEquals(400, e.getStatusCode().value());
         verify(clientRepository, never()).save(any());
@@ -144,7 +137,7 @@ class AccountCreationTest {
 
     @Test
     void createProfessional_withAnEmailThatHasAnAccount_isRejectedAndSavesNothing() {
-        when(userRepository.existsByEmail(EMAIL)).thenReturn(true);
+        when(clientRepository.existsByEmail(EMAIL)).thenReturn(true);
         var request = professionalRequest();
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,

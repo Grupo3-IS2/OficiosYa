@@ -5,14 +5,13 @@ import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.response.ScheduleResponse;
 import com.um.uy.oficiosya.dto.response.TradeResponse;
-import com.um.uy.oficiosya.dto.response.UserResponse;
+import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
-import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import com.um.uy.oficiosya.service.interfaces.ScheduleService;
 import com.um.uy.oficiosya.service.interfaces.TradeService;
-import com.um.uy.oficiosya.service.interfaces.UserService;
+import com.um.uy.oficiosya.service.interfaces.ClientService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -36,8 +35,6 @@ class AdminControllerTest {
     private static final String BASE = "/api/v1/admin";
 
     @Mock
-    private UserService userService;
-    @Mock
     private ClientService clientService;
     @Mock
     private ProfessionalService professionalService;
@@ -54,7 +51,7 @@ class AdminControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         mvc = MockMvcBuilders
-                .standaloneSetup(new AdminController(userService, clientService, professionalService, tradeService,
+                .standaloneSetup(new AdminController(clientService, professionalService, tradeService,
                         jobRequestService, scheduleService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -62,8 +59,8 @@ class AdminControllerTest {
 
     @Test
     void listings_returnWhatTheServicesHave() throws Exception {
-        when(userService.listUsers()).thenReturn(List.of(new UserResponse(), new UserResponse()));
-        when(clientService.listClients()).thenReturn(List.of(new UserResponse()));
+        when(clientService.listUsers()).thenReturn(List.of(new ClientResponse(), new ClientResponse()));
+        when(clientService.listClients()).thenReturn(List.of(new ClientResponse()));
         when(professionalService.listProfessionals()).thenReturn(List.of(new ProfessionalResponse()));
         when(jobRequestService.listAllJobRequests()).thenReturn(List.of(new JobRequestResponse()));
         when(scheduleService.listAllSchedules()).thenReturn(List.of(new ScheduleResponse(), new ScheduleResponse()));

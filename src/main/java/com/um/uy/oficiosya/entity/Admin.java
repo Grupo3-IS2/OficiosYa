@@ -9,5 +9,5 @@ import lombok.experimental.SuperBuilder;
 @Table(name = "admin")
 @SuperBuilder
 @NoArgsConstructor
-public class Admin extends User {
+public class Admin extends Client {
 }

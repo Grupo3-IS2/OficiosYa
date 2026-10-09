@@ -805,7 +805,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const createdBody = await created.json();
 
     const token = createdBody.token;
-    const updated = await request.patch(`${API_BASE}/api/v1/clients/me`, {
+    const updated = await request.patch(`${API_BASE}/api/v1/users/me`, {
       headers: {
         Authorization: `Bearer ${token}`
       },
@@ -987,7 +987,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
   });
 
   test('API: perfil sin autenticación devuelve 401 al intentar actualizar', async ({ request }) => {
-    const response = await request.patch(`${API_BASE}/api/v1/clients/me`, {
+    const response = await request.patch(`${API_BASE}/api/v1/users/me`, {
       data: {
         name: 'Cliente no autenticado'
       }
@@ -1265,7 +1265,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(created.status()).toBe(200);
     const auth = await created.json();
 
-    const updated = await request.patch(`${API_BASE}/api/v1/clients/me`, {
+    const updated = await request.patch(`${API_BASE}/api/v1/users/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },
@@ -1371,7 +1371,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(emailVerified.status()).toBe(200);
     expect((await emailVerified.json()).email).toBe(newEmail.toLowerCase());
 
-    const nameUpdate = await request.patch(`${API_BASE}/api/v1/clients/me`, {
+    const nameUpdate = await request.patch(`${API_BASE}/api/v1/users/me`, {
       headers: {
         Authorization: `Bearer ${auth.token}`
       },

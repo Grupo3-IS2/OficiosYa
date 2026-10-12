@@ -18,10 +18,14 @@ export interface RegistrationProfile {
 
 /**
  * Something started that a mailed code has to finish: a registration (the account does not exist
- * until the code is verified) or an email change (the email stays as it is until then).
+ * until the code is verified) or an email change (the email stays as it is until then). With
+ * verification turned off in the backend `verificationRequired` is false: it is already done.
  */
 export interface PendingVerification {
   email: string
+  verificationRequired: boolean
+  /** The new account's session, when a registration completed without a code. */
+  session?: LoginResponse
   message: string
   codeLength: number
   expiresInSeconds: number

@@ -17,6 +17,7 @@ import com.um.uy.oficiosya.service.interfaces.JwtService;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.RegistrationService;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -53,6 +54,10 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Value("${app.verification.resend-cooldown-seconds}")
     private long resendCooldownSeconds;
 
+    /** Off, registering creates the account right away: no code is mailed or asked for. */
+    @Value("${app.verification.enabled:true}")
+    private boolean verificationEnabled = true;
+
     public RegistrationServiceImpl(ClientRepository clientRepository, PasswordEncoder passwordEncoder,
                                    EmailVerificationService emailVerificationService,
                                    ClientService clientService, ProfessionalService professionalService,
@@ -63,6 +68,13 @@ public class RegistrationServiceImpl implements RegistrationService {
         this.clientService = clientService;
         this.professionalService = professionalService;
         this.jwtService = jwtService;
+    }
+
+    @PostConstruct
+    void warnIfVerificationIsOff() {
+        if (!verificationEnabled) {
+            log.warn("app.verification.enabled is false: accounts and email changes are not verified, set VERIFICATION_ENABLED=true outside development");
+        }
     }
 
     @Override
@@ -82,13 +94,22 @@ public class RegistrationServiceImpl implements RegistrationService {
         // Hashed before looking at the email so an existing one doesn't answer any faster.
         String passwordHash = passwordEncoder.encode(request.getPassword());
 
-        if (clientRepository.existsByEmailIgnoreCase(email)) {
+        // Without a code step there is no pending answer that hides the account: creating it fails instead.
+        if (verificationEnabled && clientRepository.existsByEmailIgnoreCase(email)) {
             log.info("Registration started for an email that already has an account, nothing sent");
             return pendingResponse(email);
         }
 
         PendingRegistration pending = new PendingRegistration(
                 accountType, request.getName(), passwordHash, phoneNumber, workingLocation);
+
+        if (!verificationEnabled) {
+            return PendingVerificationResponse.builder()
+                    .email(email)
+                    .verificationRequired(false)
+                    .session(createAccount(email, pending))
+                    .build();
+        }
 
         emailVerificationService.sendCode(email, VerificationPurpose.REGISTER, null, write(pending));
         return pendingResponse(email);
@@ -106,8 +127,10 @@ public class RegistrationServiceImpl implements RegistrationService {
         VerificationResult result = emailVerificationService.verifyCode(
                 email, VerificationPurpose.REGISTER, request.getCode());
 
-        PendingRegistration pending = read(result.payload());
+        return createAccount(email, read(result.payload()));
+    }
 
+    private LoginResponse createAccount(String email, PendingRegistration pending) {
         // The unique constraint on users.email is the last line of defense if another
         // registration with this email won the race while the code was being entered.
         ClientResponse created = switch (pending.accountType()) {
@@ -155,6 +178,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     private PendingVerificationResponse pendingResponse(String email) {
         return PendingVerificationResponse.builder()
                 .email(email)
+                .verificationRequired(true)
                 .message(PENDING_MESSAGE)
                 .codeLength(codeLength)
                 .expiresInSeconds(expirationMinutes * 60)

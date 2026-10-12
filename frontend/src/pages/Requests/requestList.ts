@@ -25,7 +25,7 @@ export function requestDescription(request: JobRequest): string {
 function matchesFilter(request: JobRequest, filter: RequestFilter): boolean {
     if (filter === 'all') return true
     if (filter === 'pending') return request.status === 'PROPOSED'
-    if (filter === 'accepted') return request.status === 'ACCEPTED'
+    if (filter === 'accepted') return request.status === 'ACCEPTED' || request.status === 'RESCHEDULE_REQUESTED'
     if (filter === 'completed') return request.status === 'COMPLETED'
     return request.status === 'CANCELLED' || request.status === 'REJECTED'
 }

@@ -47,7 +47,8 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
 
 /**
  * Starts a registration: the backend mails a code and creates nothing yet, so there is no
- * session to store. `verifyEmail` finishes it.
+ * session to store. `verifyEmail` finishes it. With verification off the account is created
+ * right away and its session comes back, already stored.
  */
 export async function register(
   request: RegisterRequest,
@@ -65,10 +66,14 @@ export async function register(
       }
     : request
 
-  return apiRequest<PendingVerification>(endpoint, {
+  const response = await apiRequest<PendingVerification>(endpoint, {
     method: 'POST',
     body: JSON.stringify(body),
   })
+
+  if (response.session) storeSession(response.session)
+
+  return response
 }
 
 /** Creates the account once the code is right, and leaves the user logged in. */

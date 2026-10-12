@@ -18,6 +18,7 @@ import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
 import com.um.uy.oficiosya.service.interfaces.ProfileImageStorage;
 import com.um.uy.oficiosya.service.interfaces.ClientService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,10 @@ public class ClientServiceImpl implements ClientService {
     private final ClientMapper clientMapper;
     private final ProfileImageStorage profileImageStorage;
     private final EmailVerificationService emailVerificationService;
+
+    /** Off, an email change takes effect right away: no code is mailed to the new address. */
+    @Value("${app.verification.enabled:true}")
+    private boolean verificationEnabled = true;
 
     public ClientServiceImpl(ClientRepository clientRepository, PasswordEncoder passwordEncoder, ClientMapper clientMapper,
                              ProfileImageStorage profileImageStorage, EmailVerificationService emailVerificationService) {
@@ -101,6 +106,12 @@ public class ClientServiceImpl implements ClientService {
 
         if (clientRepository.existsByEmailIgnoreCase(newEmail)) {
             throw new ClientAlreadyExists("Ya existe un usuario con el email " + newEmail);
+        }
+
+        if (!verificationEnabled) {
+            user.setEmail(newEmail);
+            clientRepository.save(user);
+            return PendingVerificationResponse.builder().email(newEmail).verificationRequired(false).build();
         }
 
         emailVerificationService.sendCode(newEmail, VerificationPurpose.EMAIL_CHANGE, user.getPublicId(), null);
@@ -168,6 +179,7 @@ public class ClientServiceImpl implements ClientService {
         EmailVerificationService.VerificationTerms terms = emailVerificationService.terms();
         return PendingVerificationResponse.builder()
                 .email(email)
+                .verificationRequired(true)
                 .message("Te enviamos un código al nuevo correo. Ingresalo para confirmar el cambio.")
                 .codeLength(terms.codeLength())
                 .expiresInSeconds(terms.expiresInSeconds())

@@ -9,6 +9,8 @@ function request(id: number, createdAt: string, status: JobRequest['status']): J
         createdAt,
         status,
         clientId: 'client-id',
+        clientName: 'Cliente',
+        clientProfileImageUrl: null,
         professionalId: 'professional-id',
         professionalName: 'Profesional',
         professionalProfileImageUrl: null,
@@ -57,4 +59,10 @@ test('treats rejected requests as cancelled for the visible filter', () => {
         request(3, '2026-10-05T12:00:00-03:00', 'PROPOSED'),
     ]
     assert.deepEqual(filterAndOrderRequests(requests, 'cancelled', 'newest').map(item => item.id), [1, 2])
+})
+
+test('counts a pending reschedule as accepted', () => {
+    const requests = [request(1, '2026-10-04T12:00:00-03:00', 'RESCHEDULE_REQUESTED')]
+
+    assert.deepEqual(filterAndOrderRequests(requests, 'accepted', 'newest').map(item => item.id), [1])
 })

@@ -8,7 +8,7 @@ import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.entity.Schedule;
 import com.um.uy.oficiosya.entity.ScheduleType;
 import com.um.uy.oficiosya.exception.ScheduleNotFoundException;
-import com.um.uy.oficiosya.exception.UserNotFoundException;
+import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.mapper.ScheduleMapperImpl;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.ScheduleRepository;
@@ -105,7 +105,7 @@ class ScheduleServiceImplTest {
         when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.empty());
         ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
 
-        assertThrows(UserNotFoundException.class, () -> service.createSchedule(request, professionalId));
+        assertThrows(ClientNotFoundException.class, () -> service.createSchedule(request, professionalId));
     }
 
     @Test
@@ -323,7 +323,7 @@ class ScheduleServiceImplTest {
     void getAgenda_unpublishedProfessional_isNotFoundForThePublic() {
         when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(false);
 
-        assertThrows(UserNotFoundException.class, () -> service.getAgenda(professionalId, null, null, false));
+        assertThrows(ClientNotFoundException.class, () -> service.getAgenda(professionalId, null, null, false));
     }
 
     @Test

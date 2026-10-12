@@ -20,7 +20,7 @@ import com.um.uy.oficiosya.entity.ScheduleType;
 import com.um.uy.oficiosya.entity.Trade;
 import com.um.uy.oficiosya.exception.JobRequestNotFoundException;
 import com.um.uy.oficiosya.exception.TradeNotFoundException;
-import com.um.uy.oficiosya.exception.UserNotFoundException;
+import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.mapper.JobRequestMapperImpl;
 import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.repository.JobRequestRepository;
@@ -142,11 +142,40 @@ class JobRequestServiceImplTest {
     }
 
     @Test
+    void createJobRequest_byAProfessional_isTheClientOfThatJob() {
+        UUID otherProfessionalId = UUID.randomUUID();
+        Professional requester = Professional.builder().id(4L).publicId(otherProfessionalId).name("Carla")
+                .email("carla@example.com").phoneNumber("099654321").build();
+        when(clientRepository.findByPublicId(otherProfessionalId)).thenReturn(Optional.of(requester));
+        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        when(tradeRepository.findById(3L)).thenReturn(Optional.of(Trade.builder().id(3L).name("Plomería").build()));
+        when(passwordEncoder.encode(anyString())).thenReturn("pin-hash");
+
+        JobRequestResponse response = service.createJobRequest(createRequest(3L), otherProfessionalId);
+
+        assertEquals(otherProfessionalId, response.getClientId());
+        assertEquals(professionalId, response.getProfessionalId());
+    }
+
+    @Test
+    void createJobRequest_toThemselves_isRejected() {
+        when(clientRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        JobRequestCreateRequest request = createRequest(3L);
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.createJobRequest(request, professionalId));
+
+        assertEquals(400, e.getStatusCode().value());
+        verify(jobRequestRepository, never()).save(any());
+    }
+
+    @Test
     void createJobRequest_unknownClient_isRejected() {
         when(clientRepository.findByPublicId(clientId)).thenReturn(Optional.empty());
         JobRequestCreateRequest request = createRequest(3L);
 
-        assertThrows(UserNotFoundException.class, () -> service.createJobRequest(request, clientId));
+        assertThrows(ClientNotFoundException.class, () -> service.createJobRequest(request, clientId));
     }
 
     @Test
@@ -155,7 +184,7 @@ class JobRequestServiceImplTest {
         when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.empty());
         JobRequestCreateRequest request = createRequest(3L);
 
-        assertThrows(UserNotFoundException.class, () -> service.createJobRequest(request, clientId));
+        assertThrows(ClientNotFoundException.class, () -> service.createJobRequest(request, clientId));
     }
 
     @Test

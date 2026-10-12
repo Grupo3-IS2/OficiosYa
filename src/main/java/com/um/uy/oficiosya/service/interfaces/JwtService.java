@@ -1,6 +1,6 @@
 package com.um.uy.oficiosya.service.interfaces;
 
-import com.um.uy.oficiosya.entity.User;
+import com.um.uy.oficiosya.entity.Client;
 import io.jsonwebtoken.Claims;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -13,7 +13,7 @@ public interface JwtService {
 
     <T> T extractClaim(String token, Function<Claims, T> claimsResolver);
 
-    String generateToken(User user);
+    String generateToken(Client user);
 
     String generateToken(Map<String, Object> extraClaims, String id);
 

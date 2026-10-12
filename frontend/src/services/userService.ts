@@ -36,8 +36,6 @@ export interface UserUpdateRequest {
   name?: string
 }
 
-export type ClientUpdateRequest = UserUpdateRequest
-
 export interface ProfessionalUpdateRequest extends UserUpdateRequest {
   phoneNumber?: string
   workingLocation?: string
@@ -116,8 +114,8 @@ export function uploadProfileImage(image: File): Promise<AuthenticatedUserRespon
   })
 }
 
-export function updateClient(request: ClientUpdateRequest): Promise<UserResponse> {
-  return apiRequest<UserResponse>('/clients/me', {
+export function updateUser(request: UserUpdateRequest): Promise<UserResponse> {
+  return apiRequest<UserResponse>('/users/me', {
     method: 'PATCH',
     body: JSON.stringify(request),
   })

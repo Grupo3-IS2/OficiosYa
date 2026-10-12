@@ -5,8 +5,8 @@ import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.MessageResponse;
 import com.um.uy.oficiosya.dto.response.TokenResponse;
 import com.um.uy.oficiosya.entity.Role;
-import com.um.uy.oficiosya.entity.User;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.entity.Client;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
 import com.um.uy.oficiosya.service.interfaces.JwtService;
 import com.um.uy.oficiosya.service.interfaces.TokenRevocationService;
@@ -26,7 +26,7 @@ import java.util.UUID;
 @Slf4j
 public class AuthServiceImpl implements AuthService {
 
-    private final UserRepository userRepository;
+    private final ClientRepository clientRepository;
 
     private final PasswordEncoder passwordEncoder;
 
@@ -36,9 +36,9 @@ public class AuthServiceImpl implements AuthService {
 
     private final String dummyPasswordHash;
 
-    public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
+    public AuthServiceImpl(ClientRepository clientRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
                            TokenRevocationService tokenRevocationService) {
-        this.userRepository = userRepository;
+        this.clientRepository = clientRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.tokenRevocationService = tokenRevocationService;
@@ -50,15 +50,15 @@ public class AuthServiceImpl implements AuthService {
 
         String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase(Locale.ROOT);
 
-        Optional<User> candidate = userRepository.findByEmailIgnoreCase(email);
-        String passwordHash = candidate.map(User::getPassword).orElse(dummyPasswordHash);
+        Optional<Client> candidate = clientRepository.findByEmailIgnoreCase(email);
+        String passwordHash = candidate.map(Client::getPassword).orElse(dummyPasswordHash);
 
         if (!passwordEncoder.matches(request.getPassword(), passwordHash) || candidate.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "Email o contraseña incorrectos");
         }
 
-        User user = candidate.get();
+        Client user = candidate.get();
 
         String jwtToken = jwtService.generateToken(user);
 
@@ -117,9 +117,9 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /** The JWT subject is the user's publicId, an unparseable one is simply not a user. */
-    private Optional<User> findByPublicId(String subject) {
+    private Optional<Client> findByPublicId(String subject) {
         try {
-            return userRepository.findByPublicId(UUID.fromString(subject));
+            return clientRepository.findByPublicId(UUID.fromString(subject));
         } catch (IllegalArgumentException _) {
             log.warn("Token with an invalid subject: {}", subject);
             return Optional.empty();

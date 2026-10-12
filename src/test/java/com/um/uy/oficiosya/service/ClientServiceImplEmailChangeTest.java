@@ -3,13 +3,13 @@ package com.um.uy.oficiosya.service;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
-import com.um.uy.oficiosya.dto.response.UserResponse;
+import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.VerificationPurpose;
-import com.um.uy.oficiosya.exception.UserAlreadyExists;
-import com.um.uy.oficiosya.mapper.UserMapper;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.exception.ClientAlreadyExists;
+import com.um.uy.oficiosya.mapper.ClientMapper;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService.VerificationResult;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService.VerificationTerms;
@@ -39,7 +39,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Changing the email takes a code mailed to the new address: nothing changes until it is verified. */
-class UserServiceImplEmailChangeTest {
+class ClientServiceImplEmailChangeTest {
 
     private static final String OLD_EMAIL = "ana@example.com";
     private static final String NEW_EMAIL = "ana.nueva@example.com";
@@ -47,31 +47,31 @@ class UserServiceImplEmailChangeTest {
     private static final String HASH = "{argon2}hash";
 
     @Mock
-    private UserRepository userRepository;
+    private ClientRepository clientRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
-    private UserMapper userMapper;
+    private ClientMapper clientMapper;
     @Mock
     private ProfileImageStorage profileImageStorage;
     @Mock
     private EmailVerificationService emailVerificationService;
 
-    private UserServiceImpl service;
+    private ClientServiceImpl service;
     private Client user;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new UserServiceImpl(userRepository, passwordEncoder, userMapper, profileImageStorage, emailVerificationService);
+        service = new ClientServiceImpl(clientRepository, passwordEncoder, clientMapper, profileImageStorage, emailVerificationService);
         user = Client.builder().id(1L).publicId(UUID.randomUUID()).name("Ana Pérez").email(OLD_EMAIL).password(HASH).build();
 
-        when(userRepository.findByPublicId(user.getPublicId())).thenReturn(Optional.of(user));
+        when(clientRepository.findByPublicId(user.getPublicId())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(PASSWORD, HASH)).thenReturn(true);
         when(emailVerificationService.terms()).thenReturn(new VerificationTerms(6, 900, 60));
-        when(userRepository.save(any(Client.class))).thenAnswer(call -> call.getArgument(0));
-        when(userMapper.toResponse(any())).thenAnswer(call -> {
-            UserResponse response = new UserResponse();
+        when(clientRepository.save(any(Client.class))).thenAnswer(call -> call.getArgument(0));
+        when(clientMapper.toResponse(any())).thenAnswer(call -> {
+            ClientResponse response = new ClientResponse();
             response.setEmail(((Client) call.getArgument(0)).getEmail());
             return response;
         });
@@ -94,7 +94,7 @@ class UserServiceImplEmailChangeTest {
 
         verify(emailVerificationService).sendCode(NEW_EMAIL, VerificationPurpose.EMAIL_CHANGE, user.getPublicId(), null);
         assertEquals(OLD_EMAIL, user.getEmail());
-        verify(userRepository, never()).save(any());
+        verify(clientRepository, never()).save(any());
 
         assertEquals(NEW_EMAIL, response.getEmail());
         assertEquals(6, response.getCodeLength());
@@ -133,11 +133,11 @@ class UserServiceImplEmailChangeTest {
 
     @Test
     void startEmailChange_toAnAddressThatHasAnAccount_isRejectedAndSendsNothing() {
-        when(userRepository.existsByEmailIgnoreCase(NEW_EMAIL)).thenReturn(true);
+        when(clientRepository.existsByEmailIgnoreCase(NEW_EMAIL)).thenReturn(true);
         var request = change(NEW_EMAIL, PASSWORD);
         var userId = user.getPublicId();
 
-        assertThrows(UserAlreadyExists.class, () -> service.startEmailChange(request, userId));
+        assertThrows(ClientAlreadyExists.class, () -> service.startEmailChange(request, userId));
 
         verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());
     }
@@ -148,12 +148,12 @@ class UserServiceImplEmailChangeTest {
     void verifyEmailChange_withTheRightCode_changesTheEmail() {
         givenPending(NEW_EMAIL, user.getPublicId());
 
-        UserResponse response = service.verifyEmailChange(
+        ClientResponse response = service.verifyEmailChange(
                 VerifyEmailRequest.builder().email(NEW_EMAIL).code("123456").build(), user.getPublicId());
 
         verify(emailVerificationService).verifyCode(NEW_EMAIL, VerificationPurpose.EMAIL_CHANGE, "123456");
         assertEquals(NEW_EMAIL, user.getEmail());
-        verify(userRepository).save(user);
+        verify(clientRepository).save(user);
         assertEquals(NEW_EMAIL, response.getEmail());
     }
 
@@ -168,7 +168,7 @@ class UserServiceImplEmailChangeTest {
         assertThrows(ResponseStatusException.class, () -> service.verifyEmailChange(request, userId));
 
         assertEquals(OLD_EMAIL, user.getEmail());
-        verify(userRepository, never()).save(any());
+        verify(clientRepository, never()).save(any());
     }
 
     @Test
@@ -193,20 +193,20 @@ class UserServiceImplEmailChangeTest {
     @Test
     void verifyEmailChange_ifTheAddressWasTakenInTheMeantime_isRejected() {
         givenPending(NEW_EMAIL, user.getPublicId());
-        when(userRepository.existsByEmailIgnoreCase(NEW_EMAIL)).thenReturn(true);
+        when(clientRepository.existsByEmailIgnoreCase(NEW_EMAIL)).thenReturn(true);
         var request = VerifyEmailRequest.builder().email(NEW_EMAIL).code("123456").build();
         var userId = user.getPublicId();
 
-        assertThrows(UserAlreadyExists.class, () -> service.verifyEmailChange(request, userId));
+        assertThrows(ClientAlreadyExists.class, () -> service.verifyEmailChange(request, userId));
 
         assertEquals(OLD_EMAIL, user.getEmail());
-        verify(userRepository, never()).save(any());
+        verify(clientRepository, never()).save(any());
     }
 
     @Test
     void verifyEmailChange_keepsTheCountedAttemptWhenTheCodeIsRejected() throws NoSuchMethodException {
         // A rejected code throws; without noRollbackFor the attempt it counted would be rolled back with it.
-        Transactional transactional = UserServiceImpl.class
+        Transactional transactional = ClientServiceImpl.class
                 .getMethod("verifyEmailChange", VerifyEmailRequest.class, UUID.class)
                 .getAnnotation(Transactional.class);
 

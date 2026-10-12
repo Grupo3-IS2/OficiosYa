@@ -141,7 +141,7 @@ Documento base para copiar cada sección a su ticket. Las prioridades son sugeri
 
 **TC-12-01 — Consultar perfil** — Tipo: API. Sin token `GET /api/v1/users/me` → `401`; Cliente válido → `200` con datos propios.
 
-**TC-12-02 — Editar nombre** — Tipo: API/UI. `PATCH /api/v1/clients/me` con nombre válido → `200`; consultar nuevamente y recargar UI conserva el valor.
+**TC-12-02 — Editar nombre** — Tipo: API/UI. `PATCH /api/v1/users/me` con nombre válido → `200`; consultar nuevamente y recargar UI conserva el valor.
 
 **TC-12-03 — Email** — Tipo: API/E2E. `PUT /api/v1/users/me/email` con contraseña incorrecta → `400`; válida → `202`, email antiguo sigue vigente hasta código correcto; verificación → `200` y email nuevo sirve para login.
 

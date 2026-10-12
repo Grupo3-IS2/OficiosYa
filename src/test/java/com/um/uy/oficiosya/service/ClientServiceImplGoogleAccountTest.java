@@ -4,8 +4,8 @@ import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.entity.AuthProvider;
 import com.um.uy.oficiosya.entity.Client;
-import com.um.uy.oficiosya.mapper.UserMapper;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.mapper.ClientMapper;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
 import com.um.uy.oficiosya.service.interfaces.ProfileImageStorage;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,29 +26,29 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** An account created with Google has no password: changing the email or the password is not for it. */
-class UserServiceImplGoogleAccountTest {
+class ClientServiceImplGoogleAccountTest {
 
     @Mock
-    private UserRepository userRepository;
+    private ClientRepository clientRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
-    private UserMapper userMapper;
+    private ClientMapper clientMapper;
     @Mock
     private ProfileImageStorage profileImageStorage;
     @Mock
     private EmailVerificationService emailVerificationService;
 
-    private UserServiceImpl service;
+    private ClientServiceImpl service;
     private final UUID id = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new UserServiceImpl(userRepository, passwordEncoder, userMapper, profileImageStorage, emailVerificationService);
+        service = new ClientServiceImpl(clientRepository, passwordEncoder, clientMapper, profileImageStorage, emailVerificationService);
         Client googleAccount = Client.builder().id(1L).publicId(id).name("Ana Pérez").email("ana@example.com")
                 .password("{argon2}random").authProvider(AuthProvider.GOOGLE).googleSubject("sub").build();
-        when(userRepository.findByPublicId(id)).thenReturn(Optional.of(googleAccount));
+        when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(googleAccount));
     }
 
     @Test
@@ -57,7 +57,7 @@ class UserServiceImplGoogleAccountTest {
         ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.startEmailChange(request, id));
 
         assertEquals(400, e.getStatusCode().value());
-        verify(userRepository, never()).save(any());
+        verify(clientRepository, never()).save(any());
     }
 
     @Test
@@ -67,6 +67,6 @@ class UserServiceImplGoogleAccountTest {
         ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.changePassword(request, id));
 
         assertEquals(400, e.getStatusCode().value());
-        verify(userRepository, never()).save(any());
+        verify(clientRepository, never()).save(any());
     }
 }

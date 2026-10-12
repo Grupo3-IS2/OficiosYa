@@ -1,12 +1,14 @@
 package com.um.uy.oficiosya.config;
 
 import com.um.uy.oficiosya.entity.Role;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
@@ -137,11 +139,22 @@ public class SecurityConfig {
     }
 
     /**
+     * A professional can do everything a client can, so every hasRole('CLIENT') check lets them through
+     * too. Admins don't get it: they oversee the platform, they don't hire anyone.
+     */
+    @Bean
+    static RoleHierarchy roleHierarchy() {
+        return RoleHierarchyImpl.withDefaultRolePrefix()
+                .role(Role.PROFESSIONAL.name()).implies(Role.CLIENT.name())
+                .build();
+    }
+
+    /**
      * The username here is the JWT subject, that is the user's publicId. The email is
      * not usable as an identifier because the user can change it.
      */
     @Bean
-    public UserDetailsService userDetailsService(UserRepository userRepository) {
+    public UserDetailsService userDetailsService(ClientRepository clientRepository) {
         return subject -> {
             UUID publicId;
             try {
@@ -150,7 +163,7 @@ public class SecurityConfig {
                 throw new UsernameNotFoundException("Invalid user identifier: " + subject);
             }
 
-            return userRepository.findByPublicId(publicId)
+            return clientRepository.findByPublicId(publicId)
                     .map(user -> org.springframework.security.core.userdetails.User
                             .withUsername(user.getPublicId().toString())
                             .password(user.getPassword())

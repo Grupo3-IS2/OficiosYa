@@ -1,17 +1,19 @@
 package com.um.uy.oficiosya.entity;
 
+import org.hibernate.Hibernate;
+
 public enum Role {
     CLIENT,
     PROFESSIONAL,
     ADMIN;
 
-    public static Role of(User user) {
-        return switch (user) {
+    /** A user that is neither a professional nor an admin is a client. */
+    public static Role of(Client user) {
+        // A lazy proxy is typed as Client even when the row is a Professional or an Admin
+        return switch ((Client) Hibernate.unproxy(user)) {
             case Professional ignored -> PROFESSIONAL;
-            case Client ignored -> CLIENT;
             case Admin ignored -> ADMIN;
-            default -> throw new IllegalStateException(
-                    "User " + user.getPublicId() + " is neither a client, a professional, nor an admin");
+            default -> CLIENT;
         };
     }
 }

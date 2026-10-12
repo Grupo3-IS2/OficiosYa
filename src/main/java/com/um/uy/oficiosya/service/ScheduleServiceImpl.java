@@ -8,7 +8,7 @@ import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.entity.Schedule;
 import com.um.uy.oficiosya.entity.ScheduleType;
 import com.um.uy.oficiosya.exception.ScheduleNotFoundException;
-import com.um.uy.oficiosya.exception.UserNotFoundException;
+import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.mapper.ScheduleMapper;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.ScheduleRepository;
@@ -55,7 +55,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         Professional professional = professionalRepository.findByPublicIdForUpdate(professionalId)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+                .orElseThrow(() -> new ClientNotFoundException("Profesional no encontrado."));
 
         if (scheduleRepository.existsOverlapping(professionalId, scheduleRequest.getStartTimestamp(),
                 scheduleRequest.getEndTimestamp(), 0L)) {
@@ -185,7 +185,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 ? professionalRepository.existsByPublicId(professionalId)
                 : professionalRepository.existsByPublicIdAndPublishedTrue(professionalId);
         if (!visible) {
-            throw new UserNotFoundException("Profesional no encontrado.");
+            throw new ClientNotFoundException("Profesional no encontrado.");
         }
 
         return scheduleRepository.findAgenda(professionalId, from, to).stream()

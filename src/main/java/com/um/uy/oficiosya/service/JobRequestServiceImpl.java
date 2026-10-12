@@ -9,7 +9,6 @@ import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.request.TaskCreateRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
-import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.PaymentState;
@@ -18,14 +17,15 @@ import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.entity.ScheduleType;
 import com.um.uy.oficiosya.entity.Task;
 import com.um.uy.oficiosya.entity.Trade;
+import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.exception.JobRequestNotFoundException;
 import com.um.uy.oficiosya.exception.TradeNotFoundException;
-import com.um.uy.oficiosya.exception.UserNotFoundException;
+import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.mapper.JobRequestMapper;
-import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.repository.JobRequestRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.TradeRepository;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import com.um.uy.oficiosya.service.interfaces.ScheduleService;
 import org.springframework.beans.factory.annotation.Value;
@@ -90,10 +90,15 @@ public class JobRequestServiceImpl implements JobRequestService {
     @Transactional
     public JobRequestResponse createJobRequest(JobRequestCreateRequest request, UUID clientId) {
         Client client = clientRepository.findByPublicId(clientId)
-                .orElseThrow(() -> new UserNotFoundException("Cliente no encontrado."));
+                .orElseThrow(() -> new ClientNotFoundException("Cliente no encontrado."));
 
         Professional professional = professionalRepository.findByPublicId(request.getProfessionalId())
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+                .orElseThrow(() -> new ClientNotFoundException("Profesional no encontrado."));
+
+        // A professional can request jobs like any client, just not to themselves
+        if (professional.getPublicId().equals(client.getPublicId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No podés solicitarte un trabajo a vos mismo");
+        }
 
         String pin = generatePin();
 

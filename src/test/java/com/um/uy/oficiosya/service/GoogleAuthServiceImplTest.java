@@ -7,15 +7,14 @@ import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
-import com.um.uy.oficiosya.dto.response.UserResponse;
+import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 import com.um.uy.oficiosya.entity.AuthProvider;
-import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.Role;
-import com.um.uy.oficiosya.entity.User;
-import com.um.uy.oficiosya.mapper.UserMapper;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.entity.Client;
+import com.um.uy.oficiosya.mapper.ClientMapper;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.GoogleTokenVerifier;
 import com.um.uy.oficiosya.service.interfaces.GoogleTokenVerifier.GoogleIdentity;
@@ -55,7 +54,7 @@ class GoogleAuthServiceImplTest {
     @Mock
     private GoogleTokenVerifier googleTokenVerifier;
     @Mock
-    private UserRepository userRepository;
+    private ClientRepository clientRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -65,7 +64,7 @@ class GoogleAuthServiceImplTest {
     @Mock
     private JwtService jwtService;
     @Mock
-    private UserMapper userMapper;
+    private ClientMapper clientMapper;
 
     private GoogleAuthServiceImpl service;
 
@@ -73,11 +72,11 @@ class GoogleAuthServiceImplTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         when(passwordEncoder.encode(anyString())).thenAnswer(call -> "{argon2}" + call.getArgument(0));
-        service = new GoogleAuthServiceImpl(googleTokenVerifier, userRepository, passwordEncoder,
-                clientService, professionalService, jwtService, userMapper);
+        service = new GoogleAuthServiceImpl(googleTokenVerifier, clientRepository, passwordEncoder,
+                clientService, professionalService, jwtService, clientMapper);
         when(googleTokenVerifier.verify(CREDENTIAL)).thenReturn(IDENTITY);
         when(passwordEncoder.matches(PASSWORD, HASH)).thenReturn(true);
-        when(userRepository.save(any(User.class))).thenAnswer(call -> call.getArgument(0));
+        when(clientRepository.save(any(Client.class))).thenAnswer(call -> call.getArgument(0));
     }
 
     private Client localAccount() {
@@ -104,7 +103,7 @@ class GoogleAuthServiceImplTest {
     void login_withAnAccountLinkedToThisGoogle_logsIn() {
         Client account = localAccount();
         account.setGoogleSubject(SUBJECT);
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.of(account));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.of(account));
         when(jwtService.generateToken(account)).thenReturn("jwt");
 
         LoginResponse response = service.login(credential());
@@ -116,8 +115,8 @@ class GoogleAuthServiceImplTest {
 
     @Test
     void login_withNoAccount_is404() {
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
-        when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
+        when(clientRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
 
         expectStatus(404, () -> service.login(credential()));
     }
@@ -125,22 +124,22 @@ class GoogleAuthServiceImplTest {
     @Test
     void login_withAPasswordAccountNotLinked_is409AndLinksNothing() {
         Client account = localAccount();
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
-        when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
+        when(clientRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
 
         expectStatus(409, () -> service.login(credential()));
 
         assertNull(account.getGoogleSubject());
-        verify(userRepository, never()).save(any());
-        verify(jwtService, never()).generateToken(any(User.class));
+        verify(clientRepository, never()).save(any());
+        verify(jwtService, never()).generateToken(any(Client.class));
     }
 
     @Test
     void login_withAnAccountLinkedToAnotherGoogle_is400() {
         Client account = localAccount();
         account.setGoogleSubject("someone-elses-sub");
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
-        when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
+        when(clientRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
 
         expectStatus(400, () -> service.login(credential()));
     }
@@ -150,31 +149,31 @@ class GoogleAuthServiceImplTest {
     @Test
     void link_withTheRightPassword_linksAndLogsIn() {
         Client account = localAccount();
-        when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
+        when(clientRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
         when(jwtService.generateToken(account)).thenReturn("jwt");
 
         LoginResponse response = service.link(linkRequest(PASSWORD));
 
         assertEquals(SUBJECT, account.getGoogleSubject());
-        verify(userRepository).save(account);
+        verify(clientRepository).save(account);
         assertEquals("jwt", response.getToken());
     }
 
     @Test
     void link_withAWrongPassword_linksNothing() {
         Client account = localAccount();
-        when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
+        when(clientRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
 
         expectStatus(400, () -> service.link(linkRequest("wrong")));
 
         assertNull(account.getGoogleSubject());
-        verify(userRepository, never()).save(any());
+        verify(clientRepository, never()).save(any());
     }
 
     @Test
     void link_withNoAccount_answersLikeAWrongPasswordAndStillComparesAPassword() {
-        when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
+        when(clientRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
         var request = linkRequest(PASSWORD);
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
@@ -191,8 +190,8 @@ class GoogleAuthServiceImplTest {
         Client other = localAccount();
         other.setId(2L);
         other.setGoogleSubject(SUBJECT);
-        when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.of(other));
+        when(clientRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.of(other));
 
         expectStatus(400, () -> service.link(linkRequest(PASSWORD)));
 
@@ -203,7 +202,7 @@ class GoogleAuthServiceImplTest {
     void link_whenTheAccountHasAnotherGoogleLinked_is400() {
         Client account = localAccount();
         account.setGoogleSubject("someone-elses-sub");
-        when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
+        when(clientRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(account));
 
         expectStatus(400, () -> service.link(linkRequest(PASSWORD)));
 
@@ -216,20 +215,20 @@ class GoogleAuthServiceImplTest {
     void registerClient_createsAGoogleAccountWithAnUnknownPassword() {
         UUID publicId = UUID.randomUUID();
         Client created = Client.builder().id(5L).publicId(publicId).name("Ana Pérez").email(EMAIL).password("x").build();
-        UserResponse createdResponse = new UserResponse();
+        ClientResponse createdResponse = new ClientResponse();
         createdResponse.setId(publicId);
 
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
-        when(clientService.createClient(any(), anyString())).thenReturn(createdResponse);
-        when(userRepository.findByPublicId(publicId)).thenReturn(Optional.of(created));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
+        when(clientService.createUser(any(), anyString())).thenReturn(createdResponse);
+        when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(created));
         when(jwtService.generateToken(created)).thenReturn("jwt");
 
         LoginResponse response = service.registerClient(credential());
 
         ArgumentCaptor<ClientCreateRequest> request = ArgumentCaptor.forClass(ClientCreateRequest.class);
         ArgumentCaptor<String> passwordHash = ArgumentCaptor.forClass(String.class);
-        verify(clientService).createClient(request.capture(), passwordHash.capture());
+        verify(clientService).createUser(request.capture(), passwordHash.capture());
         assertEquals(EMAIL, request.getValue().getEmail());
         assertEquals("Ana Pérez", request.getValue().getName());
         assertTrue(passwordHash.getValue().startsWith("{argon2}"));
@@ -244,34 +243,34 @@ class GoogleAuthServiceImplTest {
     void registerClient_usesTheEmailNameWhenGoogleGivesNone() {
         when(googleTokenVerifier.verify(CREDENTIAL)).thenReturn(new GoogleIdentity(SUBJECT, EMAIL, "  "));
         UUID publicId = UUID.randomUUID();
-        UserResponse createdResponse = new UserResponse();
+        ClientResponse createdResponse = new ClientResponse();
         createdResponse.setId(publicId);
-        when(clientService.createClient(any(), anyString())).thenReturn(createdResponse);
-        when(userRepository.findByPublicId(publicId)).thenReturn(Optional.of(localAccount()));
+        when(clientService.createUser(any(), anyString())).thenReturn(createdResponse);
+        when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(localAccount()));
 
         service.registerClient(credential());
 
         ArgumentCaptor<ClientCreateRequest> request = ArgumentCaptor.forClass(ClientCreateRequest.class);
-        verify(clientService).createClient(request.capture(), anyString());
+        verify(clientService).createUser(request.capture(), anyString());
         assertEquals("ana", request.getValue().getName());
     }
 
     @Test
     void registerClient_withAnEmailThatHasAnAccount_isRejectedAndCreatesNothing() {
-        when(userRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(true);
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(true);
 
         expectStatus(400, () -> service.registerClient(credential()));
 
-        verify(clientService, never()).createClient(any(), anyString());
+        verify(clientService, never()).createUser(any(), anyString());
     }
 
     @Test
     void registerClient_withAGoogleAlreadyRegistered_isRejected() {
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.of(localAccount()));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.of(localAccount()));
 
         expectStatus(400, () -> service.registerClient(credential()));
 
-        verify(clientService, never()).createClient(any(), anyString());
+        verify(clientService, never()).createUser(any(), anyString());
     }
 
     @Test
@@ -281,7 +280,7 @@ class GoogleAuthServiceImplTest {
         createdResponse.setId(publicId);
         Client stored = localAccount();
         when(professionalService.createProfessional(any(), anyString())).thenReturn(createdResponse);
-        when(userRepository.findByPublicId(publicId)).thenReturn(Optional.of(stored));
+        when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(stored));
 
         service.registerProfessional(GoogleProfessionalRegisterRequest.builder()
                 .credential(CREDENTIAL).phoneNumber("099123456").workingLocation("Montevideo").build());
@@ -299,22 +298,22 @@ class GoogleAuthServiceImplTest {
     @Test
     void linkToUser_withTheRightPassword_linksGoogle() {
         Client account = localAccount();
-        when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
+        when(clientRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
 
         service.linkToUser(account.getPublicId(),
                 GoogleLinkUpdateRequest.builder().credential(CREDENTIAL).currentPassword(PASSWORD).build());
 
         assertEquals(SUBJECT, account.getGoogleSubject());
-        verify(userRepository).save(account);
+        verify(clientRepository).save(account);
     }
 
     @Test
     void linkToUser_withAGoogleThatHasAnotherEmail_isRejectedAndLinksNothing() {
         when(googleTokenVerifier.verify(CREDENTIAL)).thenReturn(new GoogleIdentity(SUBJECT, "other@gmail.com", "Ana"));
         Client account = localAccount();
-        when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
+        when(clientRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
         var accountId = account.getPublicId();
         var request = GoogleLinkUpdateRequest.builder().credential(CREDENTIAL).currentPassword(PASSWORD).build();
 
@@ -324,7 +323,7 @@ class GoogleAuthServiceImplTest {
         // Tells which email to use.
         assertTrue(e.getReason().contains(EMAIL));
         assertNull(account.getGoogleSubject());
-        verify(userRepository, never()).save(any());
+        verify(clientRepository, never()).save(any());
     }
 
     @Test
@@ -332,8 +331,8 @@ class GoogleAuthServiceImplTest {
         when(googleTokenVerifier.verify(CREDENTIAL)).thenReturn(new GoogleIdentity(SUBJECT, EMAIL.toLowerCase(), "Ana"));
         Client account = localAccount();
         account.setEmail("Ana@Example.com");
-        when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
-        when(userRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
+        when(clientRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
+        when(clientRepository.findByGoogleSubject(SUBJECT)).thenReturn(Optional.empty());
 
         service.linkToUser(account.getPublicId(),
                 GoogleLinkUpdateRequest.builder().credential(CREDENTIAL).currentPassword(PASSWORD).build());
@@ -344,7 +343,7 @@ class GoogleAuthServiceImplTest {
     @Test
     void linkToUser_withAWrongPassword_is400AndDoesNotEvenCheckTheToken() {
         Client account = localAccount();
-        when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
+        when(clientRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
 
         expectStatus(400, () -> service.linkToUser(account.getPublicId(),
                 GoogleLinkUpdateRequest.builder().credential(CREDENTIAL).currentPassword("wrong").build()));
@@ -356,7 +355,7 @@ class GoogleAuthServiceImplTest {
     void linkToUser_whenAlreadyLinked_is400() {
         Client account = localAccount();
         account.setGoogleSubject("already");
-        when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
+        when(clientRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
 
         expectStatus(400, () -> service.linkToUser(account.getPublicId(),
                 GoogleLinkUpdateRequest.builder().credential(CREDENTIAL).currentPassword(PASSWORD).build()));
@@ -368,18 +367,18 @@ class GoogleAuthServiceImplTest {
     void unlinkFromUser_withTheRightPassword_clearsTheLink() {
         Client account = localAccount();
         account.setGoogleSubject(SUBJECT);
-        when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
+        when(clientRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
 
         service.unlinkFromUser(account.getPublicId(), GoogleUnlinkRequest.builder().currentPassword(PASSWORD).build());
 
         assertNull(account.getGoogleSubject());
-        verify(userRepository).save(account);
+        verify(clientRepository).save(account);
     }
 
     @Test
     void unlinkFromUser_whenNotLinked_is400() {
         Client account = localAccount();
-        when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
+        when(clientRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
 
         expectStatus(400, () -> service.unlinkFromUser(account.getPublicId(),
                 GoogleUnlinkRequest.builder().currentPassword(PASSWORD).build()));
@@ -389,7 +388,7 @@ class GoogleAuthServiceImplTest {
     void unlinkFromUser_withAWrongPassword_keepsTheLink() {
         Client account = localAccount();
         account.setGoogleSubject(SUBJECT);
-        when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
+        when(clientRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
 
         expectStatus(400, () -> service.unlinkFromUser(account.getPublicId(),
                 GoogleUnlinkRequest.builder().currentPassword("wrong").build()));
@@ -402,7 +401,7 @@ class GoogleAuthServiceImplTest {
         Client account = localAccount();
         account.setAuthProvider(AuthProvider.GOOGLE);
         account.setGoogleSubject(SUBJECT);
-        when(userRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
+        when(clientRepository.findByPublicId(account.getPublicId())).thenReturn(Optional.of(account));
 
         expectStatus(400, () -> service.unlinkFromUser(account.getPublicId(),
                 GoogleUnlinkRequest.builder().currentPassword(PASSWORD).build()));

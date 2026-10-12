@@ -1,27 +1,87 @@
 package com.um.uy.oficiosya.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Getter
 @Setter
-@Table(name = "client")
+@Table(name = "users")
+@Inheritance(strategy = InheritanceType.JOINED)
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Client extends User {
+public class Client {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /** Public identifier, the one the API exposes. **/
+    @Column(name = "public_id", unique = true, nullable = false, updatable = false)
+    private UUID publicId;
+
+    @NotBlank(message = "El nombre es obligatorio")
+    @Column(nullable = false)
+    private String name;
+
+    @NotBlank(message = "La contraseña es obligatoria")
+    @Column(nullable = false)
+    private String password;
+
+    @NotBlank(message = "El email es obligatorio")
+    @Email(message = "El email no es válido")
+    @Column(name = "email", unique = true, nullable = false)
+    private String email;
+
+    /** How the account came to be: with its own password, or through Google (which has none). */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'LOCAL'")
+    @Column(name = "auth_provider", nullable = false, length = 20)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    /** Google's stable id for the linked Google account (the {@code sub} claim); null if not linked. */
+    @Column(name = "google_subject", unique = true)
+    private String googleSubject;
+
+    @Column(name = "profile_image")
+    private String profileImageUrl;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
+    /** The jobs this user asked for, as the client side of the job. */
     @Builder.Default
     @OneToMany(mappedBy = "client")
     private List<JobRequest> jobsRequested = new ArrayList<>();
+
+    public boolean isGoogleLinked() {
+        return googleSubject != null;
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void normalizeFields() {
+        if (this.publicId == null) {
+            this.publicId = UUID.randomUUID();
+        }
+        if (this.email != null) {
+            this.email = this.email.trim().toLowerCase();
+        }
+    }
 }

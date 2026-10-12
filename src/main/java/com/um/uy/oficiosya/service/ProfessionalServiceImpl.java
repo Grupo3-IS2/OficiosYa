@@ -11,12 +11,12 @@ import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.entity.Trade;
 import com.um.uy.oficiosya.exception.ExpertiseTradeNotFoundException;
 import com.um.uy.oficiosya.exception.TradeNotFoundException;
-import com.um.uy.oficiosya.exception.UserNotFoundException;
+import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.mapper.ProfessionalMapper;
 import com.um.uy.oficiosya.repository.ExpertiseTradeRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.TradeRepository;
-import com.um.uy.oficiosya.repository.UserRepository;
+import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,20 +36,20 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     private static final String PROFESSIONAL_NOT_FOUND = "Profesional no encontrado.";
 
     private final ProfessionalRepository professionalRepository;
-    private final UserRepository userRepository;
+    private final ClientRepository clientRepository;
     private final TradeRepository tradeRepository;
     private final ExpertiseTradeRepository expertiseTradeRepository;
     private final ProfessionalMapper professionalMapper;
     private final PasswordEncoder passwordEncoder;
 
     public ProfessionalServiceImpl(ProfessionalRepository professionalRepository,
-                                   UserRepository userRepository,
+                                   ClientRepository clientRepository,
                                    TradeRepository tradeRepository,
                                    ExpertiseTradeRepository expertiseTradeRepository,
                                    ProfessionalMapper professionalMapper,
                                    PasswordEncoder passwordEncoder) {
         this.professionalRepository = professionalRepository;
-        this.userRepository = userRepository;
+        this.clientRepository = clientRepository;
         this.tradeRepository = tradeRepository;
         this.expertiseTradeRepository = expertiseTradeRepository;
         this.professionalMapper = professionalMapper;
@@ -70,7 +70,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
     /** What both public methods do: they only differ in where the password hash comes from. */
     private ProfessionalResponse persist(ProfessionalCreateRequest professionalRequest, String encodedPassword) {
-        if (this.userRepository.existsByEmail(professionalRequest.getEmail())) {
+        if (this.clientRepository.existsByEmail(professionalRequest.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "No se pudo completar el registro. Verificá los datos e intentá nuevamente.");
         }
@@ -87,7 +87,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public ProfessionalResponse updateProfessional(ProfessionalUpdateRequest professionalRequest, UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
+                .orElseThrow(() -> new ClientNotFoundException(PROFESSIONAL_NOT_FOUND));
 
         if (professionalRequest.getName() != null && !professionalRequest.getName().isBlank()) {
             professional.setName(professionalRequest.getName());
@@ -113,7 +113,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional(readOnly = true)
     public ProfessionalResponse getProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
+                .orElseThrow(() -> new ClientNotFoundException(PROFESSIONAL_NOT_FOUND));
         return professionalMapper.toResponse(professional);
     }
 
@@ -122,7 +122,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     public ProfessionalPublicResponse getPublicProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
                 .filter(Professional::isPublished)
-                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
+                .orElseThrow(() -> new ClientNotFoundException(PROFESSIONAL_NOT_FOUND));
         return professionalMapper.toPublicResponse(professional);
     }
 
@@ -130,7 +130,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public void deleteProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
+                .orElseThrow(() -> new ClientNotFoundException(PROFESSIONAL_NOT_FOUND));
         professionalRepository.delete(professional);
     }
 
@@ -146,7 +146,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public ProfessionalResponse publishProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
+                .orElseThrow(() -> new ClientNotFoundException(PROFESSIONAL_NOT_FOUND));
 
         if (professional.getDescription() == null || professional.getDescription().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -167,7 +167,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public ProfessionalResponse unpublishProfessional(UUID id) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
+                .orElseThrow(() -> new ClientNotFoundException(PROFESSIONAL_NOT_FOUND));
 
         professional.setPublished(false);
         professional = professionalRepository.save(professional);
@@ -178,7 +178,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     @Transactional
     public ProfessionalResponse addExpertiseTrade(UUID professionalId, ExpertiseTradeCreateRequest request) {
         Professional professional = professionalRepository.findByPublicId(professionalId)
-                .orElseThrow(() -> new UserNotFoundException(PROFESSIONAL_NOT_FOUND));
+                .orElseThrow(() -> new ClientNotFoundException(PROFESSIONAL_NOT_FOUND));
 
         if (request.getMinimumHourlyWage().compareTo(request.getMaximumHourlyWage()) > 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,

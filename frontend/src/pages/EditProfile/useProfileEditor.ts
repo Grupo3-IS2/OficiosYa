@@ -276,11 +276,17 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                     }
                     // The email doesn't change here: this mails a code to the new address, and it
                     // changes when the code is entered (confirmEmailChange). Once started, saving the
-                    // rest of the section doesn't start it again.
+                    // rest of the section doesn't start it again. With verification off in the
+                    // backend there is no code and it already changed.
                     if (!emailChange && saved.email !== savedPersonal.email) {
                         if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
-                        setEmailChange(await startEmailChange({ newEmail: saved.email, currentPassword: emailPassword }))
-                        emailStarted = true
+                        const started = await startEmailChange({ newEmail: saved.email, currentPassword: emailPassword })
+                        if (started.verificationRequired) {
+                            setEmailChange(started)
+                            emailStarted = true
+                        } else {
+                            applyStoredEmail(started.email)
+                        }
                     }
                 }
                 // The saved email stays the current one while a change waits for its code.
@@ -306,6 +312,15 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             saving.current = false
             setBusy(false)
         }
+    }
+
+    /** Keeps the logged-in user's email in sync once it changed without a code. */
+    function applyStoredEmail(email: string) {
+        const current = getCurrentUser()
+        if (!current) return
+        const updated = { ...current, email }
+        setUser(updated)
+        updateStoredUser(updated)
     }
 
     /** Enters the code that reached the new address: the email changes. Throws the message to show if it doesn't. */

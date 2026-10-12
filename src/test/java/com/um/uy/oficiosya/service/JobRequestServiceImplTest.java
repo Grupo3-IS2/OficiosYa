@@ -421,6 +421,18 @@ class JobRequestServiceImplTest {
     }
 
     @Test
+    void requestReschedule_toTheSameTimeframe_isRejected() {
+        OffsetDateTime start = OffsetDateTime.now().plusDays(3);
+        scheduledJob(JobStatus.ACCEPTED, start);
+        JobRequestRescheduleRequest request = reschedule(start);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.requestReschedule(10L, request, clientId));
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        verify(scheduleService, never()).checkJobSlotAvailable(any(), any(), any());
+    }
+
+    @Test
     void requestReschedule_withLessThanTheNotice_isRejected() {
         scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusHours(5));
         JobRequestRescheduleRequest request = reschedule(OffsetDateTime.now().plusDays(5));

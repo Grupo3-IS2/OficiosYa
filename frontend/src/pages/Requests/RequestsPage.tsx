@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import BackNavigation from '../../components/BackNavigation/BackNavigation'
 import Button from '../../components/Button/Button'
 import Header from '../../components/Header/Header'
 import Icon from '../../components/Icon/Icon'
 import avatarPlaceholder from '../../assets/avatar-placeholder.svg'
+import { getCurrentUser } from '../../services/authService'
 import { getMyJobRequests } from '../../services/jobRequestService'
 import type { JobRequest, JobStatus } from '../../types/JobRequest'
 import { filterAndOrderRequests, groupRequestsByDate, localDateKey, requestDescription, serviceSummary, type RequestFilter, type RequestOrder } from './requestList'
 import RequestOrderControl from './RequestOrderControl'
+import RescheduleModal from './RescheduleModal'
+import RescheduleReviewModal from './RescheduleReviewModal'
+import { timeframeText } from './rescheduleTimeframe'
 import './RequestsPage.css'
 
 const filters: { value: RequestFilter; label: string }[] = [
@@ -18,16 +23,54 @@ const filters: { value: RequestFilter; label: string }[] = [
     { value: 'cancelled', label: 'Canceladas' },
 ]
 
-const statusContent: Record<JobStatus, { label: string; tone: string; detail?: (request: JobRequest) => string }> = {
+/** Which side of the request the viewer is on: /job-requests/mine returns both. */
+type Side = 'client' | 'professional'
+
+const statusContent: Record<JobStatus, { label: string; tone: string; detail?: (request: JobRequest, side: Side) => string }> = {
     PROPOSED: {
         label: 'Pendiente de respuesta',
         tone: 'pending',
-        detail: request => `Esperando que ${request.professionalName} revise tu solicitud.`,
+        detail: (request, side) => side === 'professional'
+            ? `${request.clientName} espera tu respuesta.`
+            : `Esperando que ${request.professionalName} revise tu solicitud.`,
     },
-    ACCEPTED: { label: 'Aceptada', tone: 'accepted' },
+    ACCEPTED: {
+        label: 'Aceptada',
+        tone: 'accepted',
+        detail: request => request.scheduledStart && request.scheduledEnd
+            ? `Programada para ${timeframeText(request.scheduledStart, request.scheduledEnd)}.`
+            : '',
+    },
+    RESCHEDULE_REQUESTED: {
+        label: 'Cambio de horario pendiente',
+        tone: 'pending',
+        detail: (request, side) => {
+            const proposed = request.rescheduleStart && request.rescheduleEnd
+                ? timeframeText(request.rescheduleStart, request.rescheduleEnd)
+                : null
+            if (side === 'professional') {
+                return proposed
+                    ? `${request.clientName} propone ${proposed}.`
+                    : `${request.clientName} pidió cambiar el horario.`
+            }
+            return proposed
+                ? `Propusiste ${proposed}. Esperando a ${request.professionalName}.`
+                : `Esperando que ${request.professionalName} responda.`
+        },
+    },
     COMPLETED: { label: 'Completada', tone: 'completed' },
     CANCELLED: { label: 'Cancelada', tone: 'cancelled' },
     REJECTED: { label: 'Rechazada', tone: 'cancelled' },
+}
+
+/** Why a request can't be rescheduled: only an accepted job has a timeframe to move. */
+const rescheduleUnavailable: Record<JobStatus, string> = {
+    PROPOSED: 'Podés reagendar una vez que el profesional acepte la solicitud.',
+    ACCEPTED: '',
+    RESCHEDULE_REQUESTED: 'Ya pediste un cambio de horario: esperá la respuesta del profesional.',
+    COMPLETED: 'El trabajo ya fue completado.',
+    CANCELLED: 'La solicitud fue cancelada.',
+    REJECTED: 'La solicitud fue rechazada.',
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-UY', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Montevideo' })
@@ -38,19 +81,30 @@ function groupHeading(dateKey: string): string {
     return dateKey === localDateKey(new Date().toISOString()) ? `Hoy · ${formatted}` : formatted
 }
 
-function RequestCard({ request }: { request: JobRequest }) {
+function RequestCard({ request, side, onReschedule, onReviewReschedule }: Readonly<{
+    request: JobRequest
+    side: Side
+    onReschedule: (request: JobRequest) => void
+    onReviewReschedule: (request: JobRequest) => void
+}>) {
     const status = statusContent[request.status]
+    const detail = status.detail?.(request, side)
+    const canReschedule = request.status === 'ACCEPTED'
+    const answersReschedule = side === 'professional' && request.status === 'RESCHEDULE_REQUESTED'
+    // The other side of the job: who the viewer is dealing with.
+    const otherName = side === 'professional' ? request.clientName : request.professionalName
+    const otherImage = side === 'professional' ? request.clientProfileImageUrl : request.professionalProfileImageUrl
 
     return <article className="request-card">
         <div className="request-card__professional">
             <img
-                src={request.professionalProfileImageUrl || avatarPlaceholder}
-                alt={`Foto de ${request.professionalName}`}
+                src={otherImage || avatarPlaceholder}
+                alt={`Foto de ${otherName}`}
                 onError={event => { event.currentTarget.src = avatarPlaceholder }}
             />
             <div className="request-card__copy">
                 <h3>{serviceSummary(request)}</h3>
-                <strong>{request.professionalName}</strong>
+                <strong>{otherName}</strong>
                 <p>{requestDescription(request)}</p>
                 <span><Icon name="location" />{request.location}</span>
             </div>
@@ -62,10 +116,15 @@ function RequestCard({ request }: { request: JobRequest }) {
         <div className={`request-card__status request-card__status--${status.tone}`}>
             <span className="request-card__status-dot" aria-hidden="true" />
             <strong>{status.label}</strong>
-            {status.detail && <p>{status.detail(request)}</p>}
+            {detail && <p>{detail}</p>}
         </div>
         <div className="request-card__action">
-            <Button type="button" aria-label={`Ver solicitud de ${request.professionalName}`}>Ver solicitud</Button>
+            <Button type="button" aria-label={`Ver solicitud de ${otherName}`}>Ver solicitud</Button>
+            {answersReschedule && <Button type="button" variant="ghost" aria-label={`Ver el cambio de horario que pidió ${otherName}`}
+                onClick={() => onReviewReschedule(request)}>Ver cambio</Button>}
+            {side === 'client' && <Button type="button" variant="ghost" aria-label={`Reagendar solicitud de ${otherName}`}
+                disabled={!canReschedule} title={canReschedule ? undefined : rescheduleUnavailable[request.status]}
+                onClick={() => onReschedule(request)}>Reagendar</Button>}
         </div>
     </article>
 }
@@ -76,6 +135,11 @@ export default function RequestsPage() {
     const [loadError, setLoadError] = useState(false)
     const [activeFilter, setActiveFilter] = useState<RequestFilter>('all')
     const [order, setOrder] = useState<RequestOrder>('newest')
+    const [rescheduling, setRescheduling] = useState<JobRequest | null>(null)
+    const [reviewing, setReviewing] = useState<JobRequest | null>(null)
+    const viewerId = getCurrentUser()?.id
+    const replaceRequest = (updated: JobRequest) =>
+        setRequests(previous => previous.map(item => item.id === updated.id ? { ...item, ...updated } : item))
     const groups = useMemo(() => groupRequestsByDate(filterAndOrderRequests(requests, activeFilter, order)), [requests, activeFilter, order])
 
     useEffect(() => {
@@ -125,10 +189,30 @@ export default function RequestsPage() {
                     : groups.map(group => <section className="request-group" key={group.dateKey}>
                         <h2>{groupHeading(group.dateKey)}</h2>
                         <div className="request-group__items">
-                            {group.requests.map(request => <RequestCard key={request.id} request={request} />)}
+                            {group.requests.map(request => <RequestCard key={request.id} request={request}
+                                side={request.professionalId === viewerId ? 'professional' : 'client'}
+                                onReschedule={setRescheduling} onReviewReschedule={setReviewing} />)}
                         </div>
                     </section>)}
             </section>
         </main>
+        {rescheduling && <RescheduleModal
+            request={rescheduling}
+            onClose={() => setRescheduling(null)}
+            onRescheduled={updated => {
+                replaceRequest(updated)
+                setRescheduling(null)
+            }}
+        />}
+        {reviewing && <RescheduleReviewModal
+            request={reviewing}
+            onClose={() => setReviewing(null)}
+            onAnswered={(updated, accepted) => {
+                replaceRequest(updated)
+                setReviewing(null)
+                if (accepted) toast.success('Cambio aceptado', { description: 'El trabajo pasó al nuevo horario.' })
+                else toast.error('Cambio rechazado', { description: 'Se mantiene el horario actual.' })
+            }}
+        />}
     </div>
 }

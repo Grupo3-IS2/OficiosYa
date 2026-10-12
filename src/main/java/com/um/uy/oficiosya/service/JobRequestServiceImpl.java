@@ -214,6 +214,7 @@ public class JobRequestServiceImpl implements JobRequestService {
 
         requireNotice(jobRequest, "reagendar");
         requireFuture(request.getStartTimestamp());
+        requireDifferentTimeframe(jobRequest, request.getStartTimestamp(), request.getEndTimestamp());
         // Fails early if the slot is already taken, rather than leaving the professional a request they can't approve
         scheduleService.checkJobSlotAvailable(jobRequest, request.getStartTimestamp(), request.getEndTimestamp());
 
@@ -376,6 +377,20 @@ public class JobRequestServiceImpl implements JobRequestService {
                             "No se puede " + action + " un trabajo con menos de " + minNotice.toHours()
                                     + " h de anticipación");
                 });
+    }
+
+    /** A reschedule to the timeframe already agreed would leave the professional nothing to decide. */
+    private static void requireDifferentTimeframe(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
+        boolean same = jobRequest.getSchedules().stream()
+                .filter(schedule -> schedule.getType() == ScheduleType.SCHEDULED_JOB)
+                .findFirst()
+                .map(schedule -> schedule.getStartTimestamp().isEqual(start) && schedule.getEndTimestamp().isEqual(end))
+                .orElse(false);
+
+        if (same) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El nuevo horario es igual al actual, elegí uno distinto");
+        }
     }
 
     private static String reason(String reason) {

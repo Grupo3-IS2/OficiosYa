@@ -20,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -28,6 +29,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -100,6 +102,18 @@ class ClientServiceImplEmailChangeTest {
         assertEquals(6, response.getCodeLength());
         assertEquals(900, response.getExpiresInSeconds());
         assertEquals(60, response.getResendCooldownSeconds());
+    }
+
+    @Test
+    void startEmailChange_withVerificationOff_changesTheEmailWithoutACode() {
+        ReflectionTestUtils.setField(service, "verificationEnabled", false);
+
+        PendingVerificationResponse response = service.startEmailChange(change(NEW_EMAIL, PASSWORD), user.getPublicId());
+
+        verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());
+        verify(clientRepository).save(user);
+        assertEquals(NEW_EMAIL, user.getEmail());
+        assertFalse(response.isVerificationRequired());
     }
 
     @Test

@@ -104,7 +104,11 @@ function Register() {
         },
       )
 
-      setPending(started)
+      if (started.verificationRequired) {
+        setPending(started)
+      } else {
+        globalThis.location.href = '/'
+      }
     } catch (error) {
       setErrorMessage(errorText(error, 'No se pudo crear la cuenta. Intentá nuevamente.'))
     } finally {

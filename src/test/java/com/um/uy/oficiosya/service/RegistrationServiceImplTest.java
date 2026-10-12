@@ -31,8 +31,10 @@ import tools.jackson.databind.json.JsonMapper;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -153,6 +155,42 @@ class RegistrationServiceImplTest {
         assertEquals(free, taken);
         // Only the second call sent a code.
         verify(emailVerificationService).sendCode(anyString(), any(), any(), anyString());
+    }
+
+    @Test
+    void startRegistration_withVerificationOff_createsTheAccountAndLogsInWithoutACode() {
+        ReflectionTestUtils.setField(service, "verificationEnabled", false);
+        UUID publicId = UUID.randomUUID();
+        Client client = Client.builder().publicId(publicId).name(NAME).email(EMAIL).password(HASH).build();
+
+        when(clientService.createUser(any(), eq(HASH))).thenReturn(clientResponse(publicId, Role.CLIENT));
+        when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(client));
+        when(jwtService.generateToken(client)).thenReturn("jwt-token");
+
+        PendingVerificationResponse response = service.startRegistration(clientRequest());
+
+        verifyNoInteractions(emailVerificationService);
+        assertFalse(response.isVerificationRequired());
+        assertEquals("jwt-token", response.getSession().getToken());
+        assertEquals(publicId, response.getSession().getId());
+    }
+
+    @Test
+    void warnIfVerificationIsOff_doesNotFailEitherWay() {
+        service.warnIfVerificationIsOff();
+        ReflectionTestUtils.setField(service, "verificationEnabled", false);
+
+        assertDoesNotThrow(service::warnIfVerificationIsOff);
+    }
+
+    @Test
+    void startRegistration_withVerificationOn_asksForTheCode() {
+        when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(false);
+
+        PendingVerificationResponse response = service.startRegistration(clientRequest());
+
+        assertTrue(response.isVerificationRequired());
+        assertNull(response.getSession());
     }
 
     // --- verifyEmail ---

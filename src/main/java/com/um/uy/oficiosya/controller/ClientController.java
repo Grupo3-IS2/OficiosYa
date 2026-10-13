@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.controller;
 
 import com.um.uy.oficiosya.config.AuthenticatedUser;
+import com.um.uy.oficiosya.config.RefreshTokenCookie;
 import com.um.uy.oficiosya.config.RequestRateLimiter;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
@@ -11,10 +12,12 @@ import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ClientUpdateRequest;
+import com.um.uy.oficiosya.service.interfaces.AuthService;
 import com.um.uy.oficiosya.service.interfaces.GoogleAuthService;
 import com.um.uy.oficiosya.service.interfaces.ClientService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,14 +34,21 @@ public class ClientController {
 
     private final RequestRateLimiter rateLimiter;
 
+    private final AuthService authService;
+
+    private final RefreshTokenCookie refreshTokenCookie;
+
     /** The endpoints that mail or check an email-change code share this per-client limit. */
     private static final String EMAIL_CHANGE_BUCKET = "email-change";
 
     public ClientController(ClientService clientService, GoogleAuthService googleAuthService,
-                            RequestRateLimiter rateLimiter) {
+                            RequestRateLimiter rateLimiter, AuthService authService,
+                            RefreshTokenCookie refreshTokenCookie) {
         this.clientService = clientService;
         this.googleAuthService = googleAuthService;
         this.rateLimiter = rateLimiter;
+        this.authService = authService;
+        this.refreshTokenCookie = refreshTokenCookie;
     }
 
     /**
@@ -89,11 +99,18 @@ public class ClientController {
                 .body(clientService.resendEmailChangeCode(resendRequest, AuthenticatedUser.id(authentication)));
     }
 
+    /**
+     * Also logs the user out of every other device. This one gets a new refresh token cookie: its
+     * access token stops working too, and the next request renews it with that cookie.
+     */
     @PutMapping("/me/password")
     public ResponseEntity<Void> changePassword(@Valid @RequestBody PasswordUpdateRequest passwordRequest,
                                                Authentication authentication) {
         clientService.changePassword(passwordRequest, AuthenticatedUser.id(authentication));
-        return ResponseEntity.noContent().build();
+        String refreshToken = authService.restartSessions(AuthenticatedUser.id(authentication));
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.create(refreshToken).toString())
+                .build();
     }
 
     /** Links a Google account so the user can sign in with it too. Needs the current password. */

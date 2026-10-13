@@ -43,6 +43,8 @@ services:
       JWT_PRIVATE_KEY_PATH: /app/keys/private_jwt.pem
       JWT_PUBLIC_KEY_PATH: /app/keys/public_jwt.pem
       JWT_EXPIRATION_TIME: ${JWT_EXPIRATION_TIME:-3600000}
+      REFRESH_TOKEN_EXPIRATION_DAYS: ${REFRESH_TOKEN_EXPIRATION_DAYS:-7}
+      REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-true}
       UPLOADS_DIR: /app/uploads
       # Default administrator, created on startup if it doesn't exist yet (see AdminSeeder).
       ADMIN_NAME: ${ADMIN_NAME:-Administrador}

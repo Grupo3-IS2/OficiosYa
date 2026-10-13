@@ -21,6 +21,8 @@ for (const session of ['absent', 'expired'] as const) {
       return route.fulfill({ json: { verified: true } });
     });
     if (session === 'expired') {
+      // The refresh cookie is gone too: the session is really over
+      await page.route('**/api/v1/auth/refresh', route => route.fulfill({ status: 401, json: { error: 'La sesión expiró' } }));
       await page.addInitScript(token => {
         if (window.location.pathname.startsWith('/profesionales/')) localStorage.setItem('oficiosya_token', token);
       }, fakeJwt(-60));
@@ -32,6 +34,29 @@ for (const session of ['absent', 'expired'] as const) {
     await expect(page.getByRole('button', { name: 'Solicitar servicio' })).toHaveCount(0);
   });
 }
+
+test('an expired access token is renewed with the refresh cookie and the profile opens', async ({ page }) => {
+  await mockProfileViewer(page);
+  let refreshes = 0;
+  await page.route('**/api/v1/auth/refresh', route => {
+    refreshes++;
+    return route.fulfill({ json: {
+      id: '33333333-3333-3333-3333-333333333333', token: fakeJwt(900), email: 'profile.viewer@qa.test',
+      name: 'Cliente Perfil QA', role: 'CLIENT', message: 'Sesión renovada',
+    } });
+  });
+  await page.route(`**/api/v1/professionals/${profileId}`, route => route.fulfill({ json: {
+    id: profileId, name: 'Profesional renovado', profileImageUrl: null, workingLocation: '',
+    description: 'Perfil de prueba', rating: null, expertiseTrades: [],
+  } }));
+  await page.addInitScript(token => {
+    if (window.location.pathname.startsWith('/profesionales/')) localStorage.setItem('oficiosya_token', token);
+  }, fakeJwt(-60));
+  await page.goto(profilePath);
+  await expect(page.getByRole('heading', { name: 'Profesional renovado' })).toBeVisible();
+  expect(refreshes).toBe(1);
+  await expect(page).toHaveURL(new RegExp(`${profilePath}$`));
+});
 
 test('a session rejected by the backend cannot open the profile and is cleared', async ({ page }) => {
   await mockProfileViewer(page);

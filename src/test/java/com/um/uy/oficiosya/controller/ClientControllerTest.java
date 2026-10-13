@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.controller;
 
+import com.um.uy.oficiosya.config.RefreshTokenCookie;
 import com.um.uy.oficiosya.config.RequestRateLimiter;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
@@ -9,12 +10,15 @@ import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
+import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
+import com.um.uy.oficiosya.service.interfaces.AuthService;
 import com.um.uy.oficiosya.service.interfaces.GoogleAuthService;
 import com.um.uy.oficiosya.service.interfaces.ClientService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,15 +31,18 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -50,6 +57,8 @@ class ClientControllerTest {
     private GoogleAuthService googleAuthService;
     @Mock
     private RequestRateLimiter rateLimiter;
+    @Mock
+    private AuthService authService;
 
     private MockMvc mvc;
     private final UUID userId = UUID.randomUUID();
@@ -63,7 +72,8 @@ class ClientControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         mvc = MockMvcBuilders
-                .standaloneSetup(new ClientController(clientService, googleAuthService, rateLimiter))
+                .standaloneSetup(new ClientController(clientService, googleAuthService, rateLimiter, authService,
+                        new RefreshTokenCookie(true, 7)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -183,5 +193,32 @@ class ClientControllerTest {
                         {"currentPassword":"ClaveSegura2026!"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.googleLinked").value(false));
+    }
+
+    // --- password ---
+
+    @Test
+    void changePassword_endsTheOtherSessionsAndKeepsThisDeviceLoggedIn() throws Exception {
+        when(authService.restartSessions(userId)).thenReturn("fresh-refresh");
+
+        mvc.perform(signedIn(put(BASE + "/password"), """
+                        {"oldPassword":"ClaveVieja2026!","newPassword":"ClaveNueva2026!","newPasswordConfirmation":"ClaveNueva2026!"}"""))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("oficiosya_refresh=fresh-refresh")));
+
+        verify(clientService).changePassword(any(PasswordUpdateRequest.class), eq(userId));
+        verify(authService).restartSessions(userId);
+    }
+
+    @Test
+    void changePassword_thatFails_endsNoSession() throws Exception {
+        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña actual es incorrecta"))
+                .when(clientService).changePassword(any(PasswordUpdateRequest.class), eq(userId));
+
+        mvc.perform(signedIn(put(BASE + "/password"), """
+                        {"oldPassword":"ClaveVieja2026!","newPassword":"ClaveNueva2026!","newPasswordConfirmation":"ClaveNueva2026!"}"""))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).restartSessions(any());
     }
 }

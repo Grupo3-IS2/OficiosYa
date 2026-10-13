@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { mockProfileViewer } from '../support/ui';
 
 /**
  * The map of a professional's zone, from OpenStreetMap. Nominatim (the search that turns the zone's
@@ -89,6 +90,9 @@ const zoneSection = (page: Page) => page.locator('section', { has: page.getByRol
 const mapOf = (page: Page) => zoneSection(page).getByRole('region', { name: /Mapa de la zona donde trabaja/ });
 
 test.describe('Mapa de la zona de trabajo (OpenStreetMap)', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockProfileViewer(page);
+  });
   test('UI: la zona se busca en Nominatim y se muestra el mapa con su marcador', async ({ page }) => {
     const mocks = await mockProfile(page, 'Cordón, Montevideo', { status: 200, body: montevideo });
 

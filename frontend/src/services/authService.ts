@@ -4,11 +4,11 @@ import {
   TOKEN_KEY,
   USER_KEY,
   clearSession,
-  expireSession,
   getToken,
-  getTokenExpiration,
   isTokenUsable,
+  storeLogin,
 } from './session'
+import { keepSessionFresh } from './sessionRenewal'
 import type {
   AccountType,
   LoginRequest,
@@ -20,18 +20,11 @@ import type {
   TokenResponse,
 } from '../types/Auth'
 
-// setTimeout overflows past this delay (~24.8 days) and would fire immediately.
-const MAX_TIMEOUT_DELAY = 2 ** 31 - 1
-
+/** A new login: the cached profile belonged to whoever was logged in before. */
 function storeSession(response: LoginResponse): void {
-  localStorage.setItem(TOKEN_KEY, response.token)
-  localStorage.setItem(USER_KEY, JSON.stringify({
-    id: response.id,
-    email: response.email,
-    name: response.name,
-    role: response.role,
-  }))
+  storeLogin(response)
   localStorage.removeItem(PROFILE_KEY)
+  keepSessionFresh()
 }
 
 export async function login(request: LoginRequest): Promise<LoginResponse> {
@@ -147,15 +140,14 @@ export async function verifyToken(): Promise<TokenResponse> {
 }
 
 /**
- * Revokes the token on the backend before dropping it here, so a copy of it stops working too.
+ * Revokes the session on the backend before dropping it here, so a copy of a token stops working
+ * too. It goes even if the access token expired: the refresh cookie says whose session it is.
  * The local session is cleared even if that call fails: the user asked to leave.
  */
 export async function logout(): Promise<void> {
-  if (isTokenUsable(getToken())) {
-    try {
-      await apiRequest<unknown>('/auth/logout', { method: 'POST' })
-    } catch { /* already invalid or backend unreachable: clearing locally is all that is left */ }
-  }
+  try {
+    await apiRequest<unknown>('/auth/logout', { method: 'POST' })
+  } catch { /* already invalid or backend unreachable: clearing locally is all that is left */ }
   clearSession()
 }
 
@@ -169,23 +161,15 @@ export function watchSessionFromOtherTabs(): void {
   })
 }
 
-/** Ends the session on its own when the token expires, even if the tab is left open. */
-export function scheduleSessionExpiry(): void {
-  const token = getToken()
-  if (!isTokenUsable(token)) return
-
-  const delay = getTokenExpiration(token!)! - Date.now()
-  if (delay <= MAX_TIMEOUT_DELAY) {
-    window.setTimeout(expireSession, delay)
-  }
-}
-
 export function updateStoredUser(user: StoredUser): void {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
   localStorage.removeItem(PROFILE_KEY)
 }
 
-/** Local check only: the token exists and has not expired. The backend has the final word. */
+/**
+ * Local check only: the token exists and has not expired. The backend has the final word. An open
+ * tab renews the token before it expires (keepSessionFresh), so a live session stays authenticated.
+ */
 export function isAuthenticated(): boolean {
   return isTokenUsable(getToken())
 }

@@ -1,9 +1,25 @@
+import type { LoginResponse } from '../types/Auth'
+
 export const TOKEN_KEY = 'oficiosya_token'
 export const USER_KEY = 'oficiosya_user'
 export const PROFILE_KEY = 'oficiosya_profile'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
+}
+
+/**
+ * Keeps the access token and who it belongs to. The refresh token never gets here: it lives in an
+ * HttpOnly cookie that only the browser and the backend see.
+ */
+export function storeLogin(response: LoginResponse): void {
+  localStorage.setItem(TOKEN_KEY, response.token)
+  localStorage.setItem(USER_KEY, JSON.stringify({
+    id: response.id,
+    email: response.email,
+    name: response.name,
+    role: response.role,
+  }))
 }
 
 export function clearSession(): void {

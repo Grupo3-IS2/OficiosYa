@@ -9,6 +9,7 @@ for (const session of ['guest', 'authenticated', 'expired'] as const) {
         localStorage.setItem('oficiosya_user', JSON.stringify({ id: 'client-id', name: 'Cliente QA', email: 'client@qa.test', role: 'CLIENT' }));
       }, fakeJwt(session === 'expired' ? -60 : 3600));
     }
+    await page.route('**/api/v1/auth/refresh', route => route.fulfill({ status: 401, json: { error: 'La sesión expiró' } }));
     await page.route('**/api/v1/trades', route => route.fulfill({ json: [] }));
     await page.route('**/api/v1/professionals/search**', route => route.fulfill({ json: {
       totalPages: 1,

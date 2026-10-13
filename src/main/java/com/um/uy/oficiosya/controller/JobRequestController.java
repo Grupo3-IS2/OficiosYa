@@ -8,8 +8,10 @@ import com.um.uy.oficiosya.dto.request.JobRequestCreateRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestRejectRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
+import com.um.uy.oficiosya.dto.response.ConversationResponse;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.entity.JobStatus;
+import com.um.uy.oficiosya.service.interfaces.ChatService;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -32,9 +34,11 @@ import java.util.List;
 public class JobRequestController {
 
     private final JobRequestService jobRequestService;
+    private final ChatService chatService;
 
-    public JobRequestController(JobRequestService jobRequestService) {
+    public JobRequestController(JobRequestService jobRequestService, ChatService chatService) {
         this.jobRequestService = jobRequestService;
+        this.chatService = chatService;
     }
 
     /**
@@ -116,6 +120,18 @@ public class JobRequestController {
                                                                  @PathVariable Long id,
                                                                  Authentication authentication) {
         return ResponseEntity.ok(jobRequestService.reviewJobRequest(id, request, AuthenticatedUser.id(authentication)));
+    }
+
+    /**
+     * The chat between the job's two sides, in any status of the job: 201 if the conversation is new,
+     * 200 if the pair already had one (from the profile or from another job). Same conversation API as
+     * ConversationController from then on.
+     */
+    @PreAuthorize("hasRole('CLIENT')")
+    @PostMapping("/{id}/conversation")
+    public ResponseEntity<ConversationResponse> openConversation(@PathVariable Long id, Authentication authentication) {
+        return ConversationController.foundOrCreated(
+                chatService.openForJobRequest(id, AuthenticatedUser.id(authentication)));
     }
 
     /** Either party involved in the job can look it up. */

@@ -69,7 +69,7 @@ export default function GoogleAccountSection({ access, email, onChange }: {
                 <>
                     <p className="profile-subtitle">
                         {googleLinked
-                            ? 'Tu cuenta está vinculada con Google: podés entrar con un solo click o con tu correo y contraseña.'
+                            ? 'Tu cuenta está vinculada con Google: puedes entrar con un solo click o con tu correo y contraseña.'
                             : `Vinculá tu cuenta con Google para entrar más rápido. Tiene que ser la cuenta de Google de ${email}. Es opcional: seguís pudiendo entrar con tu correo y contraseña.`}
                     </p>
                     <div className="profile-field">

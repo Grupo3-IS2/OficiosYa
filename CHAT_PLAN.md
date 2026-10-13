@@ -299,7 +299,7 @@ Y cambios en lo existente (§5.6): `JobRequest.proposedBy`, `proposedStart`/`pro
   "id": 12,
   "otherParticipant": { "id": "uuid", "name": "Ana Pérez", "profileImageUrl": "/uploads/...", "role": "PROFESSIONAL" },
   "myRole": "CLIENT",
-  "lastMessagePreview": "¿Podés el jueves?",
+  "lastMessagePreview": "¿Puedes el jueves?",
   "lastMessageAt": "2026-10-12T21:30:00-03:00",
   "unreadCount": 2,
   "canWrite": true,
@@ -851,7 +851,7 @@ Lo mínimo que necesita quien haga la UI:
     texto en el campo para que lo edite (no se guardó).
 11. **Bloquear:** en el menú de la conversación, "Bloquear" (`POST …/block`) o, si `blockedByMe`,
     "Desbloquear" (`DELETE …/block`). Con `canWrite: false`, campo deshabilitado y sin "Proponer
-    trabajo"; el aviso dice "Bloqueaste esta conversación" o "No podés escribir en esta conversación"
+    trabajo"; el aviso dice "Bloqueaste esta conversación" o "No puedes escribir en esta conversación"
     según `blockedByMe`.
 
 **Propuestas de trabajo**

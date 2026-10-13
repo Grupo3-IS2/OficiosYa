@@ -97,7 +97,7 @@ public class JobRequestServiceImpl implements JobRequestService {
 
         // A professional can request jobs like any client, just not to themselves
         if (professional.getPublicId().equals(client.getPublicId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No podés solicitarte un trabajo a vos mismo");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No puedes solicitarte un trabajo a vos mismo");
         }
 
         String pin = generatePin();

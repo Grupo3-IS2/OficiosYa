@@ -65,7 +65,7 @@ const statusContent: Record<JobStatus, { label: string; tone: string; detail?: (
 
 /** Why a request can't be rescheduled: only an accepted job has a timeframe to move. */
 const rescheduleUnavailable: Record<JobStatus, string> = {
-    PROPOSED: 'Podés reagendar una vez que el profesional acepte la solicitud.',
+    PROPOSED: 'Puedes reagendar una vez que el profesional acepte la solicitud.',
     ACCEPTED: '',
     RESCHEDULE_REQUESTED: 'Ya pediste un cambio de horario: esperá la respuesta del profesional.',
     COMPLETED: 'El trabajo ya fue completado.',

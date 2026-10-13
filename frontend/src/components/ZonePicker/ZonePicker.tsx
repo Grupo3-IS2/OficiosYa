@@ -129,7 +129,7 @@ function ZonePicker({ query, onChoose, locateSaved = false }: Readonly<ZonePicke
       {suggesting === 'loading' && <output className="zone-picker__note">Buscando…</output>}
       {suggesting === 'none' && <output className="zone-picker__note">No encontramos ese lugar. Probá con el barrio y la ciudad, por ejemplo «Cordón, Montevideo».</output>}
       {status === 'outside' && <output className="zone-picker__note">Elegí un lugar dentro de Uruguay.</output>}
-      {(status === 'error' || suggesting === 'error') && <p className="zone-picker__note" role="alert">No pudimos buscar en el mapa en este momento. Podés escribir tu zona a mano.</p>}
+      {(status === 'error' || suggesting === 'error') && <p className="zone-picker__note" role="alert">No pudimos buscar en el mapa en este momento. Puedes escribir tu zona a mano.</p>}
     </div>
   )
 }

@@ -247,7 +247,7 @@ test.describe('Registro con código por correo', () => {
     await page.route('**/api/v1/auth/register-client', (route) => route.fulfill({
       status: 202,
       contentType: 'application/json',
-      body: JSON.stringify({ email: 'ui.digitos@qa.test', message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
+      body: JSON.stringify({ email: 'ui.digitos@qa.test', verificationRequired: true, message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
     }));
     await page.goto(`${FRONTEND_BASE}/register`);
     await page.locator('#register-name').fill('Usuario Digitos');
@@ -266,7 +266,7 @@ test.describe('Registro con código por correo', () => {
     await page.route('**/api/v1/auth/register-client', (route) => route.fulfill({
       status: 202,
       contentType: 'application/json',
-      body: JSON.stringify({ email: 'ui.cambia@qa.test', message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
+      body: JSON.stringify({ email: 'ui.cambia@qa.test', verificationRequired: true, message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
     }));
     await page.goto(`${FRONTEND_BASE}/register`);
     await page.locator('#register-name').fill('Usuario Cambia Correo');

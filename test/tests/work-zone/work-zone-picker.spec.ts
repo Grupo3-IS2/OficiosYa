@@ -311,7 +311,7 @@ test.describe('Elegir la zona en el mapa al registrarse', () => {
       await route.fulfill({
         status: 202,
         contentType: 'application/json',
-        body: JSON.stringify({ email: 'pro.mapa@qa.test', message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
+        body: JSON.stringify({ email: 'pro.mapa@qa.test', verificationRequired: true, message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
       });
     });
     await openProfessionalForm(page);

@@ -110,6 +110,39 @@
   font-size: 18px;
 }
 
+.profile-summary__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-summary__actions > span:not(.visually-hidden) { display: block; }
+.profile-summary__actions > span:not(.visually-hidden) .button { width: 100%; }
+.profile-summary__actions .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.profile-summary__actions .button .icon { width: 20px; height: 20px; }
+
+.profile-summary__actions .profile-summary__chat {
+  border: 1px solid #0b8c4b;
+  color: #0b8c4b;
+  background: #fff;
+}
+
+.profile-summary__actions .profile-summary__chat:disabled {
+  border-color: #a8b6ad;
+  color: #718078;
+  background: #fff;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .profile-summary__action .button:disabled {
   color: #566579;
   background: #edf1f3;
@@ -306,7 +339,7 @@
   .profile-summary__avatar { width: 132px; }
   .profile-summary__identity h1 { font-size: 36px; letter-spacing: -1px; }
   .profile-summary__action { grid-column: 1 / -1; min-width: 0; flex-direction: row; align-items: center; justify-content: space-between; }
-  .profile-summary__action .button { min-width: 220px; }
+  .profile-summary__actions { min-width: 220px; }
 }
 
 @media (max-width: 520px) {
@@ -325,6 +358,7 @@
   .profile-summary__action { align-items: stretch; flex-direction: column; gap: 16px; }
   .profile-summary__price strong { font-size: 34px; }
   .profile-summary__action .button { width: 100%; min-width: 0; }
+  .profile-summary__actions { min-width: 0; }
   .public-profile-section { padding: 26px 0; }
   .public-profile-section h2 { font-size: 26px; }
   .profile-about p, .public-profile-section__intro, .profile-empty { font-size: 15px; }

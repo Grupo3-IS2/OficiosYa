@@ -1,5 +1,12 @@
-import type { JobRequest } from '../types/JobRequest'
+import type { CreatedJobRequest, CreateJobRequestPayload, JobRequest } from '../types/JobRequest'
 import { apiRequest } from './api'
+
+export function createJobRequest(payload: CreateJobRequestPayload): Promise<CreatedJobRequest> {
+    return apiRequest<CreatedJobRequest>('/job-requests', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    })
+}
 
 export function getMyJobRequests(): Promise<JobRequest[]> {
     return apiRequest<JobRequest[]>('/job-requests/mine')

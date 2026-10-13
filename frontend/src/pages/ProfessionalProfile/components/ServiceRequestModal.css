@@ -4,6 +4,7 @@
   margin: auto;
   padding: 0;
   overflow: hidden;
+  overscroll-behavior: contain;
   border: 1px solid #dfe7ee;
   border-radius: 14px;
   color: #102557;
@@ -90,6 +91,7 @@
   color: #1a2d4e;
   background: #fff;
   outline: none;
+  font: inherit;
   transition: border-color .2s ease, box-shadow .2s ease;
 }
 

@@ -9,7 +9,7 @@ interface ProfessionalProfileHeaderProps {
     onRequestService: () => void
 }
 
-function ProfessionalProfileHeader({ professional, selectedTrade, onRequestService }: ProfessionalProfileHeaderProps) {
+function ProfessionalProfileHeader({ professional, selectedTrade, onRequestService }: Readonly<ProfessionalProfileHeaderProps>) {
     const startingPrice = selectedTrade?.minimumHourlyWage ?? (professional.expertiseTrades.length > 0
         ? Math.min(...professional.expertiseTrades.map(trade => trade.minimumHourlyWage))
         : null)
@@ -41,13 +41,27 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                         <strong>${startingPrice.toLocaleString('es-UY')}</strong>
                     </span>
                 )}
-                <Button
-                    type="button"
-                    disabled={professional.expertiseTrades.length === 0}
-                    onClick={onRequestService}
-                >
-                    {professional.expertiseTrades.length === 0 ? 'Sin servicios disponibles' : 'Solicitar servicio'}
-                </Button>
+                <div className="profile-summary__actions">
+                    <span title="El chat estará disponible próximamente">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="profile-summary__chat"
+                            disabled
+                            aria-describedby="chat-coming-soon"
+                        >
+                            <Icon name="message" /> Hablar por chat
+                        </Button>
+                    </span>
+                    <span id="chat-coming-soon" className="visually-hidden">Chat disponible próximamente.</span>
+                    <Button
+                        type="button"
+                        disabled={selectedTrade === null}
+                        onClick={onRequestService}
+                    >
+                        Solicitar servicio
+                    </Button>
+                </div>
             </div>
         </section>
     )

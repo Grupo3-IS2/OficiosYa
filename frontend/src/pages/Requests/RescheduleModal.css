@@ -25,7 +25,8 @@
 .reschedule-review__timeframe--proposed { border-color: #b9e6cc; background: #eef9f2; }
 .reschedule-review__timeframe--proposed .reschedule-review__changed { color: #078f4a; font-weight: 700; }
 .reschedule-review__arrow { align-self: center; color: #7380ae; font-size: 20px; }
-.reschedule-review__close { grid-column: 1 / -1; justify-self: center; border: 0; padding: 4px 8px; color: #68758a; background: none; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
+.reschedule-modal .reschedule-modal__reject { background: #c64e56; }
+.reschedule-modal .reschedule-modal__reject:hover { box-shadow: 0 8px 18px rgb(198 78 86 / 22%); }
 @media (max-width: 420px) {
   .reschedule-review__comparison { grid-template-columns: 1fr; }
   .reschedule-review__arrow { justify-self: center; transform: rotate(90deg); }

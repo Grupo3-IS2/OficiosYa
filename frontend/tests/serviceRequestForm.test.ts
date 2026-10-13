@@ -17,7 +17,13 @@ function validForm(): ServiceRequestFormValue {
 
 test('uses the selected professional trade as the first task', () => {
     assert.equal(initialTradeId([2, 4, 7], 4), 4)
-    assert.equal(initialTradeId([2, 4, 7], 9), 2)
+})
+
+test('without a trade chosen, the only one there is, or none so the client picks it', () => {
+    assert.equal(initialTradeId([4], null), 4)
+    assert.equal(initialTradeId([2, 4, 7], null), 0)
+    // A trade the professional no longer offers counts as none chosen
+    assert.equal(initialTradeId([2, 4, 7], 9), 0)
     assert.equal(initialTradeId([], null), 0)
 })
 

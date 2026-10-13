@@ -281,6 +281,43 @@ test.describe('Elegir la zona en el mapa al registrarse', () => {
     expect(Number(mocks.reverses[0].searchParams.get('lat'))).toBeLessThan(-29);
   });
 
+  test('UI: mientras busca qué lugar es el punto tocado, avisa que está buscando coincidencias', async ({ page }) => {
+    await mockMaps(page, { reverse: cordon });
+    let answerReverse!: () => void;
+    const reverseHeld = new Promise<void>(resolve => { answerReverse = resolve; });
+    // Registered after mockMaps, so it answers first: it holds the reply until the note has been seen
+    await page.route('https://nominatim.openstreetmap.org/reverse**', async route => {
+      await reverseHeld;
+      await route.fallback();
+    });
+    await openProfessionalForm(page);
+
+    await picker(page).click({ position: { x: 150, y: 120 } });
+    await expect(page.getByText('Buscando coincidencias para ese punto del mapa…')).toBeVisible();
+
+    answerReverse();
+    await expect(page.locator('#register-location')).toHaveValue('Cordón, Montevideo');
+    await expect(page.getByText('Buscando coincidencias para ese punto del mapa…')).toHaveCount(0);
+  });
+
+  test('UI: mientras busca lo que se escribe, avisa que está buscando coincidencias', async ({ page }) => {
+    await mockMaps(page, { suggest: suggestions(photonCordon) });
+    let answerSuggest!: () => void;
+    const suggestHeld = new Promise<void>(resolve => { answerSuggest = resolve; });
+    await page.route('https://photon.komoot.io/api/**', async route => {
+      await suggestHeld;
+      await route.fallback();
+    });
+    await openProfessionalForm(page);
+
+    await page.locator('#register-location').fill('Cordón');
+    await expect(page.getByText('Buscando coincidencias…')).toBeVisible();
+
+    answerSuggest();
+    await expect(suggestedPlaces(page).getByRole('button', { name: /Cordón/ })).toBeVisible();
+    await expect(page.getByText('Buscando coincidencias…')).toHaveCount(0);
+  });
+
   test('UI: un punto fuera de Uruguay se rechaza y el campo queda como estaba', async ({ page }) => {
     await mockMaps(page, { reverse: { ...cordon, address: { city: 'Buenos Aires', country_code: 'ar' } } });
     await openProfessionalForm(page);

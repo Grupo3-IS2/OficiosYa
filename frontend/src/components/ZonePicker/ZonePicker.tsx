@@ -13,6 +13,8 @@ interface ZonePickerProps {
    * a value (it may arrive after the form is drawn); what is typed afterwards is suggested as usual.
    */
   locateSaved?: boolean
+  /** What a screen reader says the map is for. */
+  mapLabel?: string
 }
 
 /** Tapping the map: what is being asked and how it went. */
@@ -29,7 +31,7 @@ const MIN_LETTERS = 3
  * Photon, which is made for it); picking one, or tapping the map, puts its name in the field. It doesn't
  * replace typing the zone by hand, it helps to find it.
  */
-function ZonePicker({ query, onChoose, locateSaved = false }: Readonly<ZonePickerProps>) {
+function ZonePicker({ query, onChoose, locateSaved = false, mapLabel = 'Mapa para elegir tu zona de trabajo' }: Readonly<ZonePickerProps>) {
   const [choices, setChoices] = useState<ZoneChoice[]>([])
   const [focus, setFocus] = useState<MapFocus | null>(null)
   const [status, setStatus] = useState<Status>('idle')
@@ -124,12 +126,14 @@ function ZonePicker({ query, onChoose, locateSaved = false }: Readonly<ZonePicke
         </ul>
       )}
 
-      <ZoneMap focus={focus} onPick={(lat, lon, zoom) => void pick(lat, lon, zoom)} label="Mapa para elegir tu zona de trabajo" />
+      <ZoneMap focus={focus} onPick={(lat, lon, zoom) => void pick(lat, lon, zoom)} label={mapLabel} />
 
-      {suggesting === 'loading' && <output className="zone-picker__note">Buscando…</output>}
+      {suggesting === 'loading' && <output className="zone-picker__note zone-picker__note--busy">Buscando coincidencias…</output>}
+      {/* Finding the name of a tapped point takes a moment: say so, so the tap doesn't look ignored */}
+      {status === 'searching' && <output className="zone-picker__note zone-picker__note--busy">Buscando coincidencias para ese punto del mapa…</output>}
       {suggesting === 'none' && <output className="zone-picker__note">No encontramos ese lugar. Probá con el barrio y la ciudad, por ejemplo «Cordón, Montevideo».</output>}
       {status === 'outside' && <output className="zone-picker__note">Elegí un lugar dentro de Uruguay.</output>}
-      {(status === 'error' || suggesting === 'error') && <p className="zone-picker__note" role="alert">No pudimos buscar en el mapa en este momento. Puedes escribir tu zona a mano.</p>}
+      {(status === 'error' || suggesting === 'error') && <p className="zone-picker__note" role="alert">No pudimos buscar en el mapa en este momento. Puedes escribir la ubicación a mano.</p>}
     </div>
   )
 }

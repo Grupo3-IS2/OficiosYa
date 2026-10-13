@@ -26,11 +26,11 @@ public interface JobRequestService {
     JobRequestResponse cancelJobRequest(Long id, JobRequestCancelRequest request, UUID requesterId);
 
     /** The client asks to move an ACCEPTED job; it stays at its original time until the professional approves. */
-    JobRequestResponse requestReschedule(Long id, JobRequestRescheduleRequest request, UUID clientId);
+    JobRequestResponse requestReschedule(Long id, JobRequestRescheduleRequest request, UUID requesterId);
     /** The professional approves the client's new timeframe, which moves the job's agenda block. */
-    JobRequestResponse acceptReschedule(Long id, UUID professionalId);
+    JobRequestResponse acceptReschedule(Long id, UUID requesterId);
     /** The professional turns down the new timeframe; the job stays at its original one. */
-    JobRequestResponse rejectReschedule(Long id, UUID professionalId);
+    JobRequestResponse rejectReschedule(Long id, UUID requesterId);
 
     /** The professional enters the client's PIN on site; this is what moves the job to COMPLETED. */
     JobRequestResponse completeJobRequest(Long id, JobRequestCompleteRequest request, UUID professionalId);

@@ -39,9 +39,11 @@ public class JobRequestResponse {
     private OffsetDateTime scheduledStart;
     private OffsetDateTime scheduledEnd;
 
-    /** The new timeframe the client asked for; only set while RESCHEDULE_REQUESTED. */
+    /** The new timeframe one side asked for; only set while RESCHEDULE_REQUESTED. */
     private OffsetDateTime rescheduleStart;
     private OffsetDateTime rescheduleEnd;
+    /** Who asked for it (CLIENT or PROFESSIONAL): the other side answers. Only set while RESCHEDULE_REQUESTED. */
+    private Role rescheduleRequestedBy;
 
     private String rejectionReason;
     /** Which side cancelled it (CLIENT or PROFESSIONAL); null unless CANCELLED. */

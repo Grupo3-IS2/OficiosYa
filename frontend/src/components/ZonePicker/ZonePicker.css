@@ -9,3 +9,7 @@
 .zone-picker__choices small { color: #5b6a7d; font-size: 12px; }
 
 .zone-picker__note { margin: 8px 0 0; color: #5b6a7d; font-size: 13px; }
+.zone-picker__note--busy { display: flex; align-items: center; gap: 8px; }
+.zone-picker__note--busy::before { content: ''; flex: 0 0 auto; width: 12px; height: 12px; border: 2px solid #c9e8d6; border-top-color: #00ad5b; border-radius: 50%; animation: zone-picker-spin .8s linear infinite; }
+@keyframes zone-picker-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .zone-picker__note--busy::before { animation: none; } }

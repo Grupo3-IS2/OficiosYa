@@ -54,9 +54,11 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                         </Button>
                     </span>
                     <span id="chat-coming-soon" className="visually-hidden">Chat disponible próximamente.</span>
+                    {/* The service is chosen in the request itself, if it wasn't chosen on the profile already */}
                     <Button
                         type="button"
-                        disabled={selectedTrade === null}
+                        disabled={professional.expertiseTrades.length === 0}
+                        title={professional.expertiseTrades.length === 0 ? 'Este profesional todavía no publicó servicios.' : undefined}
                         onClick={onRequestService}
                     >
                         Solicitar servicio

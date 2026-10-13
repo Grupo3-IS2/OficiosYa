@@ -383,7 +383,7 @@ class JobRequestServiceImplTest {
     }
 
     @Test
-    void requestReschedule_keepsTheProposalUntilTheProfessionalAnswers() {
+    void requestReschedule_byTheClient_keepsTheProposalUntilTheProfessionalAnswers() {
         JobRequest job = scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusDays(3));
         OffsetDateTime newStart = OffsetDateTime.now().plusDays(5);
 
@@ -392,16 +392,37 @@ class JobRequestServiceImplTest {
         assertEquals(JobStatus.RESCHEDULE_REQUESTED, response.getStatus());
         assertEquals(newStart, response.getRescheduleStart());
         assertEquals(newStart.plusHours(2), response.getRescheduleEnd());
+        assertEquals(Role.CLIENT, response.getRescheduleRequestedBy());
         verify(scheduleService).checkJobSlotAvailable(job, newStart, newStart.plusHours(2));
         verify(scheduleService, never()).moveJobSchedule(any(), any(), any());
     }
 
     @Test
-    void requestReschedule_byTheProfessional_isForbidden() {
+    void requestReschedule_byTheProfessional_isTheirProposalForTheClientToAnswer() {
+        JobRequest job = scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusDays(3));
+        OffsetDateTime newStart = OffsetDateTime.now().plusDays(5);
+
+        JobRequestResponse response = service.requestReschedule(10L, reschedule(newStart), professionalId);
+
+        assertEquals(JobStatus.RESCHEDULE_REQUESTED, response.getStatus());
+        assertEquals(Role.PROFESSIONAL, response.getRescheduleRequestedBy());
+        verify(scheduleService).checkJobSlotAvailable(job, newStart, newStart.plusHours(2));
+    }
+
+    @Test
+    void requestReschedule_bySomeoneOutsideTheJob_isForbidden() {
         scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusDays(3));
         JobRequestRescheduleRequest request = reschedule(OffsetDateTime.now().plusDays(5));
 
-        assertThrows(AccessDeniedException.class, () -> service.requestReschedule(10L, request, professionalId));
+        assertThrows(AccessDeniedException.class, () -> service.requestReschedule(10L, request, strangerId));
+    }
+
+    @Test
+    void requestReschedule_byTheProfessional_withLessThanTheNotice_isRejectedToo() {
+        scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusHours(5));
+        JobRequestRescheduleRequest request = reschedule(OffsetDateTime.now().plusDays(5));
+
+        assertThrows(ResponseStatusException.class, () -> service.requestReschedule(10L, request, professionalId));
     }
 
     @Test
@@ -452,18 +473,68 @@ class JobRequestServiceImplTest {
         assertNull(job.getRescheduleStart());
     }
 
-    @Test
-    void acceptReschedule_movesTheAgendaBlockAndGoesBackToAccepted() {
+    /** A pending reschedule asked for by {@code requestedBy}; null is one from before either side could ask. */
+    private JobRequest pendingReschedule(Role requestedBy, OffsetDateTime newStart) {
         JobRequest job = scheduledJob(JobStatus.RESCHEDULE_REQUESTED, OffsetDateTime.now().plusDays(3));
-        OffsetDateTime newStart = OffsetDateTime.now().plusDays(5);
         job.setRescheduleStart(newStart);
         job.setRescheduleEnd(newStart.plusHours(2));
+        job.setRescheduleRequestedBy(requestedBy);
+        return job;
+    }
+
+    @Test
+    void acceptReschedule_movesTheAgendaBlockAndGoesBackToAccepted() {
+        OffsetDateTime newStart = OffsetDateTime.now().plusDays(5);
+        JobRequest job = pendingReschedule(Role.CLIENT, newStart);
 
         JobRequestResponse response = service.acceptReschedule(10L, professionalId);
 
         verify(scheduleService).moveJobSchedule(job, newStart, newStart.plusHours(2));
         assertEquals(JobStatus.ACCEPTED, response.getStatus());
         assertNull(response.getRescheduleStart());
+        assertNull(response.getRescheduleRequestedBy());
+    }
+
+    @Test
+    void acceptReschedule_ofTheProfessionalsProposal_isTheClientsToAnswer() {
+        OffsetDateTime newStart = OffsetDateTime.now().plusDays(5);
+        JobRequest job = pendingReschedule(Role.PROFESSIONAL, newStart);
+
+        JobRequestResponse response = service.acceptReschedule(10L, clientId);
+
+        verify(scheduleService).moveJobSchedule(job, newStart, newStart.plusHours(2));
+        assertEquals(JobStatus.ACCEPTED, response.getStatus());
+    }
+
+    @Test
+    void answeringYourOwnReschedule_isForbidden_whicheverSideAskedForIt() {
+        pendingReschedule(Role.PROFESSIONAL, OffsetDateTime.now().plusDays(5));
+        assertThrows(AccessDeniedException.class, () -> service.acceptReschedule(10L, professionalId));
+        assertThrows(AccessDeniedException.class, () -> service.rejectReschedule(10L, professionalId));
+
+        pendingReschedule(Role.CLIENT, OffsetDateTime.now().plusDays(5));
+        assertThrows(AccessDeniedException.class, () -> service.acceptReschedule(10L, clientId));
+        assertThrows(AccessDeniedException.class, () -> service.rejectReschedule(10L, clientId));
+        verify(scheduleService, never()).moveJobSchedule(any(), any(), any());
+    }
+
+    @Test
+    void aRescheduleFromBeforeEitherSideCouldAsk_isTheClients_soTheProfessionalAnswersIt() {
+        OffsetDateTime newStart = OffsetDateTime.now().plusDays(5);
+        JobRequest job = pendingReschedule(null, newStart);
+
+        assertThrows(AccessDeniedException.class, () -> service.acceptReschedule(10L, clientId));
+        service.acceptReschedule(10L, professionalId);
+
+        verify(scheduleService).moveJobSchedule(job, newStart, newStart.plusHours(2));
+    }
+
+    @Test
+    void answeringAReschedule_bySomeoneOutsideTheJob_isForbidden() {
+        pendingReschedule(Role.CLIENT, OffsetDateTime.now().plusDays(5));
+
+        assertThrows(AccessDeniedException.class, () -> service.acceptReschedule(10L, strangerId));
+        assertThrows(AccessDeniedException.class, () -> service.rejectReschedule(10L, strangerId));
     }
 
     @Test
@@ -474,13 +545,6 @@ class JobRequestServiceImplTest {
 
         assertThrows(ResponseStatusException.class, () -> service.acceptReschedule(10L, professionalId));
         verify(scheduleService, never()).moveJobSchedule(any(), any(), any());
-    }
-
-    @Test
-    void acceptReschedule_byTheClient_isForbidden() {
-        scheduledJob(JobStatus.RESCHEDULE_REQUESTED, OffsetDateTime.now().plusDays(3));
-
-        assertThrows(AccessDeniedException.class, () -> service.acceptReschedule(10L, clientId));
     }
 
     @Test
@@ -496,12 +560,14 @@ class JobRequestServiceImplTest {
         JobRequest job = scheduledJob(JobStatus.RESCHEDULE_REQUESTED, start);
         job.setRescheduleStart(OffsetDateTime.now().plusDays(5));
         job.setRescheduleEnd(OffsetDateTime.now().plusDays(5).plusHours(2));
+        job.setRescheduleRequestedBy(Role.PROFESSIONAL);
 
-        JobRequestResponse response = service.rejectReschedule(10L, professionalId);
+        JobRequestResponse response = service.rejectReschedule(10L, clientId);
 
         assertEquals(JobStatus.ACCEPTED, response.getStatus());
         assertEquals(start, response.getScheduledStart());
         assertNull(response.getRescheduleStart());
+        assertNull(response.getRescheduleRequestedBy());
         verify(scheduleService, never()).moveJobSchedule(any(), any(), any());
     }
 

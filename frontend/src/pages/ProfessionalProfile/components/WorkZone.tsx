@@ -1,43 +1,14 @@
-import { useEffect, useState } from 'react'
 import Icon from '../../../components/Icon/Icon'
 import ZoneMap from '../../../components/ZoneMap/ZoneMap'
-import { lookupBestZone, sharedZoneCache, type ZonePlace } from '../../../services/zoneMap'
+import { useZoneLookup } from '../../../components/ZoneMap/useZoneLookup'
 
 interface WorkZoneProps {
     workingLocation: string
 }
 
-type MapState =
-    | { status: 'loading' }
-    | { status: 'found'; place: ZonePlace }
-    | { status: 'not-found' }
-    | { status: 'error' }
-
-/** What a lookup ended in, and for which zone: a result for another zone is not this one's. */
-interface Outcome {
-    location: string
-    state: Exclude<MapState, { status: 'loading' }>
-}
-
 function WorkZone({ workingLocation }: Readonly<WorkZoneProps>) {
     const location = workingLocation.trim()
-    const [outcome, setOutcome] = useState<Outcome | null>(null)
-    // Searching until there is an answer for this zone.
-    const map: MapState = outcome?.location === location ? outcome.state : { status: 'loading' }
-
-    useEffect(() => {
-        if (!location) return
-
-        // The search is not cancelled (another visit to this zone may be waiting on it): its answer is
-        // just ignored if this effect is already gone.
-        let active = true
-
-        lookupBestZone(location, { cache: sharedZoneCache() })
-            .then(place => { if (active) setOutcome({ location, state: place ? { status: 'found', place } : { status: 'not-found' } }) })
-            .catch(() => { if (active) setOutcome({ location, state: { status: 'error' } }) })
-
-        return () => { active = false }
-    }, [location])
+    const map = useZoneLookup(location)
 
     return (
         <section className="public-profile-section" aria-labelledby="work-zone-heading">

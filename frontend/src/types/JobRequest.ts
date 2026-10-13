@@ -27,9 +27,11 @@ export interface JobRequest {
     /** The agreed timeframe; null until the professional accepts. */
     scheduledStart?: string | null
     scheduledEnd?: string | null
-    /** The new timeframe the client asked for; only set while RESCHEDULE_REQUESTED. */
+    /** The new timeframe one side asked for; only set while RESCHEDULE_REQUESTED. */
     rescheduleStart?: string | null
     rescheduleEnd?: string | null
+    /** Who asked for it: the other side answers. Null on requests from before either side could ask (the client's). */
+    rescheduleRequestedBy?: RequestParty | null
     rejectionReason?: string | null
     cancelledBy?: RequestParty | null
     cancellationReason?: string | null

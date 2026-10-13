@@ -199,11 +199,11 @@ public class JobRequestServiceImpl implements JobRequestService {
 
     @Override
     @Transactional
-    public JobRequestResponse requestReschedule(Long id, JobRequestRescheduleRequest request, UUID clientId) {
+    public JobRequestResponse requestReschedule(Long id, JobRequestRescheduleRequest request, UUID requesterId) {
         JobRequest jobRequest = jobRequestRepository.findById(id)
                 .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
-        if (!jobRequest.getClient().getPublicId().equals(clientId)) {
+        if (!isParticipant(jobRequest, requesterId)) {
             throw new AccessDeniedException("No tenés permiso para reagendar este trabajo");
         }
 
@@ -215,11 +215,12 @@ public class JobRequestServiceImpl implements JobRequestService {
         requireNotice(jobRequest, "reagendar");
         requireFuture(request.getStartTimestamp());
         requireDifferentTimeframe(jobRequest, request.getStartTimestamp(), request.getEndTimestamp());
-        // Fails early if the slot is already taken, rather than leaving the professional a request they can't approve
+        // Fails early if the professional's slot is already taken, rather than leaving a request nobody can approve
         scheduleService.checkJobSlotAvailable(jobRequest, request.getStartTimestamp(), request.getEndTimestamp());
 
         jobRequest.setRescheduleStart(request.getStartTimestamp());
         jobRequest.setRescheduleEnd(request.getEndTimestamp());
+        jobRequest.setRescheduleRequestedBy(sideOf(jobRequest, requesterId));
         jobRequest.setStatus(JobStatus.RESCHEDULE_REQUESTED);
         jobRequest = jobRequestRepository.save(jobRequest);
         return jobRequestMapper.toResponse(jobRequest);
@@ -227,13 +228,8 @@ public class JobRequestServiceImpl implements JobRequestService {
 
     @Override
     @Transactional
-    public JobRequestResponse acceptReschedule(Long id, UUID professionalId) {
-        JobRequest jobRequest = findOwnedByProfessional(id, professionalId, "aceptar el cambio de horario de");
-
-        if (jobRequest.getStatus() != JobStatus.RESCHEDULE_REQUESTED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El trabajo no tiene un cambio de horario pendiente");
-        }
+    public JobRequestResponse acceptReschedule(Long id, UUID requesterId) {
+        JobRequest jobRequest = findPendingRescheduleToAnswer(id, requesterId, "aceptar");
 
         requireFuture(jobRequest.getRescheduleStart());
         scheduleService.moveJobSchedule(jobRequest, jobRequest.getRescheduleStart(), jobRequest.getRescheduleEnd());
@@ -246,13 +242,8 @@ public class JobRequestServiceImpl implements JobRequestService {
 
     @Override
     @Transactional
-    public JobRequestResponse rejectReschedule(Long id, UUID professionalId) {
-        JobRequest jobRequest = findOwnedByProfessional(id, professionalId, "rechazar el cambio de horario de");
-
-        if (jobRequest.getStatus() != JobStatus.RESCHEDULE_REQUESTED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El trabajo no tiene un cambio de horario pendiente");
-        }
+    public JobRequestResponse rejectReschedule(Long id, UUID requesterId) {
+        JobRequest jobRequest = findPendingRescheduleToAnswer(id, requesterId, "rechazar");
 
         jobRequest.setStatus(JobStatus.ACCEPTED);
         jobRequest.clearReschedule();
@@ -353,6 +344,37 @@ public class JobRequestServiceImpl implements JobRequestService {
         }
 
         return jobRequest;
+    }
+
+    /**
+     * A reschedule is answered by the side that didn't ask for it. The one who asked can't approve
+     * their own proposal; they can still cancel the job.
+     */
+    private JobRequest findPendingRescheduleToAnswer(Long id, UUID requesterId, String action) {
+        JobRequest jobRequest = jobRequestRepository.findById(id)
+                .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
+
+        if (!isParticipant(jobRequest, requesterId)) {
+            throw new AccessDeniedException("No tenés permiso para " + action + " el cambio de horario de este trabajo");
+        }
+
+        if (jobRequest.getStatus() != JobStatus.RESCHEDULE_REQUESTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El trabajo no tiene un cambio de horario pendiente");
+        }
+
+        // Requests from before either side could ask were always the client's
+        Role requestedBy = jobRequest.getRescheduleRequestedBy() == null ? Role.CLIENT : jobRequest.getRescheduleRequestedBy();
+        if (sideOf(jobRequest, requesterId) == requestedBy) {
+            throw new AccessDeniedException("El cambio de horario lo pediste vos: tiene que responderlo la otra parte");
+        }
+
+        return jobRequest;
+    }
+
+    /** The side of the job the user is on; only for a participant. */
+    private static Role sideOf(JobRequest jobRequest, UUID userId) {
+        return jobRequest.getClient().getPublicId().equals(userId) ? Role.CLIENT : Role.PROFESSIONAL;
     }
 
     private boolean isParticipant(JobRequest jobRequest, UUID userId) {

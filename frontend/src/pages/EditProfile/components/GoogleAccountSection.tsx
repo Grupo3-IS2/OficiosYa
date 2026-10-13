@@ -56,16 +56,19 @@ export default function GoogleAccountSection({ access, email, onChange }: {
     }
 
     const { hasPassword, googleLinked } = access
+    // Linking needs Google set up here; unlinking doesn't
+    const canManage = googleLinked || isGoogleEnabled()
 
-    // Nothing to offer: no way to link (Google isn't set up here) and nothing linked to undo.
-    if (hasPassword && !googleLinked && !isGoogleEnabled()) return null
+    // Nothing to offer: no way to link and nothing linked to undo. It stays while it has something
+    // to say, like the confirmation of the unlink that just left nothing to offer.
+    if (hasPassword && !canManage && !message) return null
 
     return (
         <section className="profile-section" aria-labelledby="google-title">
             <h2 id="google-title">Cuenta de Google</h2>
             {!hasPassword ? (
                 <p className="profile-subtitle">Iniciás sesión con tu cuenta de Google. Tu cuenta no tiene contraseña de OficiosYa, por eso no se puede cambiar el correo ni desvincular Google.</p>
-            ) : (
+            ) : canManage && (
                 <>
                     <p className="profile-subtitle">
                         {googleLinked

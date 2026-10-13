@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
+import { getCurrentUser } from '../../../services/authService'
 import { ApiError } from '../../../services/api'
-import { createJobRequest } from '../../../services/jobRequestCreationService'
+import { createJobRequest } from '../../../services/jobRequestService'
+import { saveJobRequestPin } from '../../../services/jobRequestPinStore'
 import type { ExpertiseTrade, Professional } from '../../../types/Professional'
 import {
     hasServiceRequestErrors,
@@ -15,23 +17,23 @@ import './ServiceRequestModal.css'
 
 interface ServiceRequestModalProps {
     professional: Professional
-    preferredTradeId: number | null
+    preferredTradeId: number
     onClose: () => void
 }
 
-function ServiceRequestModal({ professional, preferredTradeId, onClose }: ServiceRequestModalProps) {
+function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readonly<ServiceRequestModalProps>) {
     const dialogRef = useRef<HTMLDialogElement>(null)
     const nextTaskId = useRef(2)
     const submissionInFlight = useRef(false)
     const copyFeedbackTimeout = useRef<number | null>(null)
-    const availableTradeId = initialTradeId(
+    const defaultTradeId = initialTradeId(
         professional.expertiseTrades.map(trade => trade.tradeId),
         preferredTradeId,
     )
     const [value, setValue] = useState<ServiceRequestFormValue>({
         location: '',
         paymentAmount: '',
-        tasks: [{ id: 1, tradeId: availableTradeId, description: '' }],
+        tasks: [{ id: 1, tradeId: defaultTradeId, description: '' }],
     })
     const [showErrors, setShowErrors] = useState(false)
     const [submitting, setSubmitting] = useState(false)
@@ -41,17 +43,22 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Servic
     const errors = useMemo(() => validateServiceRequest(value), [value])
 
     useEffect(() => {
-        const dialog = dialogRef.current!
+        const dialog = dialogRef.current
+        if (!dialog) return
+
         const previousFocus = document.activeElement
-        const previousOverflow = document.body.style.overflow
+        const previousBodyOverflow = document.body.style.overflow
+        const previousRootOverflow = document.documentElement.style.overflow
         dialog.showModal()
         document.body.style.overflow = 'hidden'
+        document.documentElement.style.overflow = 'hidden'
         dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus()
 
         return () => {
             if (copyFeedbackTimeout.current !== null) window.clearTimeout(copyFeedbackTimeout.current)
             dialog.close()
-            document.body.style.overflow = previousOverflow
+            document.body.style.overflow = previousBodyOverflow
+            document.documentElement.style.overflow = previousRootOverflow
             if (previousFocus instanceof HTMLElement) previousFocus.focus()
         }
     }, [])
@@ -71,12 +78,14 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Servic
         const id = nextTaskId.current++
         setValue(current => ({
             ...current,
-            tasks: [...current.tasks, { id, tradeId: availableTradeId, description: '' }],
+            tasks: [...current.tasks, { id, tradeId: defaultTradeId, description: '' }],
         }))
     }
 
     function removeTask(taskId: number) {
-        setValue(current => ({ ...current, tasks: current.tasks.filter(task => task.id !== taskId) }))
+        setValue(current => current.tasks.length === 1
+            ? current
+            : { ...current, tasks: current.tasks.filter(task => task.id !== taskId) })
     }
 
     async function submitRequest() {
@@ -97,6 +106,10 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Servic
                     description: task.description.trim(),
                 })),
             })
+            // The authenticated user made the request, even when that account is also a professional.
+            // Scope the PIN to that creator instead of deriving ownership from their account role.
+            const creatorId = getCurrentUser()?.id
+            if (creatorId) saveJobRequestPin(creatorId, response.id, response.confirmationPin)
             setConfirmationPin(response.confirmationPin)
         } catch (error) {
             if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
@@ -127,8 +140,7 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Servic
         }
     }
 
-    const selectedTrade = professional.expertiseTrades.find(trade => trade.tradeId === availableTradeId)
-        ?? professional.expertiseTrades[0]
+    const selectedTrade = professional.expertiseTrades.find(trade => trade.tradeId === defaultTradeId)
 
     return createPortal(
         <dialog
@@ -213,7 +225,7 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Servic
                                 <input
                                     id="service-request-amount"
                                     type="number"
-                                    min="0.01"
+                                    min="0"
                                     step="0.01"
                                     inputMode="decimal"
                                     placeholder="Ingrese el monto"
@@ -272,7 +284,7 @@ interface TaskFieldsProps {
     onRemove: () => void
 }
 
-function TaskFields({ index, task, trades, showErrors, errors, onChange, onRemove }: TaskFieldsProps) {
+function TaskFields({ index, task, trades, showErrors, errors, onChange, onRemove }: Readonly<TaskFieldsProps>) {
     const selectId = `service-request-task-${task.id}-trade`
     const descriptionId = `service-request-task-${task.id}-description`
 

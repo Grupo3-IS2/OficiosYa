@@ -1,7 +1,7 @@
 import type { ReactNode, SVGProps } from 'react'
 import './Icon.css'
 
-export type IconName = 'location' | 'document' | 'user' | 'search' | 'money' | 'calendar' | 'star' | 'wrench' | 'home' | 'mail' | 'phone' | 'lock' | 'eye' | 'eye-off' | 'filter' | 'chevron-down' | 'check' | 'close' | 'copy' | 'plus' | 'trash'
+export type IconName = 'location' | 'document' | 'user' | 'search' | 'money' | 'calendar' | 'star' | 'wrench' | 'home' | 'mail' | 'phone' | 'lock' | 'eye' | 'eye-off' | 'filter' | 'chevron-down' | 'message' | 'close' | 'plus' | 'trash' | 'copy' | 'check'
 interface IconProps extends SVGProps<SVGSVGElement> { name: IconName }
 
 function Icon({ name, ...props }: IconProps) {
@@ -22,11 +22,12 @@ function Icon({ name, ...props }: IconProps) {
     'eye-off': <><path d="m3 3 18 18M10.6 6.2A10.8 10.8 0 0 1 12 6c6.5 0 10 6 10 6a17.4 17.4 0 0 1-3.2 3.7M6.2 6.7C3.5 8.5 2 12 2 12s3.5 6 10 6c1.2 0 2.3-.2 3.3-.6" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>,
     filter: <><path d="M4 6h16M7 12h10M10 18h4" /></>,
     'chevron-down': <path d="m7 10 5 5 5-5" />,
-    check: <path d="m5 12 4.2 4.2L19 6.5" />,
-    close: <path d="M6 6l12 12M18 6 6 18" />,
-    copy: <><rect x="8" y="8" width="11" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2" /></>,
+    message: <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />,
+    close: <path d="m6 6 12 12M18 6 6 18" />,
     plus: <path d="M12 5v14M5 12h14" />,
-    trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></>,
+    trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6" /></>,
+    copy: <><rect x="8" y="8" width="11" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2" /></>,
+    check: <path d="m5 12 4 4L19 6" />,
   }
   return <svg className="icon" viewBox="0 0 24 24" aria-hidden="true" {...props}>{paths[name]}</svg>
 }

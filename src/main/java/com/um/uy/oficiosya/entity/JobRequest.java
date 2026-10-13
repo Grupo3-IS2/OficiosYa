@@ -76,9 +76,17 @@ public class JobRequest {
     @Column(length = 500)
     private String cancellationReason;
 
-    /** The timeframe the client asked to move the job to; only set while RESCHEDULE_REQUESTED. */
+    /** The timeframe one side asked to move the job to; only set while RESCHEDULE_REQUESTED. */
     private OffsetDateTime rescheduleStart;
     private OffsetDateTime rescheduleEnd;
+
+    /**
+     * Which side asked for the reschedule: the other one answers it. Only set while
+     * RESCHEDULE_REQUESTED; null on requests made before either side could ask, which were the client's.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 32)
+    private Role rescheduleRequestedBy;
 
     @Min(1)
     @Max(10)
@@ -106,5 +114,6 @@ public class JobRequest {
     public void clearReschedule() {
         this.rescheduleStart = null;
         this.rescheduleEnd = null;
+        this.rescheduleRequestedBy = null;
     }
 }

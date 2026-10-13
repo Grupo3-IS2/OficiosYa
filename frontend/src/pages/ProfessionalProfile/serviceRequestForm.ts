@@ -22,9 +22,13 @@ export interface ServiceRequestFormErrors {
     taskErrors: ServiceRequestTaskErrors[]
 }
 
+/**
+ * The trade the first task starts with: the one chosen on the profile, or the only one the professional
+ * offers. With several and none chosen it is 0, so the client picks it instead of getting one by chance.
+ */
 export function initialTradeId(availableTradeIds: number[], preferredTradeId: number | null): number {
     if (preferredTradeId !== null && availableTradeIds.includes(preferredTradeId)) return preferredTradeId
-    return availableTradeIds[0] ?? 0
+    return availableTradeIds.length === 1 ? availableTradeIds[0] : 0
 }
 
 export function validateServiceRequest(value: ServiceRequestFormValue): ServiceRequestFormErrors {

@@ -122,10 +122,10 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                         error={scheduleState.professionalId === professionalId && scheduleState.status === 'error'}
                     />
                     <ReviewsSection rating={professional.rating} />
-                    {requestModalOpen && selectedTrade && (
+                    {requestModalOpen && (
                         <ServiceRequestModal
                             professional={professional}
-                            preferredTradeId={selectedTrade.tradeId}
+                            preferredTradeId={selectedTrade?.tradeId ?? null}
                             onClose={() => setRequestModalOpen(false)}
                         />
                     )}

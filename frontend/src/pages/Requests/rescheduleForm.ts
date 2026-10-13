@@ -39,7 +39,7 @@ export function rescheduleTimeframe(draft: RescheduleDraft, current: CurrentTime
     const end = new Date(`${draft.date}T${draft.endTime}`)
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return { error: 'La fecha o el horario no son válidos.' }
     if (end <= start) return { error: 'La hora de fin tiene que ser posterior a la de inicio.' }
-    if (start <= now) return { error: 'El nuevo horario tiene que ser en el futuro.' }
+    if (start <= now) return { error: 'El horario tiene que ser en el futuro.' }
     if (current.start && current.end
         && new Date(current.start).getTime() === start.getTime()
         && new Date(current.end).getTime() === end.getTime()) {

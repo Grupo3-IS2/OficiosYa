@@ -24,7 +24,7 @@ import java.util.List;
 /**
  * Lifecycle: PROPOSED → accept → ACCEPTED → complete (PIN) → COMPLETED → review.
  * From PROPOSED it can also be rejected, and from PROPOSED or ACCEPTED cancelled.
- * Once ACCEPTED the client can ask to reschedule (→ RESCHEDULE_REQUESTED); the professional's
+ * Once ACCEPTED either side can ask to reschedule (→ RESCHEDULE_REQUESTED); the other side's
  * answer takes it back to ACCEPTED, at the new time or the original one.
  */
 @RestController
@@ -80,7 +80,10 @@ public class JobRequestController {
         return ResponseEntity.ok(jobRequestService.cancelJobRequest(id, request, AuthenticatedUser.id(authentication)));
     }
 
-    /** The client proposes a new timeframe for an accepted job; the professional has to approve it. */
+    /**
+     * Either side proposes a new timeframe for an accepted job, with enough notice; the other side
+     * has to approve it.
+     */
     @PostMapping("/{id}/reschedule")
     public ResponseEntity<JobRequestResponse> requestReschedule(@Valid @RequestBody JobRequestRescheduleRequest request,
                                                                   @PathVariable Long id,
@@ -88,6 +91,7 @@ public class JobRequestController {
         return ResponseEntity.ok(jobRequestService.requestReschedule(id, request, AuthenticatedUser.id(authentication)));
     }
 
+    /** Only the side that didn't ask for the reschedule can answer it. */
     @PostMapping("/{id}/reschedule/accept")
     public ResponseEntity<JobRequestResponse> acceptReschedule(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(jobRequestService.acceptReschedule(id, AuthenticatedUser.id(authentication)));

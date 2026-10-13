@@ -65,8 +65,11 @@
 
 .service-request-field { display: block; margin-bottom: 22px; }
 .service-request-field > span:first-child,
+.service-request-field > label:first-child,
 .service-request-task label > span { display: block; margin-bottom: 8px; color: #102557; font-size: 14px; font-weight: 700; }
 .service-request-field em { color: #e24335; font-style: normal; }
+.service-request-field .zone-picker { margin-top: 10px; }
+.service-request-field .zone-map { height: 220px; }
 
 .service-request-input { position: relative; display: flex; align-items: center; }
 .service-request-input > .icon,

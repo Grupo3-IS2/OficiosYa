@@ -330,7 +330,7 @@ function Register() {
 
         <div className="register-divider" />
         <p className="register-login">
-          ¿Ya tenés una cuenta? <a href="/login">Iniciar sesión</a>
+          ¿Ya tienes una cuenta? <a href="/login">Iniciar sesión</a>
         </p>
         </>
         )}

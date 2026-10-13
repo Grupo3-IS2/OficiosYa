@@ -61,7 +61,7 @@ const dateFormatter = new Intl.DateTimeFormat('es-UY', {
     timeZone: 'America/Montevideo',
 })
 
-export default function RequestDetailModal({ request, isClient, pin, initialResponse, onClose, onAnswered, onReviewReschedule }: Readonly<{
+export default function RequestDetailModal({ request, isClient, pin, initialResponse, onClose, onAnswered, onReviewReschedule, onReschedule }: Readonly<{
     request: JobRequest
     isClient: boolean
     pin: string | null
@@ -72,6 +72,8 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
     onAnswered: (updated: JobRequest, outcome: RequestOutcome) => void
     /** Shows the change to confirm accepting or rejecting a reschedule the other side asked for. */
     onReviewReschedule: (request: JobRequest, decision: Decision) => void
+    /** Opens the form to propose a new timeframe for an accepted job, over the detail. */
+    onReschedule: (request: JobRequest) => void
 }>) {
     const dialogRef = useRef<HTMLDialogElement>(null)
     const feedbackTimeout = useRef<number | null>(null)
@@ -254,6 +256,9 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
             <footer className="request-detail-modal__footer">
                 {canCancel && !cancelling && <Button type="button" variant="ghost" className="request-detail-cancel"
                     onClick={() => setCancelling(true)}>Cancelar solicitud</Button>}
+                {/* As on the card: only an accepted job has a timeframe to move, and either side can ask */}
+                {request.status === 'ACCEPTED' && !cancelling && <Button type="button" variant="ghost"
+                    disabled={answering} onClick={() => onReschedule(request)}>Reagendar</Button>}
                 <Button type="button" onClick={close} disabled={answering}>Cerrar</Button>
             </footer>
         </dialog>,

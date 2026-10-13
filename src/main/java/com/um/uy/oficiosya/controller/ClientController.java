@@ -10,6 +10,7 @@ import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
+import com.um.uy.oficiosya.dto.update.NotificationsUpdateRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ClientUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
@@ -111,6 +112,13 @@ public class ClientController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.create(refreshToken).toString())
                 .build();
+    }
+
+    /** Turns the emails about the user's requests on or off: a change of timeframe asked of them, requests piling up. */
+    @PutMapping("/me/notifications")
+    public ResponseEntity<ClientResponse> updateNotifications(@Valid @RequestBody NotificationsUpdateRequest request,
+                                                              Authentication authentication) {
+        return ResponseEntity.ok(clientService.updateNotifications(request, AuthenticatedUser.id(authentication)));
     }
 
     /** Links a Google account so the user can sign in with it too. Needs the current password. */

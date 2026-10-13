@@ -15,6 +15,13 @@ export function fakeJwt(expiresInSeconds = 3600) {
  * 401 to those calls and the frontend expires the session, so UI tests with a session mock them.
  */
 export async function mockHomeApi(page: Page) {
+  // The header asks for the user's requests, to warn on "Mis solicitudes" if one waits for them.
+  // Registered first, so a test that mocks its own requests overrides it.
+  await page.route('**/api/v1/job-requests/mine', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '[]'
+  }));
   await page.route('**/api/v1/trades', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',

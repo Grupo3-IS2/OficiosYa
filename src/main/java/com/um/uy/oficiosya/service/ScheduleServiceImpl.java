@@ -76,7 +76,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .orElseThrow(() -> new ScheduleNotFoundException("Bloque de agenda no encontrado."));
 
         if (!schedule.getProfessional().getPublicId().equals(professionalId)) {
-            throw new AccessDeniedException("No tenés permiso para modificar este bloque de agenda");
+            throw new AccessDeniedException("No tienes permiso para modificar este bloque de agenda");
         }
 
         if (schedule.getType() == ScheduleType.SCHEDULED_JOB) {
@@ -214,7 +214,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .orElseThrow(() -> new ScheduleNotFoundException("Bloque de agenda no encontrado."));
 
         if (!schedule.getProfessional().getPublicId().equals(professionalId)) {
-            throw new AccessDeniedException("No tenés permiso para eliminar este bloque de agenda");
+            throw new AccessDeniedException("No tienes permiso para eliminar este bloque de agenda");
         }
 
         if (schedule.getType() == ScheduleType.SCHEDULED_JOB) {

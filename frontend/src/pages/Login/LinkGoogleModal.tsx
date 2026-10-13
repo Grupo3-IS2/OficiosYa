@@ -62,7 +62,7 @@ function LinkGoogleModal({ email, onLink, onCancel }: LinkGoogleModalProps) {
       }}
     >
       <form className="link-google-modal__body" onSubmit={handleSubmit}>
-        <h2 id="link-google-title">Ya tenés una cuenta con este correo</h2>
+        <h2 id="link-google-title">Ya tienes una cuenta con este correo</h2>
         <p id="link-google-description">
           Encontramos una cuenta de OficiosYa con {email ? <strong>{email}</strong> : 'ese correo'}.
           ¿Querés vincularla con tu cuenta de Google para entrar más rápido?

@@ -135,7 +135,7 @@ test('requests waiting for the professional stand out in the list', async ({ pag
   const answered = proposedRequest({ id: 72, status: 'ACCEPTED', createdAt: new Date(Date.now() - 3600_000).toISOString() });
   await listRequests(page, professionalId, [proposedRequest(), answered]);
 
-  await expect(page.getByRole('status').filter({ hasText: 'esperando tu respuesta' })).toContainText('Tenés 1 solicitud esperando tu respuesta');
+  await expect(page.getByRole('status').filter({ hasText: 'esperando tu respuesta' })).toContainText('Tienes 1 solicitud esperando tu respuesta');
   const urgent = page.locator('.request-card--needs-answer');
   await expect(urgent).toHaveCount(1);
   await expect(urgent.getByText('Requiere tu respuesta')).toBeVisible();
@@ -259,7 +259,7 @@ test('a client does not get the received/sent switch: all their requests are sen
 test('"Ver por responder" shows only what waits for the viewer, not their own pending requests', async ({ page }) => {
   await listRequests(page, professionalId, bothSides());
 
-  await expect(page.getByRole('status').filter({ hasText: 'esperando tu respuesta' })).toContainText('Tenés 1 solicitud');
+  await expect(page.getByRole('status').filter({ hasText: 'esperando tu respuesta' })).toContainText('Tienes 1 solicitud');
   await page.getByRole('button', { name: 'Ver por responder' }).click();
 
   await expect(page.getByRole('button', { name: 'Por responder' })).toHaveAttribute('aria-pressed', 'true');
@@ -444,7 +444,7 @@ test('a reschedule to answer is as urgent as a request to accept, for the client
   await listRequests(page, clientId, [changeForClient, acceptedRequest({ id: 74 })], 'CLIENT');
 
   const alert = page.getByRole('status').filter({ hasText: 'esperando tu respuesta' });
-  await expect(alert).toContainText('Tenés 1 solicitud esperando tu respuesta.');
+  await expect(alert).toContainText('Tienes 1 solicitud esperando tu respuesta.');
   await expect(alert).toContainText('Te pidieron un cambio de horario: aceptalo o rechazalo.');
   const urgent = page.locator('.request-card--needs-answer');
   await expect(urgent).toHaveCount(1);
@@ -463,7 +463,7 @@ test('the alert tells requests to accept and changes to answer apart', async ({ 
   })]);
 
   await expect(page.getByRole('status').filter({ hasText: 'esperando tu respuesta' }))
-    .toContainText('Tenés 2 solicitudes esperando tu respuesta. 1 pedido de trabajo y 1 cambio de horario para aceptar o rechazar.');
+    .toContainText('Tienes 2 solicitudes esperando tu respuesta. 1 pedido de trabajo y 1 cambio de horario para aceptar o rechazar.');
   await expect(page.locator('.request-card--needs-answer')).toHaveCount(2);
 });
 
@@ -539,4 +539,71 @@ test('an address the map cannot find says so, and the rest of the detail is ther
 
   await expect(dialog.getByText('No pudimos ubicar esta dirección en el mapa.')).toBeVisible();
   await expect(dialog.getByText('Cambiar la canilla de la cocina')).toBeVisible();
+});
+
+const requestsLink = (page: Page) => page.getByRole('navigation', { name: 'Navegación principal' }).getByRole('link', { name: /Mis solicitudes/ });
+
+test('the header warns on "Mis solicitudes" when something waits for the user, from any page', async ({ page }) => {
+  await mockVerifiedSession(page, { name: 'Pablo Profesional', email: 'pablo@qa.test', role: 'PROFESSIONAL' });
+  await page.route('**/api/v1/job-requests/mine', route => route.fulfill({ json: [proposedRequest()] }));
+  await page.addInitScript(([token, id]) => {
+    localStorage.setItem('oficiosya_token', token);
+    localStorage.setItem('oficiosya_user', JSON.stringify({ id, name: 'Pablo', email: 'pablo@qa.test', role: 'PROFESSIONAL' }));
+  }, [fakeJwt(), professionalId] as const);
+  await page.goto('/');
+
+  await expect(requestsLink(page).locator('.nav-alert')).toHaveText('!');
+  await expect(requestsLink(page)).toHaveAccessibleName('Mis solicitudes (1 solicitud espera tu respuesta)');
+});
+
+test('with nothing waiting, "Mis solicitudes" has no alert', async ({ page }) => {
+  await listRequests(page, clientId, [proposedRequest()], 'CLIENT');
+
+  await expect(page.locator('.request-card')).toHaveCount(1);
+  await expect(requestsLink(page).locator('.nav-alert')).toHaveCount(0);
+});
+
+test('answering the last request that waits takes the alert away', async ({ page }) => {
+  await page.route('**/api/v1/job-requests/71/reject', route => route.fulfill({ json: proposedRequest({ status: 'REJECTED' }) }));
+  await listRequests(page, professionalId);
+  await expect(requestsLink(page).locator('.nav-alert')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Rechazar solicitud de Carla Cliente' }).click();
+  await page.getByRole('button', { name: 'Confirmar rechazo' }).click();
+
+  await expect(page.getByRole('dialog', { name: 'Detalle de la solicitud' }).getByText('Rechazada', { exact: true })).toBeVisible();
+  await expect(requestsLink(page).locator('.nav-alert')).toHaveCount(0);
+});
+
+test('an accepted job can be rescheduled from its detail too, which then shows the change asked for', async ({ page }) => {
+  let sent: Record<string, string> | null = null;
+  await page.route('**/api/v1/job-requests/71/reschedule', async route => {
+    sent = route.request().postDataJSON();
+    await route.fulfill({ json: acceptedRequest({
+      status: 'RESCHEDULE_REQUESTED', rescheduleRequestedBy: 'CLIENT',
+      rescheduleStart: sent!.startTimestamp, rescheduleEnd: sent!.endTimestamp,
+    }) });
+  });
+  const detail = await openRequests(page, clientId, acceptedRequest());
+
+  await detail.getByRole('button', { name: 'Reagendar' }).click();
+  const form = page.getByRole('dialog', { name: 'Reagendar solicitud' });
+  await form.getByLabel('Fecha').fill(tomorrow());
+  await form.getByLabel('Desde').fill('15:00');
+  await form.getByLabel('Hasta').fill('17:00');
+  await form.getByRole('button', { name: 'Proponer horario' }).click();
+
+  await expect(form).toHaveCount(0);
+  await expect(detail.getByText('Cambio de horario pendiente', { exact: true })).toBeVisible();
+  await expect(detail.getByText(/Cambio pedido por vos/)).toBeVisible();
+  // A change waits for the professional now: no second one on top
+  await expect(detail.getByRole('button', { name: 'Reagendar' })).toHaveCount(0);
+  expect(new Date(sent!.startTimestamp).getTime()).toBe(new Date(`${tomorrow()}T15:00`).getTime());
+});
+
+test('the detail only offers to reschedule an accepted job', async ({ page }) => {
+  const detail = await openRequests(page, professionalId);
+
+  await expect(detail.getByRole('heading', { name: 'Detalle de la solicitud' })).toBeVisible();
+  await expect(detail.getByRole('button', { name: 'Reagendar' })).toHaveCount(0);
 });

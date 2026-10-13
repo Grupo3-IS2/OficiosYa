@@ -6,6 +6,7 @@ import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
+import com.um.uy.oficiosya.dto.update.NotificationsUpdateRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ClientUpdateRequest;
 import com.um.uy.oficiosya.entity.AuthProvider;
@@ -189,6 +190,14 @@ public class ClientServiceImpl implements ClientService {
 
     private String normalize(String email) {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    @Override
+    @Transactional
+    public ClientResponse updateNotifications(NotificationsUpdateRequest request, UUID id) {
+        Client user = clientRepository.findByPublicId(id).orElseThrow(() -> new ClientNotFoundException(USER_NOT_FOUND));
+        user.setEmailNotifications(request.getEmailNotifications());
+        return clientMapper.toResponse(clientRepository.save(user));
     }
 
     @Override

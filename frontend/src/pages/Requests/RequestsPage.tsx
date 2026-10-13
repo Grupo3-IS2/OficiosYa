@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { publishAwaitingAnswers } from '../../components/Header/useAwaitingAnswers'
 import { toast } from 'sonner'
 import BackNavigation from '../../components/BackNavigation/BackNavigation'
 import Button from '../../components/Button/Button'
@@ -218,6 +219,11 @@ export default function RequestsPage() {
     // "Por responder" only shows while there is something to answer (or it is the filter in use)
     const shownFilters = filters.filter(filter => filter.value !== 'awaiting' || awaiting.length > 0 || activeFilter === 'awaiting')
 
+    // The header's "Mis solicitudes" alert follows what waits here, as it is answered
+    useEffect(() => {
+        if (!loading && !loadError) publishAwaitingAnswers(awaiting.length)
+    }, [loading, loadError, awaiting.length])
+
     useEffect(() => {
         let active = true
         void getMyJobRequests()
@@ -273,7 +279,7 @@ export default function RequestsPage() {
             {awaiting.length > 0 && <div className="requests-alert" role="status">
                 <span className="requests-alert__count" aria-hidden="true">{awaiting.length}</span>
                 <p>
-                    <strong>Tenés {awaiting.length} {plural(awaiting.length, 'solicitud', 'solicitudes')} esperando tu respuesta.</strong>
+                    <strong>Tienes {awaiting.length} {plural(awaiting.length, 'solicitud', 'solicitudes')} esperando tu respuesta.</strong>
                     {' '}{awaitingDetail(awaitingProposals, awaiting.length - awaitingProposals)}
                 </p>
                 {!showingAwaiting && <Button type="button" onClick={() => {
@@ -288,7 +294,7 @@ export default function RequestsPage() {
                     : loadError
                         ? <div className="requests-feedback" role="alert"><h2>No pudimos cargar tus solicitudes</h2><p>Revisá tu conexión e intentá nuevamente.</p></div>
                         : requests.length === 0
-                            ? <div className="requests-empty"><h2>Todavía no tenés solicitudes</h2><p>Cuando solicites un servicio, vas a poder seguirlo desde acá.</p></div>
+                            ? <div className="requests-empty"><h2>Todavía no tienes solicitudes</h2><p>Cuando solicites un servicio, vas a poder seguirlo desde acá.</p></div>
                             : visible.length === 0 && direction !== 'all'
                                 ? <div className="requests-empty"><h2>{emptyDirection[direction].title}</h2><p>{emptyDirection[direction].text}</p></div>
                             : groups.length === 0
@@ -311,6 +317,7 @@ export default function RequestsPage() {
             initialResponse={viewingResponse}
             onClose={() => setViewing(null)}
             onReviewReschedule={review}
+            onReschedule={setRescheduling}
             onAnswered={(updated, outcome) => {
                 replaceRequest(updated)
                 // Stays open on the updated request: the new status, timeframe or reason is right there
@@ -323,6 +330,8 @@ export default function RequestsPage() {
             onClose={() => setRescheduling(null)}
             onRescheduled={updated => {
                 replaceRequest(updated)
+                // Asked from the detail: it stays open behind, now showing the change waiting for an answer
+                setViewing(previous => previous?.id === updated.id ? { ...previous, ...updated } : previous)
                 setRescheduling(null)
             }}
         />}

@@ -1298,7 +1298,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(meBody.name).toBe('Cliente QA Editado Inmediatamente');
   });
 
-  test('API: cambiar password no invalida la sesión actual del mismo usuario', async ({ request }) => {
+  test('API: cambiar password corta las otras sesiones, y este dispositivo sigue con la cookie nueva', async ({ request }) => {
     const client = {
       name: 'Cliente QA Password Session',
       email: uniqueEmail('cliente.password.session'),
@@ -1322,7 +1322,16 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
     expect(changePassword.status()).toBe(204);
 
-    const me = await getAuthenticatedUser(request, auth.token);
+    // Every access token issued before the change stops working, this device's too...
+    expect((await getAuthenticatedUser(request, auth.token)).status()).toBe(401);
+
+    // ...but the response brought it a new refresh cookie, which renews it without logging in again
+    const refreshCookie = (changePassword.headers()['set-cookie'] ?? '').split(';')[0];
+    expect(refreshCookie).toMatch(/^oficiosya_refresh=.+/);
+    const renewed = await request.post(`${API_BASE}/api/v1/auth/refresh`, { headers: { Cookie: refreshCookie } });
+    expect(renewed.status()).toBe(200);
+
+    const me = await getAuthenticatedUser(request, (await renewed.json()).token);
     expect(me.status()).toBe(200);
     const meBody = await me.json();
     expect(meBody.email).toBe(client.email);

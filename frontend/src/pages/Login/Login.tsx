@@ -161,7 +161,7 @@ function Login() {
 
                 <div className="login-divider" />
                 <p className="create-account">
-                    ¿Todavía no tenés cuenta? <a href="/register">Crear cuenta</a>
+                    ¿Todavía no tienes cuenta? <a href="/register">Crear cuenta</a>
                 </p>
             </section>
 

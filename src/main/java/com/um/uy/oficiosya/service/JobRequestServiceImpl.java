@@ -29,6 +29,7 @@ import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import com.um.uy.oficiosya.service.interfaces.ScheduleService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -65,6 +66,7 @@ public class JobRequestServiceImpl implements JobRequestService {
     private final Clock clock;
     /** Notice needed to cancel or reschedule an accepted job. */
     private final Duration minNotice;
+    private final ApplicationEventPublisher events;
 
     public JobRequestServiceImpl(JobRequestRepository jobRequestRepository,
                                   ClientRepository clientRepository,
@@ -74,7 +76,8 @@ public class JobRequestServiceImpl implements JobRequestService {
                                   ScheduleService scheduleService,
                                   PasswordEncoder passwordEncoder,
                                   Clock clock,
-                                  @Value("${app.job-request.min-notice-hours}") long minNoticeHours) {
+                                  @Value("${app.job-request.min-notice-hours}") long minNoticeHours,
+                                  ApplicationEventPublisher events) {
         this.jobRequestRepository = jobRequestRepository;
         this.clientRepository = clientRepository;
         this.professionalRepository = professionalRepository;
@@ -84,6 +87,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
         this.minNotice = Duration.ofHours(minNoticeHours);
+        this.events = events;
     }
 
     @Override
@@ -127,6 +131,7 @@ public class JobRequestServiceImpl implements JobRequestService {
 
         JobRequestResponse response = jobRequestMapper.toResponse(jobRequest);
         response.setConfirmationPin(pin);
+        awaitingAnswersMayHaveChanged(jobRequest);
         return response;
     }
 
@@ -145,6 +150,7 @@ public class JobRequestServiceImpl implements JobRequestService {
 
         jobRequest.setStatus(JobStatus.ACCEPTED);
         jobRequest = jobRequestRepository.save(jobRequest);
+        awaitingAnswersMayHaveChanged(jobRequest);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -161,6 +167,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setStatus(JobStatus.REJECTED);
         jobRequest.setRejectionReason(reason(request == null ? null : request.getReason()));
         jobRequest = jobRequestRepository.save(jobRequest);
+        awaitingAnswersMayHaveChanged(jobRequest);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -171,7 +178,7 @@ public class JobRequestServiceImpl implements JobRequestService {
                 .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!isParticipant(jobRequest, requesterId)) {
-            throw new AccessDeniedException("No tenés permiso para cancelar este trabajo");
+            throw new AccessDeniedException("No tienes permiso para cancelar este trabajo");
         }
 
         if (!CANCELLABLE.contains(jobRequest.getStatus())) {
@@ -194,6 +201,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setCancellationReason(reason(request == null ? null : request.getReason()));
         jobRequest.clearReschedule();
         jobRequest = jobRequestRepository.save(jobRequest);
+        awaitingAnswersMayHaveChanged(jobRequest);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -204,7 +212,7 @@ public class JobRequestServiceImpl implements JobRequestService {
                 .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!isParticipant(jobRequest, requesterId)) {
-            throw new AccessDeniedException("No tenés permiso para reagendar este trabajo");
+            throw new AccessDeniedException("No tienes permiso para reagendar este trabajo");
         }
 
         if (jobRequest.getStatus() != JobStatus.ACCEPTED) {
@@ -223,6 +231,8 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setRescheduleRequestedBy(sideOf(jobRequest, requesterId));
         jobRequest.setStatus(JobStatus.RESCHEDULE_REQUESTED);
         jobRequest = jobRequestRepository.save(jobRequest);
+        events.publishEvent(new JobRequestEvents.RescheduleRequested(jobRequest.getId()));
+        awaitingAnswersMayHaveChanged(jobRequest);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -237,6 +247,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setStatus(JobStatus.ACCEPTED);
         jobRequest.clearReschedule();
         jobRequest = jobRequestRepository.save(jobRequest);
+        awaitingAnswersMayHaveChanged(jobRequest);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -248,6 +259,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setStatus(JobStatus.ACCEPTED);
         jobRequest.clearReschedule();
         jobRequest = jobRequestRepository.save(jobRequest);
+        awaitingAnswersMayHaveChanged(jobRequest);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -269,6 +281,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setStatus(JobStatus.COMPLETED);
         jobRequest.clearReschedule();
         jobRequest = jobRequestRepository.save(jobRequest);
+        awaitingAnswersMayHaveChanged(jobRequest);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -279,7 +292,7 @@ public class JobRequestServiceImpl implements JobRequestService {
                 .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!jobRequest.getClient().getPublicId().equals(clientId)) {
-            throw new AccessDeniedException("No tenés permiso para calificar este trabajo");
+            throw new AccessDeniedException("No tienes permiso para calificar este trabajo");
         }
 
         if (jobRequest.getStatus() != JobStatus.COMPLETED) {
@@ -310,7 +323,7 @@ public class JobRequestServiceImpl implements JobRequestService {
                 .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!isParticipant(jobRequest, requesterId)) {
-            throw new AccessDeniedException("No tenés permiso para ver este trabajo");
+            throw new AccessDeniedException("No tienes permiso para ver este trabajo");
         }
 
         return jobRequestMapper.toResponse(jobRequest);
@@ -335,12 +348,21 @@ public class JobRequestServiceImpl implements JobRequestService {
                 .toList();
     }
 
+    /**
+     * Any change to a job can make what waits for either side's answer grow or shrink; the emails
+     * about it go out once the change is saved (RequestNotificationListener).
+     */
+    private void awaitingAnswersMayHaveChanged(JobRequest jobRequest) {
+        events.publishEvent(new JobRequestEvents.AwaitingAnswersChanged(Set.of(
+                jobRequest.getClient().getPublicId(), jobRequest.getProfessional().getPublicId())));
+    }
+
     private JobRequest findOwnedByProfessional(Long id, UUID professionalId, String action) {
         JobRequest jobRequest = jobRequestRepository.findById(id)
                 .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!jobRequest.getProfessional().getPublicId().equals(professionalId)) {
-            throw new AccessDeniedException("No tenés permiso para " + action + " este trabajo");
+            throw new AccessDeniedException("No tienes permiso para " + action + " este trabajo");
         }
 
         return jobRequest;
@@ -355,7 +377,7 @@ public class JobRequestServiceImpl implements JobRequestService {
                 .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!isParticipant(jobRequest, requesterId)) {
-            throw new AccessDeniedException("No tenés permiso para " + action + " el cambio de horario de este trabajo");
+            throw new AccessDeniedException("No tienes permiso para " + action + " el cambio de horario de este trabajo");
         }
 
         if (jobRequest.getStatus() != JobStatus.RESCHEDULE_REQUESTED) {

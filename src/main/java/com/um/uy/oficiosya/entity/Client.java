@@ -65,6 +65,16 @@ public class Client {
     @Column(nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @Builder.Default
+    @ColumnDefault("true")
+    @Column(name = "email_notifications", nullable = false)
+    private boolean emailNotifications = true;
+
+    @Builder.Default
+    @ColumnDefault("false")
+    @Column(name = "awaiting_answer_alert_sent", nullable = false)
+    private boolean awaitingAnswerAlertSent = false;
+
     /** The jobs this user asked for, as the client side of the job. */
     @Builder.Default
     @OneToMany(mappedBy = "client")

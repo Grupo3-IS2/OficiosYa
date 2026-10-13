@@ -59,6 +59,9 @@ services:
       SMTP_AUTH: ${SMTP_AUTH:-false}
       SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
       MAIL_FROM: ${MAIL_FROM:-no-reply@oficiosya.com}
+      # Emails about requests: the site's address for their links, and how many unanswered requests trigger the reminder.
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:5173}
+      NOTIFY_AWAITING_ANSWER_THRESHOLD: ${NOTIFY_AWAITING_ANSWER_THRESHOLD:-3}
       # Google sign-in. Empty disables it (see GoogleTokenVerifierImpl); the frontend uses the same value.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       # Verification codes. VERIFICATION_SECRET must be set outside local development.

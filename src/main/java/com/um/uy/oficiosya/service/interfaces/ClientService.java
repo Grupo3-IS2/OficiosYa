@@ -6,6 +6,7 @@ import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
+import com.um.uy.oficiosya.dto.update.NotificationsUpdateRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ClientUpdateRequest;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,6 +25,9 @@ public interface ClientService {
 
     /** The fields every account has, whatever its type. */
     ClientResponse updateUser(ClientUpdateRequest userRequest, UUID id);
+
+    /** Turns the emails about the user's requests on or off. */
+    ClientResponse updateNotifications(NotificationsUpdateRequest request, UUID id);
 
     /**
      * First step of changing the email: checks the current password and that the new address is

@@ -86,7 +86,7 @@ test.describe('Registro y login: validaciones visuales y roles', () => {
       await route.fulfill({
         status: 202,
         contentType: 'application/json',
-        body: JSON.stringify({ email: 'default.client@qa.test', message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
+        body: JSON.stringify({ email: 'default.client@qa.test', verificationRequired: true, message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
       });
     });
     await page.route('**/api/v1/auth/register-professional', (route) => { professionalCalls++; return route.abort(); });

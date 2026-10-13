@@ -60,6 +60,7 @@ services:
       # Google sign-in. Empty disables it (see GoogleTokenVerifierImpl); the frontend uses the same value.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       # Verification codes. VERIFICATION_SECRET must be set outside local development.
+      VERIFICATION_ENABLED: ${VERIFICATION_ENABLED:-true}
       VERIFICATION_SECRET: ${VERIFICATION_SECRET:-change-me-in-prod}
       VERIFICATION_CODE_LENGTH: ${VERIFICATION_CODE_LENGTH:-6}
       VERIFICATION_EXPIRATION_MINUTES: ${VERIFICATION_EXPIRATION_MINUTES:-15}

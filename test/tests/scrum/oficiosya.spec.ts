@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { waitForVerificationCode } from '../support/registration';
-import { fakeJwt, mockHomeApi, mockVerifiedSession } from '../support/ui';
+import { fakeJwt, mockHomeApi, mockVerifiedSession, mockProfileViewer } from '../support/ui';
 
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:8080';
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL ?? 'http://localhost:5173';
@@ -113,6 +113,20 @@ async function getFirstTrade(request: APIRequestContext) {
 async function blockProfileMapRequests(page: Page) {
   await page.route('https://nominatim.openstreetmap.org/**', (route) => route.abort());
   await page.route('https://tile.openstreetmap.org/**', (route) => route.abort());
+}
+
+async function signInProfileViewer(page: Page, request: APIRequestContext) {
+  const response = await registerClient(request, {
+    name: 'Cliente Perfil QA', email: uniqueEmail('profile.viewer'), password: 'ClaveSegura2026!',
+  });
+  expect(response.status()).toBe(200);
+  const auth = await response.json();
+  await page.addInitScript(session => {
+    localStorage.setItem('oficiosya_token', session.token);
+    localStorage.setItem('oficiosya_user', JSON.stringify({
+      id: session.id, name: session.name, email: session.email, role: session.role,
+    }));
+  }, auth);
 }
 
 async function mockHomeTradeResults(page: Page) {
@@ -1834,6 +1848,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
       workingLocation: 'Punta del Este'
     }, 'Especialista en instalaciones y soluciones rápidas para hogares y comercios.');
 
+    await signInProfileViewer(page, request);
     await page.goto(`${FRONTEND_BASE}/profesionales/${professional.id}`);
 
     await expect(page.getByRole('heading', { name: professional.name })).toBeVisible();
@@ -1869,6 +1884,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(publicProfile).not.toHaveProperty('phoneNumber');
     expect(publicProfile).not.toHaveProperty('phone');
 
+    await signInProfileViewer(page, request);
     await blockProfileMapRequests(page);
     await page.goto(`${FRONTEND_BASE}/profesionales/${professional.id}`);
 
@@ -1884,6 +1900,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
   test('SCRUM-15: el perfil representa una imagen y una calificación existentes', async ({ page }) => {
     const professionalId = '11111111-1111-4111-8111-111111111111';
+    await mockProfileViewer(page);
     await blockProfileMapRequests(page);
     await page.route(`**/api/v1/professionals/${professionalId}`, (route) => route.fulfill({
       status: 200,
@@ -1923,6 +1940,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const apiResponse = await request.get(`${API_BASE}/api/v1/professionals/${missingId}`);
     expect(apiResponse.status()).toBe(404);
 
+    await signInProfileViewer(page, request);
     await page.goto(`${FRONTEND_BASE}/profesionales/${missingId}`);
 
     await expect(page.getByRole('alert')).toContainText('No encontramos el perfil que buscás.');
@@ -1931,6 +1949,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
   test('SCRUM-15: muestra la carga mientras espera el perfil y luego renderiza el resultado', async ({ page }) => {
     const professionalId = '22222222-2222-4222-8222-222222222222';
+    await mockProfileViewer(page);
     await blockProfileMapRequests(page);
     await page.route(`**/api/v1/professionals/${professionalId}`, async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 350));
@@ -1957,6 +1976,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
   test('SCRUM-15: un error del servidor muestra un mensaje recuperable', async ({ page }) => {
     const professionalId = '33333333-3333-4333-8333-333333333333';
+    await mockProfileViewer(page);
     await page.route(`**/api/v1/professionals/${professionalId}`, (route) => route.fulfill({
       status: 500,
       contentType: 'application/json',
@@ -1978,6 +1998,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
       workingLocation: 'Montevideo'
     });
 
+    await signInProfileViewer(page, request);
     await page.goto(`${FRONTEND_BASE}/profesionales/${professional.id}`);
 
     await expect(page.getByRole('heading', { name: 'Disponibilidad semanal' })).toBeVisible();

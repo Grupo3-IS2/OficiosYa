@@ -3,7 +3,7 @@ import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
 import type { Professional } from '../../../types/Professional'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
-import { getCurrentUser } from '../../../services/authService'
+import { getCurrentUser, isAuthenticated } from '../../../services/authService'
 import { getProfessionalSchedule } from '../../../services/scheduleService'
 import { currentWeek } from '../../ProfessionalProfile/scheduleCalendar'
 import { professionalAvailability } from '../professionalAvailability'
@@ -56,7 +56,7 @@ function ProfessionalCard({ professional, selectedTradeId = null }: Professional
                     </div>
                 )}
                 <Rating value={professional.rating} />
-                {professional.workingLocation && (
+                {isAuthenticated() && professional.workingLocation && (
                     <p className="meta"><Icon name="location" /> {professional.workingLocation}</p>
                 )}
                 <p className="meta"><Icon name="calendar" /> {availability}</p>

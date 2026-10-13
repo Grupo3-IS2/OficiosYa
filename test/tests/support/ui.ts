@@ -95,3 +95,17 @@ export async function mockVerifiedSession(page: Page, user: MockedUser) {
     })
   }));
 }
+
+/** Authenticated viewer for isolated profile UI tests. Real integration tests use real tokens. */
+export async function mockProfileViewer(page: Page) {
+  await mockVerifiedSession(page, { name: 'Cliente Perfil QA', email: 'profile.viewer@qa.test', role: 'CLIENT' });
+  await page.addInitScript(token => {
+    if (!window.location.pathname.startsWith('/profesionales/')) return;
+    localStorage.setItem('oficiosya_token', token);
+    localStorage.setItem('oficiosya_user', JSON.stringify({
+      id: '33333333-3333-3333-3333-333333333333',
+      name: 'Cliente Perfil QA', email: 'profile.viewer@qa.test', role: 'CLIENT',
+    }));
+  }, fakeJwt());
+  await page.route('**/api/v1/schedules?**', route => route.fulfill({ json: [] }));
+}

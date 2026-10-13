@@ -7,9 +7,11 @@ import Icon from '../../components/Icon/Icon'
 import avatarPlaceholder from '../../assets/avatar-placeholder.svg'
 import { getCurrentUser } from '../../services/authService'
 import { getMyJobRequests } from '../../services/jobRequestService'
+import { getJobRequestPin } from '../../services/jobRequestPinStore'
 import type { JobRequest, JobStatus } from '../../types/JobRequest'
 import { filterAndOrderRequests, groupRequestsByDate, localDateKey, requestDescription, serviceSummary, type RequestFilter, type RequestOrder } from './requestList'
 import RequestOrderControl from './RequestOrderControl'
+import RequestDetailModal from './RequestDetailModal'
 import RescheduleModal from './RescheduleModal'
 import RescheduleReviewModal from './RescheduleReviewModal'
 import { timeframeText } from './rescheduleTimeframe'
@@ -81,9 +83,10 @@ function groupHeading(dateKey: string): string {
     return dateKey === localDateKey(new Date().toISOString()) ? `Hoy · ${formatted}` : formatted
 }
 
-function RequestCard({ request, side, onReschedule, onReviewReschedule }: Readonly<{
+function RequestCard({ request, side, onView, onReschedule, onReviewReschedule }: Readonly<{
     request: JobRequest
     side: Side
+    onView: (request: JobRequest) => void
     onReschedule: (request: JobRequest) => void
     onReviewReschedule: (request: JobRequest) => void
 }>) {
@@ -119,7 +122,8 @@ function RequestCard({ request, side, onReschedule, onReviewReschedule }: Readon
             {detail && <p>{detail}</p>}
         </div>
         <div className="request-card__action">
-            <Button type="button" aria-label={`Ver solicitud de ${otherName}`}>Ver solicitud</Button>
+            <Button type="button" aria-label={`Ver solicitud de ${otherName}`}
+                onClick={() => onView(request)}>Ver solicitud</Button>
             {answersReschedule && <Button type="button" variant="ghost" aria-label={`Ver el cambio de horario que pidió ${otherName}`}
                 onClick={() => onReviewReschedule(request)}>Ver cambio</Button>}
             {side === 'client' && <Button type="button" variant="ghost" aria-label={`Reagendar solicitud de ${otherName}`}
@@ -135,6 +139,7 @@ export default function RequestsPage() {
     const [loadError, setLoadError] = useState(false)
     const [activeFilter, setActiveFilter] = useState<RequestFilter>('all')
     const [order, setOrder] = useState<RequestOrder>('newest')
+    const [viewing, setViewing] = useState<JobRequest | null>(null)
     const [rescheduling, setRescheduling] = useState<JobRequest | null>(null)
     const [reviewing, setReviewing] = useState<JobRequest | null>(null)
     const viewerId = getCurrentUser()?.id
@@ -191,11 +196,18 @@ export default function RequestsPage() {
                         <div className="request-group__items">
                             {group.requests.map(request => <RequestCard key={request.id} request={request}
                                 side={request.professionalId === viewerId ? 'professional' : 'client'}
+                                onView={setViewing}
                                 onReschedule={setRescheduling} onReviewReschedule={setReviewing} />)}
                         </div>
                     </section>)}
             </section>
         </main>
+        {viewing && <RequestDetailModal
+            request={viewing}
+            isClient={viewing.clientId === viewerId}
+            pin={viewing.clientId === viewerId && viewerId ? getJobRequestPin(viewerId, viewing.id) : null}
+            onClose={() => setViewing(null)}
+        />}
         {rescheduling && <RescheduleModal
             request={rescheduling}
             onClose={() => setRescheduling(null)}

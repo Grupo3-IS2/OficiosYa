@@ -55,6 +55,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [emailChange, setEmailChange] = useState<PendingVerification | null>(null)
     // Whether the account has a password and a linked Google: what the security section offers depends on it.
     const [access, setAccess] = useState<AccountAccess>({ hasPassword: true, googleLinked: false })
+    const [emailNotifications, setEmailNotifications] = useState(true)
     // The selected photo is only uploaded when the personal section is saved.
     const [photo, setPhoto] = useState<File | null>(null)
     const photoPreview = useRef('')
@@ -83,6 +84,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             const phone = isProfessionalResponse(response) ? response.phoneNumber : null
             setIsProfessional(response.role === 'PROFESSIONAL')
             setAccess({ hasPassword: response.hasPassword ?? true, googleLinked: response.googleLinked ?? false })
+            setEmailNotifications(response.emailNotifications ?? true)
             setUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             updateStoredUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar }))
@@ -351,7 +353,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
 
     return {
         emailChange, confirmEmailChange, resendEmailChange, cancelEmailChange,
-        user, isProfessional, personal, setPersonal, selectPhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, access, setAccess, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
+        user, isProfessional, personal, setPersonal, selectPhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, access, setAccess, emailNotifications, setEmailNotifications, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
         busy, loadingProfile, profileLoadFailed, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),

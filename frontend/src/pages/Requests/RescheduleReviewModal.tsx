@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import Button from '../../components/Button/Button'
 import { acceptReschedule, rejectReschedule } from '../../services/jobRequestService'
 import type { JobRequest } from '../../types/JobRequest'
+import { rescheduleRequester } from './requestList'
+import type { Decision } from './requestResponse'
 import { changedParts, timeframeParts, type TimeframePart, type TimeframeParts } from './rescheduleTimeframe'
 import './RescheduleModal.css'
 
@@ -30,14 +32,19 @@ function Timeframe({ title, parts, changed, tone }: Readonly<{
     </div>
 }
 
-/** The professional compares the agreed timeframe with the one the client proposes, and answers. */
-export default function RescheduleReviewModal({ request, onAnswered, onClose }: Readonly<{
+/**
+ * The side that didn't ask already chose to accept or reject the reschedule: this shows the change
+ * that choice applies to, the agreed timeframe against the proposed one, before confirming it.
+ */
+export default function RescheduleReviewModal({ request, decision, onAnswered, onClose }: Readonly<{
     request: JobRequest
+    decision: Decision
     onAnswered: (updated: JobRequest, accepted: boolean) => void
     onClose: () => void
 }>) {
     const dialog = useRef<HTMLDialogElement>(null)
-    const [busy, setBusy] = useState<'accept' | 'reject' | null>(null)
+    const [busy, setBusy] = useState(false)
+    const accept = decision === 'accept'
     const [error, setError] = useState('')
     const current = request.scheduledStart && request.scheduledEnd ? timeframeParts(request.scheduledStart, request.scheduledEnd) : null
     const proposed = request.rescheduleStart && request.rescheduleEnd ? timeframeParts(request.rescheduleStart, request.rescheduleEnd) : null
@@ -58,24 +65,26 @@ export default function RescheduleReviewModal({ request, onAnswered, onClose }: 
         }
     }, [])
 
-    const answer = async (accept: boolean) => {
-        setBusy(accept ? 'accept' : 'reject')
+    const confirm = async () => {
+        setBusy(true)
         setError('')
         try {
             onAnswered(await (accept ? acceptReschedule(request.id) : rejectReschedule(request.id)), accept)
         } catch (reason) {
             setError(reason instanceof Error ? reason.message : 'No se pudo responder. Intentá nuevamente.')
-            setBusy(null)
+            setBusy(false)
         }
     }
 
+    const requester = rescheduleRequester(request) === 'PROFESSIONAL' ? request.professionalName : request.clientName
+
     return createPortal(
-        <dialog ref={dialog} className="reschedule-modal" aria-labelledby="reschedule-review-title" aria-describedby="reschedule-review-description" aria-busy={busy !== null}
+        <dialog ref={dialog} className="reschedule-modal" aria-labelledby="reschedule-review-title" aria-describedby="reschedule-review-description" aria-busy={busy}
             onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
             <div className="reschedule-modal__body">
-                <h2 id="reschedule-review-title">Cambio de horario</h2>
+                <h2 id="reschedule-review-title">{accept ? '¿Aceptar el cambio de horario?' : '¿Rechazar el cambio de horario?'}</h2>
                 <p id="reschedule-review-description">
-                    {request.clientName} pidió mover el trabajo.
+                    {requester} pidió mover el trabajo. {accept ? 'El trabajo pasa al nuevo horario.' : 'Se mantiene el horario actual.'}
                 </p>
                 <div className="reschedule-review__comparison">
                     <Timeframe title="Horario actual" parts={current} changed={changed} tone="current" />
@@ -84,14 +93,13 @@ export default function RescheduleReviewModal({ request, onAnswered, onClose }: 
                 </div>
                 {error && <p className="reschedule-modal__error" role="alert">{error}</p>}
                 <div className="reschedule-modal__actions">
-                    <button type="button" onClick={() => { void answer(false) }} disabled={busy !== null}>
-                        {busy === 'reject' ? 'Rechazando…' : 'Rechazar cambio'}
-                    </button>
-                    <Button type="button" onClick={() => { void answer(true) }} disabled={busy !== null}>
-                        {busy === 'accept' ? 'Aceptando…' : 'Aceptar cambio'}
+                    <button type="button" onClick={onClose} disabled={busy}>Volver</button>
+                    <Button type="button" className={accept ? undefined : 'reschedule-modal__reject'} onClick={() => { void confirm() }} disabled={busy}>
+                        {accept
+                            ? busy ? 'Aceptando…' : 'Aceptar cambio'
+                            : busy ? 'Rechazando…' : 'Rechazar cambio'}
                     </Button>
                 </div>
-                <button type="button" className="reschedule-review__close" onClick={onClose} disabled={busy !== null}>Decidir después</button>
             </div>
         </dialog>,
         document.body,

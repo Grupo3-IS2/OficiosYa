@@ -9,6 +9,7 @@ import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.entity.JobStatus;
+import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import org.junit.jupiter.api.BeforeEach;
@@ -154,14 +155,17 @@ class JobRequestControllerTest {
     }
 
     @Test
-    void requestReschedule() throws Exception {
+    void requestReschedule_answersWhoAskedForIt() throws Exception {
+        JobRequestResponse pending = job(JobStatus.RESCHEDULE_REQUESTED);
+        pending.setRescheduleRequestedBy(Role.PROFESSIONAL);
         when(jobRequestService.requestReschedule(eq(10L), any(JobRequestRescheduleRequest.class), eq(userId)))
-                .thenReturn(job(JobStatus.RESCHEDULE_REQUESTED));
+                .thenReturn(pending);
 
         mvc.perform(signedIn(post(BASE + "/10/reschedule"), """
                         {"startTimestamp":"2030-01-02T10:00:00-03:00","endTimestamp":"2030-01-02T12:00:00-03:00"}"""))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("RESCHEDULE_REQUESTED"));
+                .andExpect(jsonPath("$.status").value("RESCHEDULE_REQUESTED"))
+                .andExpect(jsonPath("$.rescheduleRequestedBy").value("PROFESSIONAL"));
     }
 
     @Test

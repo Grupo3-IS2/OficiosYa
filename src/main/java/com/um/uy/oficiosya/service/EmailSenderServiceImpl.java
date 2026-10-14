@@ -41,6 +41,23 @@ public class EmailSenderServiceImpl implements EmailSenderService {
         }
     }
 
+    @Override
+    public boolean sendNotification(String to, String subject, String body) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromAddress);
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(body);
+
+        try {
+            mailSender.send(message);
+            return true;
+        } catch (MailException e) {
+            log.error("Failed to send a notification email to {}", to, e);
+            return false;
+        }
+    }
+
     private String subjectFor(VerificationPurpose purpose) {
         return switch (purpose) {
             case REGISTER -> "Confirmá tu cuenta de OficiosYa";

@@ -168,7 +168,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
-        return build(HttpStatus.FORBIDDEN, "No tenés permiso para realizar esta acción", null);
+        return build(HttpStatus.FORBIDDEN, "No tienes permiso para realizar esta acción", null);
     }
 
     @ResponseStatus(HttpStatus.UNAUTHORIZED)

@@ -73,4 +73,22 @@ class EmailSenderServiceImplTest {
 
         assertEquals(503, e.getStatusCode().value());
     }
+
+    @Test
+    void aNotification_goesWithItsSubjectAndBody() {
+        assertTrue(service.sendNotification("ana@example.com", "Asunto", "Cuerpo"));
+
+        SimpleMailMessage message = sent();
+        assertEquals("no-reply@oficiosya.com", message.getFrom());
+        assertEquals("ana@example.com", message.getTo()[0]);
+        assertEquals("Asunto", message.getSubject());
+        assertEquals("Cuerpo", message.getText());
+    }
+
+    @Test
+    void aNotificationThatFails_isAnsweredWithFalse_insteadOfAnError() {
+        doThrow(new MailSendException("down")).when(mailSender).send(any(SimpleMailMessage.class));
+
+        assertEquals(false, service.sendNotification("ana@example.com", "Asunto", "Cuerpo"));
+    }
 }

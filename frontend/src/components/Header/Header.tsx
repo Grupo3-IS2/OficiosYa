@@ -7,6 +7,7 @@ import {
     isAuthenticated,
     logout,
 } from '../../services/authService'
+import { useAwaitingAnswers } from './useAwaitingAnswers'
 import './Header.css'
 
 function Header() {
@@ -20,6 +21,7 @@ function Header() {
             ? 'Panel profesional'
             : 'Convertirse en profesional'
     const requestsActive = window.location.pathname === '/mis-solicitudes'
+    const awaiting = useAwaitingAnswers(authenticated)
 
     const toggleMenu = () => {
         setIsMenuOpen((isOpen) => !isOpen)
@@ -69,8 +71,14 @@ function Header() {
                         href="/mis-solicitudes"
                         aria-current={requestsActive ? 'page' : undefined}
                     >
-                        <Icon name="document" />
+                        <span className="nav-item__icon">
+                            <Icon name="document" />
+                            {awaiting > 0 && <b className="nav-alert" aria-hidden="true">!</b>}
+                        </span>
                         <span>Mis solicitudes</span>
+                        {awaiting > 0 && <span className="nav-alert-text">
+                            {awaiting === 1 ? '(1 solicitud espera tu respuesta)' : `(${awaiting} solicitudes esperan tu respuesta)`}
+                        </span>}
                     </a>
                 )}
 

@@ -2,6 +2,7 @@ import Icon from '../../components/Icon/Icon'
 import PersonalDataSection from './components/PersonalDataSection'
 import SecuritySection from './components/SecuritySection'
 import GoogleAccountSection from './components/GoogleAccountSection'
+import NotificationsSection from './components/NotificationsSection'
 import ProfessionalProfileSection from './components/ProfessionalProfileSection'
 import ScheduleSection from './components/ScheduleSection'
 import BecomeProfessionalCard from './components/BecomeProfessionalCard'
@@ -35,6 +36,8 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                     {(editor.loadingProfile || editor.access.hasPassword) && <SecuritySection value={editor.security} onChange={editor.setSecurity} onSave={() => editor.saveSection('security')} message={editor.messages.security} error={editor.errorSection === 'security' ? editor.error : ''} />}
                     {/* Not before the profile says whether Google is linked: it would show the wrong state. */}
                     {!editor.loadingProfile && !editor.profileLoadFailed && <GoogleAccountSection access={editor.access} email={editor.savedPersonalEmail} onChange={editor.setAccess} />}
+                    {/* Same: not before the profile says how the switch is */}
+                    {!editor.loadingProfile && !editor.profileLoadFailed && <NotificationsSection enabled={editor.emailNotifications} onChange={editor.setEmailNotifications} />}
                     {editor.isProfessional
                         ? <>
                             <ProfessionalProfileSection value={editor.professional} onChange={editor.setProfessional} onSave={() => editor.saveSection('professional')} message={editor.messages.professional} error={editor.errorSection === 'professional' ? editor.error : ''} trades={editor.trades} tradesLoading={editor.tradesLoading} tradesError={editor.tradesError} />

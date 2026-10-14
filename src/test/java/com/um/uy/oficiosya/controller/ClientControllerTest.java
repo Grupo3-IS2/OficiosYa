@@ -10,6 +10,7 @@ import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
+import com.um.uy.oficiosya.dto.update.NotificationsUpdateRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
 import com.um.uy.oficiosya.service.interfaces.GoogleAuthService;
@@ -220,5 +221,29 @@ class ClientControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(authService, never()).restartSessions(any());
+    }
+
+    // --- notifications ---
+
+    @Test
+    void updateNotifications_turnsTheEmailsOffAndAnswersTheUser() throws Exception {
+        ClientResponse response = new ClientResponse();
+        response.setEmailNotifications(false);
+        when(clientService.updateNotifications(any(NotificationsUpdateRequest.class), eq(userId))).thenReturn(response);
+
+        mvc.perform(signedIn(put(BASE + "/notifications"), """
+                        {"emailNotifications":false}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emailNotifications").value(false));
+
+        verify(clientService).updateNotifications(new NotificationsUpdateRequest(false), userId);
+    }
+
+    @Test
+    void updateNotifications_withoutTheValue_is400() throws Exception {
+        mvc.perform(signedIn(put(BASE + "/notifications"), "{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(clientService);
     }
 }

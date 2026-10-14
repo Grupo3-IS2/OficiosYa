@@ -13,6 +13,8 @@ export interface UserResponse {
   hasPassword: boolean
   /** Whether a Google account is linked to this one. */
   googleLinked: boolean
+  /** Whether the user gets emails about their requests (a change of timeframe, requests piling up). */
+  emailNotifications: boolean
 }
 
 export interface ProfessionalResponse extends UserResponse {
@@ -64,6 +66,14 @@ export function unlinkGoogle(currentPassword: string): Promise<AuthenticatedUser
   return apiRequest<AuthenticatedUserResponse>('/users/me/google', {
     method: 'DELETE',
     body: JSON.stringify({ currentPassword }),
+  })
+}
+
+/** Turns the emails about the user's requests on or off; it takes effect right away. */
+export function updateNotifications(emailNotifications: boolean): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/notifications', {
+    method: 'PUT',
+    body: JSON.stringify({ emailNotifications }),
   })
 }
 

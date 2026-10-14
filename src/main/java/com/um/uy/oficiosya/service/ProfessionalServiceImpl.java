@@ -211,7 +211,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
                                                      ExpertiseTradeUpdateRequest request) {
         ExpertiseTrade expertiseTrade = expertiseTradeRepository
                 .findByIdAndProfessional_PublicId(expertiseTradeId, professionalId)
-                .orElseThrow(() -> new ExpertiseTradeNotFoundException("No tenés ese oficio en tu perfil."));
+                .orElseThrow(() -> new ExpertiseTradeNotFoundException("No tienes ese oficio en tu perfil."));
 
         BigDecimal minimum = request.getMinimumHourlyWage() != null
                 ? request.getMinimumHourlyWage() : expertiseTrade.getMinimumHourlyWage();
@@ -235,7 +235,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     public ProfessionalResponse removeExpertiseTrade(UUID professionalId, Long expertiseTradeId) {
         ExpertiseTrade expertiseTrade = expertiseTradeRepository
                 .findByIdAndProfessional_PublicId(expertiseTradeId, professionalId)
-                .orElseThrow(() -> new ExpertiseTradeNotFoundException("No tenés ese oficio en tu perfil."));
+                .orElseThrow(() -> new ExpertiseTradeNotFoundException("No tienes ese oficio en tu perfil."));
 
         Professional professional = expertiseTrade.getProfessional();
         professional.getExpertiseTrades().remove(expertiseTrade);

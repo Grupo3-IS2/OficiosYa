@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
+import ZonePicker from '../../../components/ZonePicker/ZonePicker'
 import { getCurrentUser } from '../../../services/authService'
 import { ApiError } from '../../../services/api'
 import { createJobRequest } from '../../../services/jobRequestService'
@@ -17,7 +18,8 @@ import './ServiceRequestModal.css'
 
 interface ServiceRequestModalProps {
     professional: Professional
-    preferredTradeId: number
+    /** The service chosen on the profile, if any: the first task starts with it. */
+    preferredTradeId: number | null
     onClose: () => void
 }
 
@@ -200,8 +202,9 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
             ) : (
                 <>
                     <div className="service-request-modal__body">
-                        <label className="service-request-field" htmlFor="service-request-location">
-                            <span>¿Dónde se realizará el trabajo? <em>*</em></span>
+                        {/* Not a <label> around it all: the map and the suggestions inside are controls of their own */}
+                        <div className="service-request-field">
+                            <label htmlFor="service-request-location">¿Dónde se realizará el trabajo? <em>*</em></label>
                             <span className="service-request-input">
                                 <Icon name="location" />
                                 <input
@@ -216,7 +219,13 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
                                 />
                             </span>
                             {showErrors && errors.location && <small id="service-request-location-error" className="service-request-error">{errors.location}</small>}
-                        </label>
+                            {/* The same help as when a professional enters their zone: suggestions while typing, or a tap on the map */}
+                            <ZonePicker
+                                query={value.location}
+                                onChoose={location => setValue(current => ({ ...current, location }))}
+                                mapLabel="Mapa para elegir dónde se realizará el trabajo"
+                            />
+                        </div>
 
                         <label className="service-request-field" htmlFor="service-request-amount">
                             <span>Monto del servicio <em>*</em></span>
@@ -299,6 +308,7 @@ function TaskFields({ index, task, trades, showErrors, errors, onChange, onRemov
                     aria-invalid={showErrors && Boolean(errors?.tradeId)}
                     onChange={event => onChange({ tradeId: Number(event.target.value) })}
                 >
+                    <option value={0} disabled>Elegí un servicio</option>
                     {trades.map(trade => <option key={trade.tradeId} value={trade.tradeId}>{trade.tradeName}</option>)}
                 </select>
                 {showErrors && errors?.tradeId && <small className="service-request-error">{errors.tradeId}</small>}

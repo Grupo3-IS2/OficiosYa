@@ -29,4 +29,7 @@ public class ClientResponse {
 
     /** Whether a Google account is linked, so the user can sign in with it. */
     private boolean googleLinked;
+
+    /** Whether the user gets emails about their requests (a change of timeframe, requests piling up). */
+    private boolean emailNotifications;
 }

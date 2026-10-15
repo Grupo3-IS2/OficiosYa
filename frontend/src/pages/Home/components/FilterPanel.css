@@ -141,3 +141,17 @@
 @media (prefers-reduced-motion: reduce) {
   .filter-panel, .filter-panel::backdrop { animation: none; }
 }
+
+.filter-group .zone-picker { margin-top: 12px; }
+
+.trade-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.trade-options button { min-height: 36px; border: 1px solid #dfe5e8; border-radius: 999px; padding: 7px 13px; background: #fff; color: #536174; font-size: 12px; }
+.trade-options button:hover { border-color: #b9e6ca; color: #078b48; }
+.trade-options button.active { border-color: #07984c; background: #e7f7ed; color: #077a40; font-weight: 750; }
+
+/* "Personalizar" takes the whole row and opens the calendar under the quick choices. */
+.rating-options .availability-custom { grid-column: 1 / -1; }
+.availability-menu { margin-top: 10px; border: 1px solid #dfe5e8; border-radius: 14px; padding: 4px 12px 12px; background: #fff; box-shadow: 0 10px 28px rgba(17, 30, 49, .1); }
+.availability-menu .date-range-calendar { margin-top: 8px; border: 0; padding: 0; }
+.availability-menu__done { display: block; margin: 10px 0 0 auto; border: 0; border-radius: 10px; padding: 7px 16px; background: #07984c; color: #fff; font-size: 13px; font-weight: 750; }
+.availability-menu__done:hover { background: #087f41; }

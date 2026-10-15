@@ -20,6 +20,7 @@
 .edit-profile-page .button:disabled { opacity: .6; cursor: wait; }
 .profile-photo .button { background: #fff; border: 1px solid #0ba756; color: #07984c; min-height: 35px; padding: 6px 20px; font-size: 14px; font-weight: 400; }
 .profile-photo .button:hover { background: #effaf3; }
+.profile-photo__remove { border: 0; padding: 2px 4px; background: none; color: #b42318; font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .profile-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 21px; min-width: 0; }
 .profile-field label { font-size: 15px; }
 .profile-field input, .profile-field textarea { width: 100%; min-width: 0; border: 1px solid #cdd2cf; border-radius: 6px; background: #fff; color: #252925; padding: 10px 14px; font: inherit; font-size: 16px; }
@@ -166,9 +167,30 @@
     .schedule-editor__list-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
     .schedule-editor__bulk-actions { align-items: flex-start; flex-direction: column; }
 }
-.profile-actions .button--ghost { background: #fff; border: 1px solid #0ba756; color: #07984c; }
-.profile-actions .button--ghost:hover { background: #effaf3; }
+:is(.profile-actions, .profile-terms, .mailed-code) .button--ghost { background: #fff; border: 1px solid #0ba756; color: #07984c; }
+:is(.profile-actions, .profile-terms, .mailed-code) .button--ghost:hover { background: #effaf3; }
 .email-change__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 4px; }
 .email-change__actions > button:not(.button) { padding: 6px 0; border: 0; background: none; color: #078747; font: inherit; font-size: 15px; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .email-change__actions > button:not(.button):disabled { color: #829091; font-weight: 400; text-decoration: none; cursor: default; }
 @media (max-width: 680px) { .email-change__actions .button { width: 100%; } }
+
+.profile-danger { border-color: #f4a49b; background: #fff8f7; }
+.profile-danger h2 { color: #b42318; }
+.profile-danger .profile-subtitle { color: #7a2e26; }
+.profile-danger .button--ghost { border: 1px solid #d92d20; background: #fff; color: #b42318; }
+.profile-danger .button.profile-danger__confirm { background: #d92d20; color: #fff; }
+.profile-danger .button.profile-danger__confirm:hover { background: #b42318; }
+.profile-danger .button--ghost:hover { background: #fef3f2; }
+.profile-terms .button { display: inline-flex; align-items: center; margin-top: 12px; text-decoration: none; }
+
+/* The phone: the country's prefix and the number in one box, like the other fields. */
+.profile-phone { display: flex; align-items: stretch; height: 43px; border: 1px solid #cdd2cf; border-radius: 6px; background: #fff; padding-left: 12px; }
+.profile-phone:focus-within { border-color: #0ba756; box-shadow: 0 0 0 3px rgba(11, 167, 86, .12); }
+.profile-phone > input { flex: 1; height: auto; border: 0; outline: 0; background: transparent; }
+.profile-phone .phone-prefix__manual { height: auto; border-top: 0; border-bottom: 0; border-left: 0; border-radius: 0; padding-left: 0; }
+
+/* The code and the button that mails it, side by side. */
+.mailed-code { display: flex; gap: 10px; }
+.mailed-code input { flex: 1; }
+.mailed-code .button { flex: 0 0 auto; min-height: 43px; padding: 8px 18px; white-space: nowrap; }
+@media (max-width: 680px) { .mailed-code { flex-direction: column; } }

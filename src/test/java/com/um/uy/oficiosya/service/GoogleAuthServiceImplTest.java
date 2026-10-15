@@ -1,9 +1,9 @@
 package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
-import com.um.uy.oficiosya.dto.request.GoogleCredentialRequest;
 import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
+import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
@@ -84,8 +84,8 @@ class GoogleAuthServiceImplTest {
                 .password(HASH).build();
     }
 
-    private GoogleCredentialRequest credential() {
-        return GoogleCredentialRequest.builder().credential(CREDENTIAL).build();
+    private GoogleRegisterRequest credential() {
+        return GoogleRegisterRequest.builder().credential(CREDENTIAL).build();
     }
 
     private GoogleLinkRequest linkRequest(String password) {
@@ -256,6 +256,21 @@ class GoogleAuthServiceImplTest {
     }
 
     @Test
+    void registerClient_usesTheNameTheUserWroteInsteadOfGooglesOne() {
+        UUID publicId = UUID.randomUUID();
+        ClientResponse createdResponse = new ClientResponse();
+        createdResponse.setId(publicId);
+        when(clientService.createUser(any(), anyString())).thenReturn(createdResponse);
+        when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(localAccount()));
+
+        service.registerClient(GoogleRegisterRequest.builder().credential(CREDENTIAL).name("  Ana María Pérez ").build());
+
+        ArgumentCaptor<ClientCreateRequest> request = ArgumentCaptor.forClass(ClientCreateRequest.class);
+        verify(clientService).createUser(request.capture(), anyString());
+        assertEquals("Ana María Pérez", request.getValue().getName());
+    }
+
+    @Test
     void registerClient_withAnEmailThatHasAnAccount_isRejectedAndCreatesNothing() {
         when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(true);
 
@@ -291,6 +306,22 @@ class GoogleAuthServiceImplTest {
         assertEquals("Montevideo", request.getValue().getWorkingLocation());
         assertEquals(EMAIL, request.getValue().getEmail());
         assertEquals(AuthProvider.GOOGLE, stored.getAuthProvider());
+    }
+
+    @Test
+    void registerProfessional_usesTheNameTheUserWrote() {
+        UUID publicId = UUID.randomUUID();
+        ProfessionalResponse createdResponse = new ProfessionalResponse();
+        createdResponse.setId(publicId);
+        when(professionalService.createProfessional(any(), anyString())).thenReturn(createdResponse);
+        when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(localAccount()));
+
+        service.registerProfessional(GoogleProfessionalRegisterRequest.builder()
+                .credential(CREDENTIAL).name("Bruno Díaz").phoneNumber("099123456").workingLocation("Salto").build());
+
+        ArgumentCaptor<ProfessionalCreateRequest> request = ArgumentCaptor.forClass(ProfessionalCreateRequest.class);
+        verify(professionalService).createProfessional(request.capture(), anyString());
+        assertEquals("Bruno Díaz", request.getValue().getName());
     }
 
     // --- from the profile ---

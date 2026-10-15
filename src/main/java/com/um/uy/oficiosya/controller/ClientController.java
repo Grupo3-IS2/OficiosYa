@@ -7,10 +7,12 @@ import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.dto.response.ClientResponse;
+import com.um.uy.oficiosya.dto.update.AccountDeletionRequest;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 import com.um.uy.oficiosya.dto.update.NotificationsUpdateRequest;
+import com.um.uy.oficiosya.dto.update.PasswordSetupRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ClientUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
@@ -41,6 +43,8 @@ public class ClientController {
 
     /** The endpoints that mail or check an email-change code share this per-client limit. */
     private static final String EMAIL_CHANGE_BUCKET = "email-change";
+    private static final String PASSWORD_SETUP_BUCKET = "password-setup";
+    private static final String ACCOUNT_DELETION_BUCKET = "account-deletion";
 
     public ClientController(ClientService clientService, GoogleAuthService googleAuthService,
                             RequestRateLimiter rateLimiter, AuthService authService,
@@ -114,6 +118,33 @@ public class ClientController {
                 .build();
     }
 
+    /**
+     * For an account created with Google: mails a code to its email to give it a password. Asking
+     * again is the resend (it answers 429 inside the cooldown).
+     */
+    @PostMapping("/me/password/setup")
+    public ResponseEntity<PendingVerificationResponse> startPasswordSetup(Authentication authentication,
+                                                                          HttpServletRequest request) {
+        rateLimiter.check(request, PASSWORD_SETUP_BUCKET);
+        return ResponseEntity.accepted().body(clientService.startPasswordSetup(AuthenticatedUser.id(authentication)));
+    }
+
+    /**
+     * The code and the new password: the account gets it, and answers the updated user. Like a
+     * password change, every other device is logged out and this one gets a new refresh cookie.
+     */
+    @PutMapping("/me/password/setup")
+    public ResponseEntity<ClientResponse> completePasswordSetup(@Valid @RequestBody PasswordSetupRequest setupRequest,
+                                                                Authentication authentication,
+                                                                HttpServletRequest request) {
+        rateLimiter.check(request, PASSWORD_SETUP_BUCKET);
+        ClientResponse response = clientService.completePasswordSetup(setupRequest, AuthenticatedUser.id(authentication));
+        String refreshToken = authService.restartSessions(AuthenticatedUser.id(authentication));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.create(refreshToken).toString())
+                .body(response);
+    }
+
     /** Turns the emails about the user's requests on or off: a change of timeframe asked of them, requests piling up. */
     @PutMapping("/me/notifications")
     public ResponseEntity<ClientResponse> updateNotifications(@Valid @RequestBody NotificationsUpdateRequest request,
@@ -140,10 +171,34 @@ public class ClientController {
         return ResponseEntity.ok(clientService.changeProfileImage(image, AuthenticatedUser.id(authentication)));
     }
 
+    /** Back to no photo. */
+    @DeleteMapping("/me/profile-image")
+    public ResponseEntity<ClientResponse> removeProfileImage(Authentication authentication) {
+        return ResponseEntity.ok(clientService.removeProfileImage(AuthenticatedUser.id(authentication)));
+    }
+
+    /** Mails the code that deleting the account asks for; asking again resends it. */
+    @PostMapping("/me/deletion-code")
+    public ResponseEntity<PendingVerificationResponse> startAccountDeletion(Authentication authentication,
+                                                                            HttpServletRequest request) {
+        rateLimiter.check(request, ACCOUNT_DELETION_BUCKET);
+        return ResponseEntity.accepted().body(clientService.startAccountDeletion(AuthenticatedUser.id(authentication)));
+    }
+
+    /**
+     * Deletes the account (see {@link ClientService#deleteUser}), confirmed with the password or, for
+     * an account created with Google, its email, and the code mailed to it. Every session ends, this one's
+     * cookie too.
+     */
     @DeleteMapping("/me")
-    public ResponseEntity<Void> deleteUser(Authentication authentication) {
-        clientService.deleteUser(AuthenticatedUser.id(authentication));
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<Void> deleteUser(@RequestBody AccountDeletionRequest deletionRequest, Authentication authentication,
+                                           HttpServletRequest request) {
+        rateLimiter.check(request, ACCOUNT_DELETION_BUCKET);
+        clientService.deleteUser(deletionRequest, AuthenticatedUser.id(authentication));
+        authService.endSessions(AuthenticatedUser.id(authentication));
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.clear().toString())
+                .build();
     }
 
 }

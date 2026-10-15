@@ -5,6 +5,7 @@ import EditProfilePage from './pages/EditProfile/EditProfilePage'
 import RequireAuth from './components/RequireAuth/RequireAuth'
 import ProfessionalProfilePage from './pages/ProfessionalProfile/ProfessionalProfilePage'
 import RequestsPage from './pages/Requests/RequestsPage'
+import TermsPage from './pages/Terms/TermsPage'
 
 function App() {
     const currentPath = window.location.pathname
@@ -49,6 +50,10 @@ function App() {
 
     if (currentPath === '/register') {
         return <Register />
+    }
+
+    if (currentPath === '/terminos') {
+        return <TermsPage />
     }
 
     return <Home />

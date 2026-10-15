@@ -1,6 +1,8 @@
 package com.um.uy.oficiosya.service.interfaces;
 
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
+import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
+import com.um.uy.oficiosya.dto.response.PriceRangeResponse;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
@@ -9,7 +11,6 @@ import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,9 +42,12 @@ public interface ProfessionalService {
     ProfessionalResponse removeExpertiseTrade(UUID professionalId, Long expertiseTradeId);
 
     /**
-     * Published professionals only; every filter is optional and combinable. tradeIds, minPrice
-     * and maxPrice are matched against the same offered trade.
+     * Published professionals only, a page at a time; every filter is optional and combinable.
+     * tradeIds, minPrice and maxPrice are matched against the same offered trade. The order comes
+     * in the filters: a sort in the Pageable is ignored.
      */
-    Page<ProfessionalPublicResponse> searchProfessionals(List<Long> tradeIds, BigDecimal minPrice, BigDecimal maxPrice,
-                                                    Double minRating, String location, String query, Pageable pageable);
+    Page<ProfessionalPublicResponse> searchProfessionals(ProfessionalSearchFilters filters, Pageable pageable);
+
+    /** The hourly rates on offer, to bound the price filter: of those trades (all if none) and that name. */
+    PriceRangeResponse priceRange(List<Long> tradeIds, String query);
 }

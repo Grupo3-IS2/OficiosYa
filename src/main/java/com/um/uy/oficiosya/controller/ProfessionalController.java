@@ -2,6 +2,8 @@ package com.um.uy.oficiosya.controller;
 
 import com.um.uy.oficiosya.config.AuthenticatedUser;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
+import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
+import com.um.uy.oficiosya.dto.response.PriceRangeResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
@@ -13,6 +15,7 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +23,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -69,9 +73,20 @@ public class ProfessionalController {
             @RequestParam(required = false) Double minRating,
             @RequestParam(required = false) String location,
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime availableFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime availableTo,
+            @RequestParam(required = false) ProfessionalSearchFilters.Order order,
             @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(
-                professionalService.searchProfessionals(tradeIds, minPrice, maxPrice, minRating, location, query, pageable));
+        ProfessionalSearchFilters filters = new ProfessionalSearchFilters(tradeIds, minPrice, maxPrice, minRating,
+                location, query, availableFrom, availableTo, order);
+        return ResponseEntity.ok(professionalService.searchProfessionals(filters, pageable));
+    }
+
+    /** The lowest and highest hourly rates on offer, for those trades (all if none) and that name. */
+    @GetMapping("/search/price-range")
+    public ResponseEntity<PriceRangeResponse> priceRange(@RequestParam(required = false) List<Long> tradeIds,
+                                                         @RequestParam(required = false) String query) {
+        return ResponseEntity.ok(professionalService.priceRange(tradeIds, query));
     }
 
     /** Requires a description and at least one offered trade already set. */

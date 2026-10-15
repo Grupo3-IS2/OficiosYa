@@ -10,6 +10,8 @@ import com.um.uy.oficiosya.entity.VerificationPurpose;
 import com.um.uy.oficiosya.exception.ClientAlreadyExists;
 import com.um.uy.oficiosya.mapper.ClientMapper;
 import com.um.uy.oficiosya.repository.ClientRepository;
+import com.um.uy.oficiosya.repository.JobRequestRepository;
+import com.um.uy.oficiosya.service.interfaces.EmailSenderService;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService.VerificationResult;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService.VerificationTerms;
@@ -58,6 +60,10 @@ class ClientServiceImplEmailChangeTest {
     private ProfileImageStorage profileImageStorage;
     @Mock
     private EmailVerificationService emailVerificationService;
+    @Mock
+    private EmailSenderService emailSenderService;
+    @Mock
+    private JobRequestRepository jobRequestRepository;
 
     private ClientServiceImpl service;
     private Client user;
@@ -65,7 +71,8 @@ class ClientServiceImplEmailChangeTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new ClientServiceImpl(clientRepository, passwordEncoder, clientMapper, profileImageStorage, emailVerificationService);
+        service = new ClientServiceImpl(clientRepository, passwordEncoder, clientMapper, profileImageStorage, emailVerificationService,
+                emailSenderService, jobRequestRepository);
         user = Client.builder().id(1L).publicId(UUID.randomUUID()).name("Ana Pérez").email(OLD_EMAIL).password(HASH).build();
 
         when(clientRepository.findByPublicId(user.getPublicId())).thenReturn(Optional.of(user));

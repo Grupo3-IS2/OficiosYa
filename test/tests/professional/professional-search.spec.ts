@@ -4,6 +4,7 @@ import {
   completeRegistration,
   startProfessionalRegistration
 } from '../support/registration';
+import { mockProfessionalSearch, type MockSchedule } from '../support/professionalSearch';
 
 const PASSWORD = 'ClaveSegura2026!';
 const SEARCH_URL = `${API_BASE}/api/v1/professionals/search`;
@@ -74,7 +75,8 @@ function search(request: APIRequestContext, params: Record<string, string>) {
   return request.get(`${SEARCH_URL}?${new URLSearchParams(params)}`);
 }
 
-async function mockHomeSearch(page: Page, professionals: unknown[]) {
+/** The trades, and a search over these professionals (and their free time) that answers like the backend. */
+async function mockHomeSearch(page: Page, professionals: unknown[], schedules: MockSchedule[] = []) {
   await page.route('**/api/v1/trades', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -83,11 +85,12 @@ async function mockHomeSearch(page: Page, professionals: unknown[]) {
       { id: 2, name: 'Plomería' }
     ])
   }));
-  await page.route('**/api/v1/professionals/search**', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({ content: professionals, totalPages: 1 })
-  }));
+  // The cards ask for each one's week too.
+  await page.route('**/api/v1/schedules?**', (route) => {
+    const professionalId = new URL(route.request().url()).searchParams.get('professionalId');
+    return route.fulfill({ json: schedules.filter(schedule => schedule.professionalId === professionalId) });
+  });
+  return mockProfessionalSearch(page, professionals, schedules);
 }
 
 function electrician(id: string, name: string, minimumHourlyWage: number, maximumHourlyWage: number) {
@@ -280,5 +283,113 @@ test.describe('Búsqueda y filtros de profesionales', () => {
     await expect(page.locator('.active-filters')).toHaveCount(0);
     await expect(page.locator('.professional-card')).toHaveCount(1);
     await expect(page.getByRole('heading', { name: 'Carla Plomera' })).toBeVisible();
+  });
+
+  test('el filtro de disponibilidad muestra solo a quien tiene horario libre en ese momento', async ({ page }) => {
+    // Ana has a free block that is going on right now; Carla only a job already booked.
+    const now = Date.now();
+    const block = (id: number, professionalId: string, type: string) => ({
+      id, professionalId, jobRequestId: null, type,
+      startTimestamp: new Date(now - 60_000).toISOString(), endTimestamp: new Date(now + 30 * 60_000).toISOString()
+    });
+    const searches = await mockHomeSearch(page, [
+      electrician('electrician-1', 'Ana Electricista', 350, 600),
+      plumber('plumber-1', 'Carla Plomera')
+    ], [block(1, 'electrician-1', 'URGENT_AVAILABLE'), block(2, 'plumber-1', 'SCHEDULED_JOB')]);
+    await page.goto(FRONTEND_BASE);
+    await expect(page.locator('.professional-card')).toHaveCount(2);
+
+    await page.getByRole('button', { name: /filtros/i }).click();
+    await page.getByRole('group', { name: 'Cuándo' }).getByRole('button', { name: 'Hoy' }).click();
+    await page.getByRole('button', { name: 'Aplicar filtros' }).click();
+
+    await expect(page.locator('.professional-card')).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Ana Electricista' })).toBeVisible();
+    await expect(page.locator('.active-filters')).toContainText('Disponible hoy');
+    // The server filters: from now to the end of today.
+    const asked = searches.at(-1)!;
+    expect(new Date(asked.get('availableFrom')!).getTime()).toBeLessThanOrEqual(Date.now());
+    const midnight = new Date(); midnight.setHours(24, 0, 0, 0);
+    expect(new Date(asked.get('availableTo')!).getTime()).toBe(midnight.getTime());
+
+    await page.locator('.active-filters').getByRole('button', { name: /Disponible hoy/ }).click();
+    await expect(page.locator('.professional-card')).toHaveCount(2);
+  });
+
+  test('en el calendario de disponibilidad se elige un rango de días', async ({ page }) => {
+    // Ana is free in three days; Carla only today.
+    const at = (days: number, hour: number) => { const date = new Date(); date.setDate(date.getDate() + days); date.setHours(hour, 0, 0, 0); return date; };
+    const freeOn = (professionalId: string, days: number) => ({ professionalId, type: 'URGENT_AVAILABLE',
+      startTimestamp: at(days, 0).toISOString(), endTimestamp: at(days, 23).toISOString() });
+    await mockHomeSearch(page, [
+      electrician('electrician-1', 'Ana Electricista', 350, 600),
+      plumber('plumber-1', 'Carla Plomera')
+    ], [freeOn('electrician-1', 3), freeOn('plumber-1', 0)]);
+    await page.goto(FRONTEND_BASE);
+    await expect(page.locator('.professional-card')).toHaveCount(2);
+
+    await page.getByRole('button', { name: /filtros/i }).click();
+    // The calendar is behind "Personalizar".
+    await expect(page.locator('.date-range-calendar')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Personalizar' }).click();
+    const calendar = page.locator('.date-range-calendar');
+    const tap = async (date: Date) => {
+      if (date.getMonth() !== new Date().getMonth()) await calendar.getByRole('button', { name: 'Mes siguiente' }).click();
+      await calendar.locator('.date-range-calendar__grid button:not([disabled])', { hasText: new RegExp(`^${date.getDate()}$`) }).click();
+    };
+    // From tomorrow to four days ahead: Ana's day is inside, Carla's (today) is not.
+    await tap(at(1, 12));
+    await tap(at(4, 12));
+    await page.getByRole('button', { name: 'Listo' }).click();
+    await expect(calendar).toHaveCount(0);
+    // Closed, it shows the days chosen.
+    await expect(page.getByRole('button', { name: /^Personalizar: / })).toHaveAttribute('aria-expanded', 'false');
+    await page.getByRole('button', { name: 'Aplicar filtros' }).click();
+
+    await expect(page.locator('.professional-card')).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Ana Electricista' })).toBeVisible();
+    await expect(page.locator('.active-filters')).toContainText('Disponible');
+  });
+
+  test('el inicio carga pocos profesionales y trae los siguientes al bajar', async ({ page }) => {
+    const many = Array.from({ length: 30 }, (_, index) =>
+      electrician(`electrician-${index}`, `Electricista ${String(index).padStart(2, '0')}`, 300 + index, 600 + index));
+    const searches = await mockHomeSearch(page, many);
+    await page.goto(FRONTEND_BASE);
+
+    // Only the first page, not all of them. (The dev server's StrictMode mounts twice: page 0 may be asked twice.)
+    const pagesAsked = () => [...new Set(searches.map(search => search.get('page')))];
+    await expect(page.locator('.professional-card')).toHaveCount(12);
+    await page.waitForTimeout(500);
+    expect(pagesAsked()).toEqual(['0']);
+    expect(searches[0].get('size')).toBe('12');
+
+    await page.locator('.professional-card').last().scrollIntoViewIfNeeded();
+    await expect(page.locator('.professional-card')).toHaveCount(24);
+    await page.locator('.professional-card').last().scrollIntoViewIfNeeded();
+    await expect(page.locator('.professional-card')).toHaveCount(30);
+    await expect(page.getByRole('heading', { name: 'Electricista 29' })).toBeVisible();
+
+    // Nothing left: no more pages are asked for.
+    await page.mouse.wheel(0, 5000);
+    await page.waitForTimeout(500);
+    expect(pagesAsked()).toEqual(['0', '1', '2']);
+    expect(searches.filter(search => search.get('page') !== '0')).toHaveLength(2);
+  });
+
+  test('cambiar el orden vuelve a pedir la primera página ordenada por el servidor', async ({ page }) => {
+    const searches = await mockHomeSearch(page, [
+      electrician('electrician-1', 'Ana Electricista', 700, 900),
+      electrician('electrician-2', 'Bruno Electricista', 300, 500)
+    ]);
+    await page.goto(FRONTEND_BASE);
+    await expect(page.locator('.professional-card').first()).toContainText('Ana Electricista');
+
+    await page.locator('.sort-control__trigger').click();
+    await page.getByRole('option', { name: 'Menor precio' }).click();
+
+    await expect(page.locator('.professional-card').first()).toContainText('Bruno Electricista');
+    expect(searches.at(-1)!.get('order')).toBe('PRICE_ASC');
+    expect(searches.at(-1)!.get('page')).toBe('0');
   });
 });

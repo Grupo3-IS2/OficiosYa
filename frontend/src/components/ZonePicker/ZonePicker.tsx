@@ -18,13 +18,18 @@ interface ZonePickerProps {
 }
 
 /** Tapping the map: what is being asked and how it went. */
-type Status = 'idle' | 'searching' | 'error' | 'outside'
+type Status = 'idle' | 'locating' | 'searching' | 'error' | 'outside'
 /** Suggesting while typing. */
 type Suggesting = 'idle' | 'loading' | 'none' | 'error'
 
 /** How long to wait after the last key before asking, and how much has to be written: the search service is shared. */
 const SUGGEST_DELAY_MS = 400
 const MIN_LETTERS = 3
+
+/** The person's own position: a recent one is good enough, and a phone shouldn't switch its GPS on for it. */
+const POSITION_OPTIONS: PositionOptions = { enableHighAccuracy: false, timeout: 10_000, maximumAge: 5 * 60_000 }
+/** Nominatim's zoom for the zone of the person's position: a neighbourhood, not their front door. */
+const CURRENT_ZONE_ZOOM = 14
 
 /**
  * The map under the location field. While the field is typed in, places that match are suggested (from
@@ -37,8 +42,44 @@ function ZonePicker({ query, onChoose, locateSaved = false, mapLabel = 'Mapa par
   const [status, setStatus] = useState<Status>('idle')
   const [suggesting, setSuggesting] = useState<Suggesting>('idle')
   const located = useRef(false)
+  // The position arrives later: by then the field may have been typed in or loaded, and is then left alone.
+  const latestQuery = useRef(query)
+  const latestOnChoose = useRef(onChoose)
   /** The text that came from a choice or the saved zone: it is not something typed, so it isn't searched. */
   const settled = useRef('')
+
+  useEffect(() => {
+    latestQuery.current = query
+    latestOnChoose.current = onChoose
+  })
+
+  // Once, when the map appears: if nothing is written yet, the map goes where the person is and the field gets that zone.
+  useEffect(() => {
+    if (latestQuery.current.trim() || !('geolocation' in navigator)) return
+    let active = true
+    setStatus('locating')
+
+    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      if (!active) return
+      try {
+        const zone = await reverseZone(coords.latitude, coords.longitude, { zoom: CURRENT_ZONE_ZOOM })
+        // Out of Uruguay, or the field was filled meanwhile: the map stays as it is.
+        if (!active || !zone || latestQuery.current.trim()) return
+        setFocus({ lat: coords.latitude, lon: coords.longitude })
+        settled.current = zone.label
+        latestOnChoose.current(zone.label)
+      } catch {
+        // Without a name for the point the map just stays on the country.
+      } finally {
+        if (active) setStatus(current => current === 'locating' ? 'idle' : current)
+      }
+    }, () => {
+      // Not allowed or not known: the zone is chosen by hand, as before.
+      if (active) setStatus(current => current === 'locating' ? 'idle' : current)
+    }, POSITION_OPTIONS)
+
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     if (!locateSaved || located.current || !query.trim()) return
@@ -128,6 +169,8 @@ function ZonePicker({ query, onChoose, locateSaved = false, mapLabel = 'Mapa par
 
       <ZoneMap focus={focus} onPick={(lat, lon, zoom) => void pick(lat, lon, zoom)} label={mapLabel} />
 
+      {/* Only while nothing is written: the browser may still be asking the person, and typing answers it too */}
+      {status === 'locating' && !query.trim() && <output className="zone-picker__note zone-picker__note--busy">Buscando tu ubicación…</output>}
       {suggesting === 'loading' && <output className="zone-picker__note zone-picker__note--busy">Buscando coincidencias…</output>}
       {/* Finding the name of a tapped point takes a moment: say so, so the tap doesn't look ignored */}
       {status === 'searching' && <output className="zone-picker__note zone-picker__note--busy">Buscando coincidencias para ese punto del mapa…</output>}

@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.controller;
 
+import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
@@ -24,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.time.OffsetDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -99,11 +101,14 @@ class ProfessionalControllerTest {
     void searchProfessionals_passesTheFilters() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<ProfessionalPublicResponse> page = new PageImpl<>(List.of(new ProfessionalPublicResponse()));
-        when(professionalService.searchProfessionals(List.of(1L, 2L), new BigDecimal("100"), null, 5.0,
-                "Montevideo", "beto", pageable)).thenReturn(page);
+        OffsetDateTime from = OffsetDateTime.parse("2030-01-02T10:00:00-03:00");
+        OffsetDateTime to = OffsetDateTime.parse("2030-01-03T00:00:00-03:00");
+        when(professionalService.searchProfessionals(new ProfessionalSearchFilters(List.of(1L, 2L), new BigDecimal("100"), null, 5.0,
+                "Montevideo", "beto", from, to, ProfessionalSearchFilters.Order.RATING_DESC), pageable)).thenReturn(page);
 
         ResponseEntity<Page<ProfessionalPublicResponse>> response = new ProfessionalController(professionalService)
-                .searchProfessionals(List.of(1L, 2L), new BigDecimal("100"), null, 5.0, "Montevideo", "beto", pageable);
+                .searchProfessionals(List.of(1L, 2L), new BigDecimal("100"), null, 5.0, "Montevideo", "beto",
+                        from, to, ProfessionalSearchFilters.Order.RATING_DESC, pageable);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(page, response.getBody());

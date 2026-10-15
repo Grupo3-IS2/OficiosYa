@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCurrentUser, isAuthenticated, updateStoredUser } from '../../services/authService'
-import { addExpertiseTrade, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, resendEmailChangeCode, setProfessionalPublished, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, uploadProfileImage, verifyEmailChange } from '../../services/userService'
+import { addExpertiseTrade, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, resendEmailChangeCode, setProfessionalPublished, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, removeProfileImage, uploadProfileImage, verifyEmailChange } from '../../services/userService'
 import type { ProfessionalResponse } from '../../services/userService'
 import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
@@ -125,6 +125,13 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     function releasePhotoPreview() {
         if (photoPreview.current) URL.revokeObjectURL(photoPreview.current)
         photoPreview.current = ''
+    }
+
+    /** Like choosing a photo, it is only applied when the personal section is saved. */
+    function removePhoto() {
+        releasePhotoPreview()
+        setPhoto(null)
+        setPersonal(previous => ({ ...previous, avatar: '' }))
     }
 
     function selectPhoto(file: File) {
@@ -256,6 +263,10 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                         setPersonal(previous => ({ ...previous, avatar }))
                         setPhoto(null)
                         releasePhotoPreview()
+                    } else if (!saved.avatar && savedPersonal.avatar) {
+                        if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
+                        await removeProfileImage()
+                        setSavedPersonal(previous => ({ ...previous, avatar: '' }))
                     }
                     // Los datos propios del rol se guardan en su endpoint; el correo tiene el suyo.
                     const nameChanged = saved.name !== savedPersonal.name
@@ -353,7 +364,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
 
     return {
         emailChange, confirmEmailChange, resendEmailChange, cancelEmailChange,
-        user, isProfessional, personal, setPersonal, selectPhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, access, setAccess, emailNotifications, setEmailNotifications, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
+        user, isProfessional, personal, setPersonal, selectPhoto, removePhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, access, setAccess, emailNotifications, setEmailNotifications, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
         busy, loadingProfile, profileLoadFailed, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),

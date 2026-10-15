@@ -104,7 +104,7 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
     await expect(page.locator('.fake-google-button')).toContainText('signin_with');
   });
 
-  test('UI: Google sin cuenta muestra el mensaje del backend y no inicia sesión', async ({ page }) => {
+  test('UI: Google sin cuenta lleva a registrarse con los datos de Google ya completos', async ({ page }) => {
     await mockGoogleIdentity(page, credential('nadie@qa.test'));
     await page.route('**/api/v1/auth/google/login', (route) => route.fulfill({
       status: 404,
@@ -116,8 +116,13 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
 
     await page.locator('.fake-google-button').click();
 
-    await expect(page.getByRole('alert')).toContainText('registrate primero');
+    await expect(page).toHaveURL(`${FRONTEND_BASE}/register`);
+    await expect(page.locator('#register-name')).toHaveValue('Usuario Google');
+    await expect(page.locator('#register-email')).toHaveValue('nadie@qa.test');
+    await expect(page.locator('.register-google-notice')).toContainText('Todavía no tenés una cuenta');
     expect(await page.evaluate(() => localStorage.getItem('oficiosya_token'))).toBeNull();
+    // The token was handed over once: reloading opens the empty form.
+    expect(await page.evaluate(() => sessionStorage.getItem('oficiosya_google_signup'))).toBeNull();
   });
 
   test('UI: un correo con cuenta y contraseña sin vincular abre el cuadro, y "No, gracias" no vincula nada', async ({ page }) => {
@@ -190,6 +195,14 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
 
     await page.locator('.fake-google-button').click();
 
+    // The Google data fills the form, and it says what is left before the account can be made.
+    await expect(page.locator('#register-name')).toHaveValue('Usuario Google');
+    await expect(page.locator('#register-email')).toHaveValue('bob@qa.test');
+    await expect(page.locator('#register-password')).toHaveCount(0);
+    await expect(page.locator('.register-google-notice')).toContainText('términos');
+    expect(calls).toBe(0);
+
+    await page.getByRole('button', { name: 'Crear cuenta con Google' }).click();
     await expect(page.getByRole('alert')).toContainText('términos');
     expect(calls).toBe(0);
   });
@@ -214,6 +227,51 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
     expect(sent).toEqual({ credential: credential('bob@qa.test') });
   });
 
+  test('UI: con todo completo, Google registra con su nombre aunque antes se hubiera escrito otro', async ({ page }) => {
+    let sent: Record<string, unknown> | null = null;
+    await mockGoogleIdentity(page, credential('bob@qa.test'));
+    await page.route('**/api/v1/auth/google/register-client', async (route) => {
+      sent = await jsonBody(route);
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(loginResponse) });
+    });
+    await page.route('**/api/v1/trades', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+    await page.route('**/api/v1/professionals/search**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [], totalPages: 0 }) }));
+    await page.goto(`${FRONTEND_BASE}/register`);
+    await requireGoogleButton(page);
+
+    await page.locator('#register-name').fill('Ana');
+    await page.locator('.terms input').check();
+    await page.locator('.fake-google-button').click();
+
+    // What was on screen is Google's name, so that is what counts: the typed "Ana" is not sent.
+    await expect(page).toHaveURL(`${FRONTEND_BASE}/`);
+    expect(sent).toEqual({ credential: credential('bob@qa.test') });
+  });
+
+  test('UI: al registrarse con Google se puede cambiar el nombre, y se envía el elegido', async ({ page }) => {
+    let sent: Record<string, unknown> | null = null;
+    await mockGoogleIdentity(page, credential('bob@qa.test'));
+    await page.route('**/api/v1/auth/google/register-client', async (route) => {
+      sent = await jsonBody(route);
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(loginResponse) });
+    });
+    await page.route('**/api/v1/trades', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+    await page.route('**/api/v1/professionals/search**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [], totalPages: 0 }) }));
+    await page.goto(`${FRONTEND_BASE}/register`);
+    await requireGoogleButton(page);
+
+    await page.locator('.fake-google-button').click();
+    await expect(page.locator('#register-name')).toHaveValue('Usuario Google');
+    await expect(page.locator('#register-email')).not.toBeEditable();
+
+    await page.locator('#register-name').fill('Roberto Gómez');
+    await page.locator('.terms input').check();
+    await page.getByRole('button', { name: 'Crear cuenta con Google' }).click();
+
+    await expect(page).toHaveURL(`${FRONTEND_BASE}/`);
+    expect(sent).toEqual({ credential: credential('bob@qa.test'), name: 'Roberto Gómez' });
+  });
+
   test('UI: registrar un profesional con Google pide teléfono y ubicación primero', async ({ page }) => {
     let sent: Record<string, unknown> | null = null;
     await mockGoogleIdentity(page, credential('pro@qa.test'));
@@ -229,15 +287,16 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
     await page.locator('.terms input').check();
 
     await page.locator('.fake-google-button').click();
-    await expect(page.getByRole('alert')).toContainText('ubicación');
+    await expect(page.locator('.register-google-notice')).toContainText('ubicación');
+    await expect(page.locator('#register-email')).toHaveValue('pro@qa.test');
     expect(sent).toBeNull();
 
     await page.locator('#register-location').fill('Salto');
     await page.locator('#register-phone').fill('099123456');
-    await page.locator('.fake-google-button').click();
+    await page.getByRole('button', { name: 'Crear cuenta con Google' }).click();
 
     await expect(page).toHaveURL(`${FRONTEND_BASE}/`);
-    expect(sent).toEqual({ credential: credential('pro@qa.test'), phoneNumber: '099123456', workingLocation: 'Salto' });
+    expect(sent).toEqual({ credential: credential('pro@qa.test'), phoneNumber: '+59899123456', workingLocation: 'Salto' });
   });
 
   async function openProfile(page: Page, user: Partial<MockedUser>) {
@@ -265,16 +324,16 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
     await openProfile(page, { googleLinked: true });
 
     const section = page.locator('section', { has: page.getByRole('heading', { name: 'Cuenta de Google' }) });
-    await section.getByRole('button', { name: 'Desvincular Google' }).click();
+    await section.getByRole('button', { name: 'Desvincular de Google' }).click();
     await expect(section.getByRole('alert')).toContainText('contraseña actual');
     expect(unlinkBody).toBeNull();
 
     await section.getByLabel('Contraseña actual').fill(PASSWORD);
-    await section.getByRole('button', { name: 'Desvincular Google' }).click();
+    await section.getByRole('button', { name: 'Desvincular de Google' }).click();
 
     await expect(section.getByRole('status')).toContainText('desvinculada');
     expect(unlinkBody).toEqual({ currentPassword: PASSWORD });
-    await expect(section.getByRole('button', { name: 'Desvincular Google' })).toHaveCount(0);
+    await expect(section.getByRole('button', { name: 'Desvincular de Google' })).toHaveCount(0);
   });
 
   test('UI: perfil sin Google vinculado ofrece vincularlo, y pide la contraseña antes', async ({ page }) => {
@@ -303,7 +362,7 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
     expect(linkBody).toEqual({ credential: credential('perfil.google@qa.test'), currentPassword: PASSWORD });
   });
 
-  test('UI: un Google con otro correo se rechaza y el perfil sigue sin vincular; avisa qué correo usar', async ({ page }) => {
+  test('UI: un Google con otro correo se rechaza y el perfil sigue sin vincular; el error dice qué correo usar', async ({ page }) => {
     await mockGoogleIdentity(page, credential('otro.correo@qa.test'));
     await page.route('**/api/v1/users/me/google', (route) => route.fulfill({
       status: 400,
@@ -313,24 +372,74 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
     await openProfile(page, { googleLinked: false });
     await requireGoogleButton(page);
     const section = page.locator('section', { has: page.getByRole('heading', { name: 'Cuenta de Google' }) });
-    // Before choosing, the page already says which Google it has to be.
-    await expect(section).toContainText('perfil.google@qa.test');
 
     await section.getByLabel('Contraseña actual').fill(PASSWORD);
     await section.locator('.fake-google-button').click();
 
     await expect(section.getByRole('alert')).toContainText('usa otro correo');
     await expect(section.getByRole('alert')).toContainText('perfil.google@qa.test');
-    await expect(section.getByRole('button', { name: 'Desvincular Google' })).toHaveCount(0);
+    await expect(section.getByRole('button', { name: 'Desvincular de Google' })).toHaveCount(0);
   });
 
-  test('UI: una cuenta creada con Google no tiene contraseña que cambiar ni correo editable', async ({ page }) => {
+  test('UI: una cuenta creada con Google no tiene contraseña que cambiar ni correo editable, pero ofrece desvincular', async ({ page }) => {
     await mockGoogleIdentity(page, credential('perfil.google@qa.test'));
     await openProfile(page, { hasPassword: false, googleLinked: true });
 
     await expect(page.getByRole('heading', { name: 'Cuenta de Google' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Seguridad' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Desvincular Google' })).toHaveCount(0);
-    await expect(page.getByLabel('Correo electrónico')).toHaveAttribute('readonly', '');
+    // Unlinking is offered, through creating a password (no password field to type an old one into).
+    await expect(page.getByRole('button', { name: 'Desvincular de Google' })).toBeVisible();
+    await expect(page.getByLabel('Contraseña actual')).toHaveCount(0);
+    await expect(page.getByLabel('Correo electrónico')).toBeDisabled();
+  });
+
+  test('UI: una cuenta creada con Google se desvincula creando una contraseña, con un código que pide en el formulario', async ({ page }) => {
+    let setupBody: Record<string, unknown> | null = null;
+    let unlinkBody: Record<string, unknown> | null = null;
+    let codesAsked = 0;
+    await mockGoogleIdentity(page, credential('perfil.google@qa.test'));
+    await page.route('**/api/v1/users/me/password/setup', async (route) => {
+      if (route.request().method() === 'POST') {
+        codesAsked++;
+        return route.fulfill({ status: 202, json: { email: 'perfil.google@qa.test', verificationRequired: true, codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 } });
+      }
+      setupBody = await jsonBody(route);
+      return route.fulfill({ json: { id: '33333333-3333-3333-3333-333333333333', name: 'Perfil Google QA', email: 'perfil.google@qa.test', role: 'CLIENT', hasPassword: true, googleLinked: true } });
+    });
+    await page.route('**/api/v1/users/me/google', async (route) => {
+      unlinkBody = await jsonBody(route);
+      return route.fulfill({ json: { id: '33333333-3333-3333-3333-333333333333', name: 'Perfil Google QA', email: 'perfil.google@qa.test', role: 'CLIENT', hasPassword: true, googleLinked: false } });
+    });
+    await openProfile(page, { hasPassword: false, googleLinked: true });
+    const section = page.getByRole('region', { name: 'Cuenta de Google' });
+
+    // The button opens the form; no code is mailed until it is asked for there.
+    await section.getByRole('button', { name: 'Desvincular de Google' }).click();
+    await expect(section.getByLabel('Código de verificación')).toBeDisabled();
+    expect(codesAsked).toBe(0);
+
+    await section.getByRole('button', { name: 'Enviar código de verificación' }).click();
+    await expect(section.getByText('Te enviamos un código de 6 dígitos a')).toBeVisible();
+    expect(codesAsked).toBe(1);
+    // Within the cooldown the code can't be asked again.
+    await expect(section.getByRole('button', { name: /Reenviar en/ })).toBeDisabled();
+
+    await section.getByLabel('Código de verificación').fill('123456');
+    await section.getByLabel('Nueva contraseña').fill(PASSWORD);
+    await section.getByLabel('Confirmar contraseña').fill('Distinta2026!');
+    await section.getByRole('button', { name: 'Crear contraseña y desvincular' }).click();
+    await expect(section.getByRole('alert')).toContainText('no coinciden');
+    expect(setupBody).toBeNull();
+
+    await section.getByLabel('Confirmar contraseña').fill(PASSWORD);
+    await section.getByRole('button', { name: 'Crear contraseña y desvincular' }).click();
+
+    await expect(section.getByText('Cuenta de Google desvinculada')).toBeVisible();
+    expect(setupBody).toEqual({ code: '123456', newPassword: PASSWORD, newPasswordConfirmation: PASSWORD });
+    // The password just created is what confirms the unlink.
+    expect(unlinkBody).toEqual({ currentPassword: PASSWORD });
+    // Now it signs in with its password: it can change it, and change the email.
+    await expect(page.getByRole('heading', { name: 'Seguridad' })).toBeVisible();
+    await expect(page.getByLabel('Correo electrónico')).toBeEnabled();
   });
 });

@@ -2,6 +2,7 @@ package com.um.uy.oficiosya.config;
 
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.PaymentState;
+import com.um.uy.oficiosya.entity.VerificationPurpose;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -34,11 +35,16 @@ class EnumCheckConstraintUpdaterTest {
     }
 
     @Test
-    void run_dropsAndRecreatesBothConstraints() {
+    void purposeConstraint_listsEveryVerificationPurpose() {
+        assertEquals(sqlList(VerificationPurpose.class), EnumCheckConstraintUpdater.PURPOSE_VALUES);
+    }
+
+    @Test
+    void run_dropsAndRecreatesEveryConstraint() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
 
         new EnumCheckConstraintUpdater(jdbcTemplate).run();
 
-        verify(jdbcTemplate, times(4)).execute(anyString());
+        verify(jdbcTemplate, times(6)).execute(anyString());
     }
 }

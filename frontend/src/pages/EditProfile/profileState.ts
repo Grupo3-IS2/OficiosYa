@@ -75,7 +75,7 @@ const PHONE_FORMAT = /^(\+\d{1,3})?\d{9}$/
 export function validatePhone(phone: string): string {
     const value = phone.trim()
     if (!value) return 'Ingresa tu número de teléfono.'
-    if (!PHONE_FORMAT.test(value)) return 'Ingresa un teléfono válido: 9 dígitos, con prefijo internacional opcional.'
+    if (!PHONE_FORMAT.test(value)) return 'Ingresa un número de teléfono válido, sin el código del país.'
     return ''
 }
 

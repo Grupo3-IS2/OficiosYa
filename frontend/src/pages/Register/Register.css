@@ -127,12 +127,12 @@
   cursor: not-allowed;
 }
 
-.register-google-hint {
-  margin: 10px 0 0;
-  color: #718092;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 /* The zone picker sits right under its field, closer than the form's usual gap. */
 .register-form .zone-picker { margin: -4px 0 16px; }
+
+/* Signing up with Google: which account it is, and a way back to the password form. */
+.register-google-account { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; border: 1px solid #cdebd9; border-radius: 12px; padding: 11px 14px; background: #eefaf3; }
+.register-google-account p { margin: 0; color: #2f5a42; font-size: 13px; line-height: 1.4; }
+.register-google-account button { flex: 0 0 auto; border: 0; padding: 4px 0; background: transparent; color: #087f41; font-size: 13px; font-weight: 750; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.register-form input[readonly] { color: #5b6a7d; cursor: default; }
+.register-google-notice { margin: 12px 0 0; border-radius: 10px; padding: 10px 12px; background: #eefaf3; color: #2f5a42; font-size: 13px; line-height: 1.4; }

@@ -1,7 +1,9 @@
 package com.um.uy.oficiosya.service;
 
+import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.response.PriceRangeResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -29,6 +32,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.OffsetDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -400,16 +404,21 @@ class ProfessionalServiceImplTest {
 
     // --- search ---
 
+    private static ProfessionalSearchFilters filters(List<Long> tradeIds, BigDecimal minPrice, BigDecimal maxPrice, Double minRating,
+                                                     String location, String query) {
+        return new ProfessionalSearchFilters(tradeIds, minPrice, maxPrice, minRating, location, query, null, null, null);
+    }
+
     @Test
     void searchProfessionals_normalizesTheFilters() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Professional> page = new PageImpl<>(List.of(professional));
-        when(professionalRepository.search(List.of(3L), BigDecimal.ONE, BigDecimal.TEN, 5.0, "Montevideo", "beto", pageable))
-                .thenReturn(page);
+        when(professionalRepository.search(List.of(3L), BigDecimal.ONE, BigDecimal.TEN, 5.0, "Montevideo", "beto",
+                null, null, "RELEVANCE", pageable)).thenReturn(page);
         when(professionalMapper.toPublicResponse(professional)).thenReturn(new ProfessionalPublicResponse());
 
-        Page<ProfessionalPublicResponse> result = service.searchProfessionals(List.of(3L), BigDecimal.ONE, BigDecimal.TEN,
-                5.0, "  Montevideo ", " beto ", pageable);
+        Page<ProfessionalPublicResponse> result = service.searchProfessionals(
+                filters(List.of(3L), BigDecimal.ONE, BigDecimal.TEN, 5.0, "  Montevideo ", " beto "), pageable);
 
         assertEquals(1, result.getTotalElements());
     }
@@ -417,20 +426,53 @@ class ProfessionalServiceImplTest {
     @Test
     void searchProfessionals_emptyFilters_areSentAsNull() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(professionalRepository.search(any(), any(), any(), any(), any(), any(), any())).thenReturn(Page.empty());
+        when(professionalRepository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Page.empty());
 
-        service.searchProfessionals(List.of(), null, null, null, " ", " ", pageable);
-        service.searchProfessionals(null, BigDecimal.ONE, null, null, null, null, pageable);
-        service.searchProfessionals(null, null, BigDecimal.ONE, null, null, null, pageable);
+        service.searchProfessionals(filters(List.of(), null, null, null, " ", " "), pageable);
+        service.searchProfessionals(filters(null, BigDecimal.ONE, null, null, null, null), pageable);
+        service.searchProfessionals(filters(null, null, BigDecimal.ONE, null, null, null), pageable);
 
-        verify(professionalRepository).search(null, null, null, null, null, null, pageable);
+        verify(professionalRepository).search(null, null, null, null, null, null, null, null, "RELEVANCE", pageable);
+    }
+
+    @Test
+    void searchProfessionals_passesTheOrderAndAvailability_andIgnoresTheSortAndHugePages() {
+        OffsetDateTime from = OffsetDateTime.parse("2030-01-02T10:00:00-03:00");
+        OffsetDateTime to = OffsetDateTime.parse("2030-01-03T00:00:00-03:00");
+        when(professionalRepository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Page.empty());
+
+        service.searchProfessionals(new ProfessionalSearchFilters(null, null, null, null, null, null, from, to,
+                ProfessionalSearchFilters.Order.PRICE_ASC), PageRequest.of(2, 500, Sort.by("name")));
+
+        verify(professionalRepository).search(null, null, null, null, null, null, from, to, "PRICE_ASC",
+                PageRequest.of(2, ProfessionalServiceImpl.MAX_PAGE_SIZE));
+    }
+
+    @Test
+    void searchProfessionals_withHalfOrAnEmptyAvailabilityRange_isRejected() {
+        OffsetDateTime now = OffsetDateTime.parse("2030-01-02T10:00:00-03:00");
+        Pageable pageable = PageRequest.of(0, 10);
+
+        assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(
+                new ProfessionalSearchFilters(null, null, null, null, null, null, now, null, null), pageable));
+        assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(
+                new ProfessionalSearchFilters(null, null, null, null, null, null, now, now, null), pageable));
+        verify(professionalRepository, never()).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void priceRange_normalizesTheFilters() {
+        PriceRangeResponse range = new PriceRangeResponse(BigDecimal.ONE, BigDecimal.TEN);
+        when(professionalRepository.priceRange(null, "beto")).thenReturn(range);
+
+        assertSame(range, service.priceRange(List.of(), " beto "));
     }
 
     @Test
     void searchProfessionals_minimumPriceAboveMaximum_isRejected() {
         Pageable pageable = mock(Pageable.class);
 
-        assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(null, BigDecimal.TEN,
-                BigDecimal.ONE, null, null, null, pageable));
+        assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(
+                filters(null, BigDecimal.TEN, BigDecimal.ONE, null, null, null), pageable));
     }
 }

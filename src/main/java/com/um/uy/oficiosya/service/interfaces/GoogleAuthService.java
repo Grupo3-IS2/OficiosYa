@@ -3,6 +3,7 @@ package com.um.uy.oficiosya.service.interfaces;
 import com.um.uy.oficiosya.dto.request.GoogleCredentialRequest;
 import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
+import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
@@ -26,7 +27,7 @@ public interface GoogleAuthService {
     /** The user's "yes, link it": checks the account's password, links Google to it and logs in. */
     LoginResponse link(GoogleLinkRequest request);
 
-    LoginResponse registerClient(GoogleCredentialRequest request);
+    LoginResponse registerClient(GoogleRegisterRequest request);
 
     LoginResponse registerProfessional(GoogleProfessionalRegisterRequest request);
 

@@ -1,10 +1,13 @@
 import type { Professional } from '../../types/Professional'
+import type { DayRange } from './professionalAvailability.ts'
 
 export interface ProfessionalFilters {
     location: string
     minimumPrice: number | null
     maximumPrice: number | null
     minimumRating: number | null
+    /** The days the service is needed: only professionals with free time on them. */
+    availability: DayRange | null
 }
 
 export interface PriceRange {
@@ -17,41 +20,36 @@ export const emptyProfessionalFilters: ProfessionalFilters = {
     minimumPrice: null,
     maximumPrice: null,
     minimumRating: null,
+    availability: null,
 }
 
-export function tradesFor(professional: Professional, tradeId: number | null) {
-    return tradeId === null
+/** No trade chosen means every trade. */
+export function tradesFor(professional: Professional, tradeIds: readonly number[]) {
+    return tradeIds.length === 0
         ? professional.expertiseTrades
-        : professional.expertiseTrades.filter(trade => trade.tradeId === tradeId)
+        : professional.expertiseTrades.filter(trade => tradeIds.includes(trade.tradeId))
 }
 
-export function priceRangeFor(professionals: Professional[], tradeId: number | null): PriceRange | null {
-    const trades = professionals.flatMap(professional => tradesFor(professional, tradeId))
-    if (trades.length === 0) return null
-
-    return {
-        minimum: Math.floor(Math.min(...trades.map(trade => trade.minimumHourlyWage))),
-        maximum: Math.ceil(Math.max(...trades.map(trade => trade.maximumHourlyWage))),
-    }
+/** Tapping a trade card: chooses only that trade, or none if it was the only one chosen. */
+export function selectOnlyTrade(tradeIds: readonly number[], tradeId: number) {
+    return tradeIds.length === 1 && tradeIds[0] === tradeId ? [] : [tradeId]
 }
 
-export function filterProfessionals(professionals: Professional[], tradeId: number | null, filters: ProfessionalFilters) {
-    const normalizedLocation = filters.location.trim().toLocaleLowerCase('es')
-
-    return professionals.filter(professional => {
-        const relevantTrades = tradesFor(professional, tradeId)
-        if (tradeId !== null && relevantTrades.length === 0) return false
-        if (normalizedLocation && !professional.workingLocation.toLocaleLowerCase('es').includes(normalizedLocation)) return false
-        if (filters.minimumRating !== null && (professional.rating === null || professional.rating < filters.minimumRating)) return false
-        if ((filters.minimumPrice !== null || filters.maximumPrice !== null) && !relevantTrades.some(trade =>
-            (filters.minimumPrice === null || trade.maximumHourlyWage >= filters.minimumPrice)
-            && (filters.maximumPrice === null || trade.minimumHourlyWage <= filters.maximumPrice))) return false
-        return true
-    })
+/** Adds the trade to the selection, or takes it out if it was already there. */
+export function toggleTrade(tradeIds: readonly number[], tradeId: number) {
+    return tradeIds.includes(tradeId) ? tradeIds.filter(id => id !== tradeId) : [...tradeIds, tradeId]
 }
 
 export function activeFilterCount(filters: ProfessionalFilters) {
     return Number(Boolean(filters.location.trim()))
         + Number(filters.minimumPrice !== null || filters.maximumPrice !== null)
         + Number(filters.minimumRating !== null)
+        + Number(filters.availability !== null)
+}
+
+/** How the chosen trades are named in a heading: "Plomería", "Plomería y Electricista", "4 rubros". */
+export function tradeSelectionName(names: readonly string[]) {
+    if (names.length <= 1) return names[0] ?? ''
+    if (names.length <= 3) return `${names.slice(0, -1).join(', ')} y ${names.at(-1)}`
+    return `${names.length} rubros`
 }

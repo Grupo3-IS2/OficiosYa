@@ -3,6 +3,7 @@ import Button from '../../../components/Button/Button'
 import GoogleButton from '../../../components/GoogleButton/GoogleButton'
 import { isGoogleEnabled } from '../../../services/googleIdentity'
 import { linkGoogle, unlinkGoogle } from '../../../services/userService'
+import GoogleUnlinkSetup from './GoogleUnlinkSetup'
 
 export interface AccountAccess {
     /** False for an account created with Google: it has no password. */
@@ -64,16 +65,25 @@ export default function GoogleAccountSection({ access, email, onChange }: {
     if (hasPassword && !canManage && !message) return null
 
     return (
-        <section className="profile-section" aria-labelledby="google-title">
+        // Linked, what it offers is unlinking: shown in red, like deleting the account below it.
+        <section className={`profile-section${googleLinked ? ' profile-danger' : ''}`} aria-labelledby="google-title">
             <h2 id="google-title">Cuenta de Google</h2>
             {!hasPassword ? (
-                <p className="profile-subtitle">Iniciás sesión con tu cuenta de Google. Tu cuenta no tiene contraseña de OficiosYa, por eso no se puede cambiar el correo ni desvincular Google.</p>
+                <>
+                    <p className="profile-subtitle">Tu cuenta está vinculada con Google.</p>
+                    <GoogleUnlinkSetup email={email} onDone={account => {
+                        onChange(account)
+                        setMessage(account.googleLinked
+                            ? 'Tu cuenta ya tiene contraseña, pero no pudimos Desvincular de Google. Inténtalo de nuevo con tu nueva contraseña.'
+                            : 'Cuenta de Google desvinculada. Desde ahora entrás con tu correo y tu nueva contraseña.')
+                    }} />
+                </>
             ) : canManage && (
                 <>
                     <p className="profile-subtitle">
                         {googleLinked
-                            ? 'Tu cuenta está vinculada con Google: podés entrar con un solo click o con tu correo y contraseña.'
-                            : `Vinculá tu cuenta con Google para entrar más rápido. Tiene que ser la cuenta de Google de ${email}. Es opcional: seguís pudiendo entrar con tu correo y contraseña.`}
+                            ? 'Tu cuenta está vinculada con Google.'
+                            : `Vinculá tu cuenta con Google para entrar más rápido.`}
                     </p>
                     <div className="profile-field">
                         <label htmlFor="google-current-password">Contraseña actual</label>
@@ -81,7 +91,7 @@ export default function GoogleAccountSection({ access, email, onChange }: {
                         <small id="google-password-help">{googleLinked ? 'Necesaria para desvincular tu cuenta de Google.' : 'Escribila y después elegí tu cuenta de Google.'}</small>
                     </div>
                     {googleLinked
-                        ? <div className="profile-actions"><Button type="button" variant="ghost" disabled={busy} onClick={unlink}>{busy ? 'Desvinculando…' : 'Desvincular Google'}</Button></div>
+                        ? <div className="profile-actions"><Button type="button" variant="ghost" disabled={busy} onClick={unlink}>{busy ? 'Desvinculando…' : 'Desvincular de Google'}</Button></div>
                         : <GoogleButton text="continue_with" onCredential={link} />}
                 </>
             )}

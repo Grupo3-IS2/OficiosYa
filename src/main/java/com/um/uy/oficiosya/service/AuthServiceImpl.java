@@ -85,9 +85,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String restartSessions(UUID userId) {
+        endSessions(userId);
+        return refreshTokenService.issue(userId);
+    }
+
+    @Override
+    public void endSessions(UUID userId) {
         refreshTokenService.revokeAll(userId);
         tokenRevocationService.revokeSessions(userId);
-        return refreshTokenService.issue(userId);
     }
 
     @Override

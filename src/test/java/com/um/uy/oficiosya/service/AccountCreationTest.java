@@ -12,6 +12,8 @@ import com.um.uy.oficiosya.repository.ExpertiseTradeRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.TradeRepository;
 import com.um.uy.oficiosya.repository.ClientRepository;
+import com.um.uy.oficiosya.repository.JobRequestRepository;
+import com.um.uy.oficiosya.service.interfaces.EmailSenderService;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
 import com.um.uy.oficiosya.service.interfaces.ProfileImageStorage;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,7 +64,7 @@ class AccountCreationTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         clientService = new ClientServiceImpl(clientRepository, passwordEncoder, clientMapper, profileImageStorage,
-                emailVerificationService);
+                emailVerificationService, mock(EmailSenderService.class), mock(JobRequestRepository.class));
         professionalService = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
                 expertiseTradeRepository, professionalMapper, passwordEncoder);
         when(passwordEncoder.encode("ClaveSegura2026!")).thenReturn("{argon2}fresh");

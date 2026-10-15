@@ -3,6 +3,7 @@ package com.um.uy.oficiosya.service;
 import com.um.uy.oficiosya.dto.request.GoogleCredentialRequest;
 import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
+import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
@@ -104,12 +105,12 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
 
     @Override
     @Transactional
-    public LoginResponse registerClient(GoogleCredentialRequest request) {
+    public LoginResponse registerClient(GoogleRegisterRequest request) {
         GoogleIdentity identity = googleTokenVerifier.verify(request.getCredential());
         requireNoAccountFor(identity);
 
         ClientResponse created = clientService.createUser(
-                ClientCreateRequest.builder().name(displayName(identity)).email(identity.email()).build(),
+                ClientCreateRequest.builder().name(displayName(identity, request.getName())).email(identity.email()).build(),
                 unusablePasswordHash());
 
         return googleAccountLoginResponse(created, identity);
@@ -123,7 +124,7 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
 
         ClientResponse created = professionalService.createProfessional(
                 ProfessionalCreateRequest.builder()
-                        .name(displayName(identity))
+                        .name(displayName(identity, request.getName()))
                         .email(identity.email())
                         .phoneNumber(request.getPhoneNumber())
                         .workingLocation(request.getWorkingLocation())
@@ -234,7 +235,11 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
     }
 
     /** Google's name is not held to the name rules of the form (it can be a single word); it just can't be empty. */
-    private String displayName(GoogleIdentity identity) {
+    /** The name the user wrote when signing up; without one, the Google account's. */
+    private String displayName(GoogleIdentity identity, String requested) {
+        if (requested != null && !requested.isBlank()) {
+            return requested.trim();
+        }
         String name = identity.name() == null ? "" : identity.name().trim();
         if (name.isEmpty()) {
             name = identity.email().substring(0, identity.email().indexOf('@'));

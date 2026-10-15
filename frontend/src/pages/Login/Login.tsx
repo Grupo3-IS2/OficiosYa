@@ -4,7 +4,7 @@ import GoogleButton from '../../components/GoogleButton/GoogleButton'
 import Icon from '../../components/Icon/Icon'
 import { ApiError } from '../../services/api'
 import { googleLink, googleLogin, login } from '../../services/authService'
-import { emailFromCredential } from '../../services/googleCredential'
+import { emailFromCredential, handOverGoogleSignup } from '../../services/googleCredential'
 import { isGoogleEnabled } from '../../services/googleIdentity'
 import LinkGoogleModal from './LinkGoogleModal'
 import './Login.css'
@@ -62,6 +62,12 @@ function Login() {
         } catch (error) {
             if (error instanceof ApiError && error.status === 409) {
                 setCredentialToLink(credential)
+                return
+            }
+            // No account for this Google account yet: straight to signing up, already filled in with it.
+            if (error instanceof ApiError && error.status === 404) {
+                handOverGoogleSignup(credential)
+                window.location.href = '/register'
                 return
             }
             setErrorMessage(

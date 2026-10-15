@@ -6,6 +6,7 @@ import com.um.uy.oficiosya.config.RequestRateLimiter;
 import com.um.uy.oficiosya.dto.request.GoogleCredentialRequest;
 import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
+import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.request.LoginRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
@@ -120,7 +121,7 @@ public class AuthController {
 
     @PostMapping("/google/register-client")
     public ResponseEntity<LoginResponse> googleRegisterClient(
-            @Valid @RequestBody GoogleCredentialRequest dto, HttpServletRequest request){
+            @Valid @RequestBody GoogleRegisterRequest dto, HttpServletRequest request){
         rateLimiter.check(request, GOOGLE_BUCKET);
         return this.withSession(googleAuthService.registerClient(dto));
     }

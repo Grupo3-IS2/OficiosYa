@@ -5,8 +5,10 @@ import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.dto.response.ClientResponse;
+import com.um.uy.oficiosya.dto.update.AccountDeletionRequest;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.NotificationsUpdateRequest;
+import com.um.uy.oficiosya.dto.update.PasswordSetupRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ClientUpdateRequest;
 import org.springframework.web.multipart.MultipartFile;
@@ -44,8 +46,37 @@ public interface ClientService {
     PendingVerificationResponse resendEmailChangeCode(ResendCodeRequest request, UUID id);
 
     void changePassword(PasswordUpdateRequest passwordRequest, UUID id);
+
+    /**
+     * First step of giving a password to an account created with Google: mails a code to the
+     * account's email, so whoever holds the session alone can't take the account over.
+     */
+    PendingVerificationResponse startPasswordSetup(UUID id);
+
+    /**
+     * Second step: with that code, the account gets its password and can sign in with it (and
+     * unlink Google). The owner is told by email.
+     */
+    ClientResponse completePasswordSetup(PasswordSetupRequest request, UUID id);
     ClientResponse changeProfileImage(MultipartFile image, UUID id);
-    void deleteUser(UUID id);
+
+    /** Back to no photo: the stored image is deleted too. */
+    ClientResponse removeProfileImage(UUID id);
+
+    /**
+     * Deletes the account by wiping it: name, email, phone, photo, password and Google go, the
+     * professional profile stops being shown, and its free time slots are removed. The row stays so
+     * the jobs it took part in keep their history for the other side ("Cuenta eliminada"). The email
+     * is free to register again. Refused while a job of theirs is still open (proposed, accepted or
+     * waiting on a new timeframe): those have to be cancelled or finished first.
+     */
+    void deleteUser(AccountDeletionRequest request, UUID id);
+
+    /**
+     * Mails the code that deleting the account asks for. Refused, before mailing anything, while a job
+     * of theirs is still open.
+     */
+    PendingVerificationResponse startAccountDeletion(UUID id);
 
     /** Every account regardless of type (client, professional or admin). Admin-only. */
     List<ClientResponse> listUsers();

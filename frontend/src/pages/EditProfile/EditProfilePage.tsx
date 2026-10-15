@@ -6,6 +6,8 @@ import NotificationsSection from './components/NotificationsSection'
 import ProfessionalProfileSection from './components/ProfessionalProfileSection'
 import ScheduleSection from './components/ScheduleSection'
 import BecomeProfessionalCard from './components/BecomeProfessionalCard'
+import TermsSection from './components/TermsSection'
+import DeleteAccountSection from './components/DeleteAccountSection'
 import UnsavedChangesModal from './components/UnsavedChangesModal'
 import useProfileEditor from './useProfileEditor'
 import useUnsavedNavigation from './useUnsavedNavigation'
@@ -32,11 +34,9 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                 </div>
                 {editor.error && !editor.errorSection && !navigation.isOpen && <p className="profile-error profile-page-error" role="alert">{editor.error}</p>}
                 <fieldset className="profile-editor-fields" disabled={editor.busy || editor.loadingProfile || editor.profileLoadFailed} aria-busy={editor.busy || editor.loadingProfile}>
-                    <PersonalDataSection value={editor.personal} onChange={editor.setPersonal} onPhotoChange={editor.selectPhoto} onSave={() => editor.saveSection('personal')} message={editor.messages.personal} error={editor.errorSection === 'personal' ? editor.error : ''} emailChanged={editor.personal.email.trim() !== editor.savedPersonalEmail} currentPassword={editor.emailPassword} onCurrentPasswordChange={editor.setEmailPassword} showPhone={editor.isProfessional} emailEditable={editor.access.hasPassword} emailChange={editor.emailChange} currentEmail={editor.savedPersonalEmail} onConfirmEmailChange={editor.confirmEmailChange} onResendEmailChange={editor.resendEmailChange} onCancelEmailChange={editor.cancelEmailChange} />
+                    <PersonalDataSection value={editor.personal} onChange={editor.setPersonal} onPhotoChange={editor.selectPhoto} onPhotoRemove={editor.removePhoto} onSave={() => editor.saveSection('personal')} message={editor.messages.personal} error={editor.errorSection === 'personal' ? editor.error : ''} emailChanged={editor.personal.email.trim() !== editor.savedPersonalEmail} currentPassword={editor.emailPassword} onCurrentPasswordChange={editor.setEmailPassword} showPhone={editor.isProfessional} emailEditable={editor.access.hasPassword} emailChange={editor.emailChange} currentEmail={editor.savedPersonalEmail} onConfirmEmailChange={editor.confirmEmailChange} onResendEmailChange={editor.resendEmailChange} onCancelEmailChange={editor.cancelEmailChange} />
                     {(editor.loadingProfile || editor.access.hasPassword) && <SecuritySection value={editor.security} onChange={editor.setSecurity} onSave={() => editor.saveSection('security')} message={editor.messages.security} error={editor.errorSection === 'security' ? editor.error : ''} />}
-                    {/* Not before the profile says whether Google is linked: it would show the wrong state. */}
-                    {!editor.loadingProfile && !editor.profileLoadFailed && <GoogleAccountSection access={editor.access} email={editor.savedPersonalEmail} onChange={editor.setAccess} />}
-                    {/* Same: not before the profile says how the switch is */}
+                    {/* Not before the profile says how the switch is */}
                     {!editor.loadingProfile && !editor.profileLoadFailed && <NotificationsSection enabled={editor.emailNotifications} onChange={editor.setEmailNotifications} />}
                     {editor.isProfessional
                         ? <>
@@ -45,6 +45,11 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                         </>
                         : <BecomeProfessionalCard />}
                 </fieldset>
+                <TermsSection />
+                {/* At the end, with deleting the account: unlinking Google is the other way to lose a way in.
+                    Not before the profile says whether Google is linked: it would show the wrong state. */}
+                {!editor.loadingProfile && !editor.profileLoadFailed && <GoogleAccountSection access={editor.access} email={editor.savedPersonalEmail} onChange={editor.setAccess} />}
+                {!editor.loadingProfile && !editor.profileLoadFailed && <DeleteAccountSection hasPassword={editor.access.hasPassword} email={editor.savedPersonalEmail} />}
             </main>
             {navigation.isOpen && <UnsavedChangesModal busy={editor.busy} error={editor.error} onSave={() => void saveAndLeave()}
                 onDiscard={() => { editor.discard(); navigation.continueNavigation() }} onCancel={() => { editor.clearError(); navigation.cancelNavigation() }} />}

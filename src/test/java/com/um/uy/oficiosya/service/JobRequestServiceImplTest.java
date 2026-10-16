@@ -10,6 +10,7 @@ import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.request.TaskCreateRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.entity.Client;
+import com.um.uy.oficiosya.entity.Conversation;
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.PaymentState;
@@ -23,6 +24,7 @@ import com.um.uy.oficiosya.exception.TradeNotFoundException;
 import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.mapper.JobRequestMapperImpl;
 import com.um.uy.oficiosya.repository.ClientRepository;
+import com.um.uy.oficiosya.repository.ConversationRepository;
 import com.um.uy.oficiosya.repository.JobRequestRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.TradeRepository;
@@ -47,6 +49,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -74,6 +77,8 @@ class JobRequestServiceImplTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private ApplicationEventPublisher events;
+    @Mock
+    private ConversationRepository conversationRepository;
 
     private JobRequestServiceImpl service;
 
@@ -87,7 +92,7 @@ class JobRequestServiceImplTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new JobRequestServiceImpl(jobRequestRepository, clientRepository, professionalRepository,
-                tradeRepository, new JobRequestMapperImpl(), scheduleService, passwordEncoder, Clock.systemUTC(), 24, events);
+                tradeRepository, new JobRequestMapperImpl(), scheduleService, passwordEncoder, Clock.systemUTC(), 24, events, conversationRepository);
         client = Client.builder().id(1L).publicId(clientId).name("Ana").email("ana@example.com").build();
         professional = Professional.builder().id(2L).publicId(professionalId).name("Beto")
                 .email("beto@example.com").phoneNumber("099123456").build();
@@ -797,5 +802,242 @@ class JobRequestServiceImplTest {
 
         assertEquals(1, service.getMyJobRequests(professionalId, JobStatus.PROPOSED).size());
         verify(jobRequestRepository, never()).findByParticipant(any());
+    }
+
+    // --- proposals from either side ---
+
+    private final OffsetDateTime proposedStart = OffsetDateTime.now().plusDays(3);
+
+    /** A professional's proposal to the client, with the trade stubbed and the pair already talking. */
+    private JobRequestCreateRequest professionalProposal() {
+        JobRequestCreateRequest request = createRequest(3L);
+        request.setProfessionalId(null);
+        request.setClientId(clientId);
+        request.setStartTimestamp(proposedStart);
+        request.setEndTimestamp(proposedStart.plusHours(2));
+        when(tradeRepository.findById(3L)).thenReturn(Optional.of(Trade.builder().id(3L).name("Plomería").build()));
+        when(clientRepository.findByPublicId(clientId)).thenReturn(Optional.of(client));
+        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        when(conversationRepository.findBetween(1L, 2L)).thenReturn(Optional.of(
+                Conversation.builder().id(12L).client(client).professional(professional).build()));
+        return request;
+    }
+
+    private JobRequest proposedByProfessional() {
+        JobRequest job = job(JobStatus.PROPOSED);
+        job.setProposedBy(Role.PROFESSIONAL);
+        job.setConfirmationPinHash(null);
+        job.setProposedStart(proposedStart);
+        job.setProposedEnd(proposedStart.plusHours(2));
+        return job;
+    }
+
+    @Test
+    void createJobRequest_byAProfessional_keepsTheTimeframeWithoutPinAndLeavesItsCard() {
+        JobRequestResponse response = service.createJobRequest(professionalProposal(), professionalId);
+
+        ArgumentCaptor<JobRequest> saved = ArgumentCaptor.forClass(JobRequest.class);
+        verify(jobRequestRepository).save(saved.capture());
+        assertEquals(Role.PROFESSIONAL, saved.getValue().getProposedBy());
+        assertNull(saved.getValue().getConfirmationPinHash());
+        assertEquals(proposedStart, saved.getValue().getProposedStart());
+        assertNull(response.getConfirmationPin());
+        assertEquals(Role.PROFESSIONAL, response.getProposedBy());
+        verify(scheduleService).checkJobSlotAvailable(any(), any(), any());
+        verify(events).publishEvent(any(JobRequestEvents.JobProposed.class));
+    }
+
+    @Test
+    void createJobRequest_byAClient_isProposedByTheClientWithItsPin() {
+        when(clientRepository.findByPublicId(clientId)).thenReturn(Optional.of(client));
+        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        when(tradeRepository.findById(3L)).thenReturn(Optional.of(Trade.builder().id(3L).name("Plomería").build()));
+        when(passwordEncoder.encode(anyString())).thenReturn("pin-hash");
+
+        JobRequestResponse response = service.createJobRequest(createRequest(3L), clientId);
+
+        assertEquals(Role.CLIENT, response.getProposedBy());
+        assertEquals(6, response.getConfirmationPin().length());
+        verify(events).publishEvent(any(JobRequestEvents.JobProposed.class));
+    }
+
+    @Test
+    void createJobRequest_byAProfessionalWithoutAConversation_isForbidden() {
+        JobRequestCreateRequest request = professionalProposal();
+        when(conversationRepository.findBetween(1L, 2L)).thenReturn(Optional.empty());
+
+        assertThrows(AccessDeniedException.class, () -> service.createJobRequest(request, professionalId));
+        verify(jobRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void createJobRequest_withClientIdBySomeoneWhoIsNotAProfessional_isForbidden() {
+        JobRequestCreateRequest request = professionalProposal();
+
+        assertThrows(AccessDeniedException.class, () -> service.createJobRequest(request, strangerId));
+    }
+
+    @Test
+    void createJobRequest_byAProfessionalWithoutATimeframe_isABadRequest() {
+        JobRequestCreateRequest request = professionalProposal();
+        request.setEndTimestamp(null);
+
+        assertThrows(ResponseStatusException.class, () -> service.createJobRequest(request, professionalId));
+        verify(jobRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void createJobRequest_byAProfessionalInThePast_isABadRequest() {
+        JobRequestCreateRequest request = professionalProposal();
+        request.setStartTimestamp(OffsetDateTime.now().minusHours(1));
+
+        assertThrows(ResponseStatusException.class, () -> service.createJobRequest(request, professionalId));
+    }
+
+    @Test
+    void createJobRequest_byAClientWithATimeframe_isABadRequest() {
+        JobRequestCreateRequest request = createRequest(3L);
+        request.setStartTimestamp(proposedStart);
+        when(clientRepository.findByPublicId(clientId)).thenReturn(Optional.of(client));
+        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+
+        assertThrows(ResponseStatusException.class, () -> service.createJobRequest(request, clientId));
+    }
+
+    @Test
+    void createJobRequest_withBothOrNeitherSide_isABadRequest() {
+        JobRequestCreateRequest both = createRequest(3L);
+        both.setClientId(clientId);
+        JobRequestCreateRequest neither = createRequest(3L);
+        neither.setProfessionalId(null);
+
+        assertThrows(ResponseStatusException.class, () -> service.createJobRequest(both, clientId));
+        assertThrows(ResponseStatusException.class, () -> service.createJobRequest(neither, clientId));
+    }
+
+    @Test
+    void createJobRequest_inABlockedConversation_isForbiddenInEitherDirection() {
+        JobRequestCreateRequest request = professionalProposal();
+        Conversation blocked = Conversation.builder().id(12L).client(client).professional(professional)
+                .clientBlockedAt(OffsetDateTime.now()).build();
+        when(conversationRepository.findBetween(1L, 2L)).thenReturn(Optional.of(blocked));
+
+        assertThrows(AccessDeniedException.class, () -> service.createJobRequest(request, professionalId));
+        assertThrows(AccessDeniedException.class, () -> service.createJobRequest(createRequest(3L), clientId));
+        verify(jobRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void acceptJobRequest_theClientAcceptsAProfessionalsProposal_atItsTimeframe_andGetsThePinOnce() {
+        JobRequest job = proposedByProfessional();
+        when(passwordEncoder.encode(anyString())).thenReturn("pin-hash");
+
+        JobRequestResponse response = service.acceptJobRequest(10L, null, clientId);
+
+        verify(scheduleService).createJobSchedule(job, proposedStart, proposedStart.plusHours(2));
+        assertEquals(JobStatus.ACCEPTED, job.getStatus());
+        assertEquals("pin-hash", job.getConfirmationPinHash());
+        assertEquals(6, response.getConfirmationPin().length());
+        assertNull(job.getProposedStart());
+        assertNull(job.getProposedEnd());
+        verify(events).publishEvent(new JobRequestEvents.JobStatusChanged(10L, JobRequestEvents.Change.ACCEPTED, clientId));
+    }
+
+    @Test
+    void acceptJobRequest_theClientCantChangeTheProfessionalsTimeframe() {
+        proposedByProfessional();
+        JobRequestAcceptRequest request = new JobRequestAcceptRequest();
+        request.setStartTimestamp(proposedStart.plusDays(1));
+        request.setEndTimestamp(proposedStart.plusDays(1).plusHours(2));
+
+        assertThrows(ResponseStatusException.class, () -> service.acceptJobRequest(10L, request, clientId));
+        verify(scheduleService, never()).createJobSchedule(any(), any(), any());
+    }
+
+    @Test
+    void acceptJobRequest_whenTheProposedSlotWasTakenMeanwhile_failsAndStaysProposed() {
+        JobRequest job = proposedByProfessional();
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT)).when(scheduleService).createJobSchedule(any(), any(), any());
+
+        assertThrows(ResponseStatusException.class, () -> service.acceptJobRequest(10L, null, clientId));
+        assertEquals(JobStatus.PROPOSED, job.getStatus());
+        assertNull(job.getConfirmationPinHash());
+    }
+
+    @Test
+    void acceptJobRequest_aProfessionalsProposalWhoseTimeframePassed_isABadRequest() {
+        JobRequest job = proposedByProfessional();
+        job.setProposedStart(OffsetDateTime.now().minusHours(1));
+
+        assertThrows(ResponseStatusException.class, () -> service.acceptJobRequest(10L, null, clientId));
+    }
+
+    @Test
+    void acceptOrRejectJobRequest_byWhoeverProposedIt_isForbidden_butTheyCanCancelIt() {
+        proposedByProfessional();
+
+        assertThrows(AccessDeniedException.class, () -> service.acceptJobRequest(10L, null, professionalId));
+        assertThrows(AccessDeniedException.class, () -> service.rejectJobRequest(10L, null, professionalId));
+        assertEquals(JobStatus.CANCELLED, service.cancelJobRequest(10L, null, professionalId).getStatus());
+    }
+
+    @Test
+    void acceptOrRejectJobRequest_theClientCantAnswerTheirOwnProposal() {
+        job(JobStatus.PROPOSED);
+
+        assertThrows(AccessDeniedException.class, () -> service.acceptJobRequest(10L, null, clientId));
+        assertThrows(AccessDeniedException.class, () -> service.rejectJobRequest(10L, null, clientId));
+    }
+
+    @Test
+    void acceptJobRequest_aClientsProposalWithoutATimeframe_isABadRequest() {
+        job(JobStatus.PROPOSED);
+
+        assertThrows(ResponseStatusException.class, () -> service.acceptJobRequest(10L, null, professionalId));
+    }
+
+    @Test
+    void rejectJobRequest_theClientRejectsAProfessionalsProposal_keepingItsTimeframeForTheCard() {
+        JobRequest job = proposedByProfessional();
+
+        service.rejectJobRequest(10L, null, clientId);
+
+        assertEquals(JobStatus.REJECTED, job.getStatus());
+        assertEquals(proposedStart, job.getProposedStart());
+        verify(events).publishEvent(new JobRequestEvents.JobStatusChanged(10L, JobRequestEvents.Change.REJECTED, clientId));
+    }
+
+    @Test
+    void anExpiredProposal_cantBeAcceptedRejectedNorCancelled() {
+        job(JobStatus.EXPIRED);
+        JobRequestAcceptRequest request = new JobRequestAcceptRequest();
+        request.setStartTimestamp(proposedStart);
+        request.setEndTimestamp(proposedStart.plusHours(2));
+
+        assertThrows(ResponseStatusException.class, () -> service.acceptJobRequest(10L, request, professionalId));
+        assertThrows(ResponseStatusException.class, () -> service.rejectJobRequest(10L, null, professionalId));
+        assertThrows(ResponseStatusException.class, () -> service.cancelJobRequest(10L, null, clientId));
+    }
+
+    // --- expiration ---
+
+    @Test
+    void expireProposal_movesAnUnansweredProposalToExpired_andTellsBothSides() {
+        JobRequest job = job(JobStatus.PROPOSED);
+
+        assertTrue(service.expireProposal(10L));
+
+        assertEquals(JobStatus.EXPIRED, job.getStatus());
+        verify(events).publishEvent(new JobRequestEvents.JobStatusChanged(10L, JobRequestEvents.Change.EXPIRED, null));
+    }
+
+    @Test
+    void expireProposal_leavesAlone_aProposalAnsweredInBetween() {
+        JobRequest job = job(JobStatus.ACCEPTED);
+
+        assertFalse(service.expireProposal(10L));
+
+        assertEquals(JobStatus.ACCEPTED, job.getStatus());
+        verify(jobRequestRepository, never()).save(any());
     }
 }

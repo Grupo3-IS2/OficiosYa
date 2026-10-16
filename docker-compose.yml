@@ -75,6 +75,15 @@ services:
       RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-10}
       # Hours of notice needed to cancel or reschedule an accepted job.
       JOB_MIN_NOTICE_HOURS: ${JOB_MIN_NOTICE_HOURS:-24}
+      JOB_PROPOSAL_EXPIRATION_HOURS: ${JOB_PROPOSAL_EXPIRATION_HOURS:-72}
+      # Encrypts the chat messages at rest. Required: without it the stored messages couldn't be read back.
+      CHAT_ENCRYPTION_KEY: ${CHAT_ENCRYPTION_KEY:?set CHAT_ENCRYPTION_KEY in .env (openssl rand -base64 32)}
+      CHAT_MESSAGE_MAX_LENGTH: ${CHAT_MESSAGE_MAX_LENGTH:-2000}
+      CHAT_UNREAD_MAIL_INTERVAL_HOURS: ${CHAT_UNREAD_MAIL_INTERVAL_HOURS:-4}
+      CHAT_MESSAGE_RETENTION_DAYS: ${CHAT_MESSAGE_RETENTION_DAYS:--1}
+      # Per user: chat messages per minute, and new conversations per day.
+      RATE_LIMIT_CHAT_PER_MINUTE: ${RATE_LIMIT_CHAT_PER_MINUTE:-30}
+      RATE_LIMIT_CHAT_NEW_CONVERSATIONS_PER_DAY: ${RATE_LIMIT_CHAT_NEW_CONVERSATIONS_PER_DAY:-20}
     volumes:
       # The .pem files must be readable by uid 1001 (the "spring" user).
       - ./keys:/app/keys:ro

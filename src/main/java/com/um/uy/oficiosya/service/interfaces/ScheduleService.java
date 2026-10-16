@@ -26,8 +26,8 @@ public interface ScheduleService {
     ScheduleResponse createJobSchedule(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end);
 
     /**
-     * Checks that an accepted job's SCHEDULED_JOB block could move to the given timeframe without
-     * overlapping anything else on the agenda (its own block doesn't count).
+     * Checks that a job could take the given timeframe without overlapping anything else on the
+     * professional's agenda: an accepted job's own block doesn't count, and a proposal has none yet.
      */
     void checkJobSlotAvailable(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end);
 

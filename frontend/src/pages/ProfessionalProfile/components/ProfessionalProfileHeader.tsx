@@ -2,6 +2,8 @@ import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
 import type { ExpertiseTrade, Professional } from '../../../types/Professional'
+import { openConversation } from '../../../services/chatService'
+import { toast } from 'sonner'
 
 interface ProfessionalProfileHeaderProps {
     professional: Professional
@@ -42,18 +44,16 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                     </span>
                 )}
                 <div className="profile-summary__actions">
-                    <span title="El chat estará disponible próximamente">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            className="profile-summary__chat"
-                            disabled
-                            aria-describedby="chat-coming-soon"
-                        >
-                            <Icon name="message" /> Hablar por chat
-                        </Button>
-                    </span>
-                    <span id="chat-coming-soon" className="visually-hidden">Chat disponible próximamente.</span>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        className="profile-summary__chat"
+                        onClick={() => openConversation(professional.id)
+                            .then(conversation => window.location.assign(`/chat?c=${conversation.id}`))
+                            .catch((error: Error) => toast.error(error.message))}
+                    >
+                        <Icon name="message" /> Hablar por chat
+                    </Button>
                     {/* The service is chosen in the request itself, if it wasn't chosen on the profile already */}
                     <Button
                         type="button"

@@ -8,8 +8,10 @@ import com.um.uy.oficiosya.dto.request.JobRequestCreateRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestRejectRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
+import com.um.uy.oficiosya.dto.response.ConversationResponse;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.entity.JobStatus;
+import com.um.uy.oficiosya.service.interfaces.ChatService;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +25,8 @@ import java.util.List;
 
 /**
  * Lifecycle: PROPOSED → accept → ACCEPTED → complete (PIN) → COMPLETED → review.
- * From PROPOSED it can also be rejected, and from PROPOSED or ACCEPTED cancelled.
+ * Either side proposes (proposedBy) and the other accepts or rejects it; a proposal nobody answers
+ * in time becomes EXPIRED. From PROPOSED or ACCEPTED it can be cancelled by either side.
  * Once ACCEPTED either side can ask to reschedule (→ RESCHEDULE_REQUESTED); the other side's
  * answer takes it back to ACCEPTED, at the new time or the original one.
  */
@@ -32,14 +35,19 @@ import java.util.List;
 public class JobRequestController {
 
     private final JobRequestService jobRequestService;
+    private final ChatService chatService;
 
-    public JobRequestController(JobRequestService jobRequestService) {
+    public JobRequestController(JobRequestService jobRequestService, ChatService chatService) {
         this.jobRequestService = jobRequestService;
+        this.chatService = chatService;
     }
 
     /**
-     * Any client can request a job, professionals included (to someone else). The response is the only
-     * place the confirmation PIN ever appears.
+     * With professionalId: the caller proposes as a client (professionals included, to someone else);
+     * the professional picks the timeframe when accepting, and this response is the only place the PIN
+     * appears. With clientId: a professional proposes to a client they already have a conversation
+     * with, with startTimestamp/endTimestamp; the PIN comes when the client accepts. Exactly one of the
+     * two. Either way the proposal shows up as a card in the pair's chat; 403 if that chat is blocked.
      */
     @PreAuthorize("hasRole('CLIENT')")
     @PostMapping
@@ -53,15 +61,19 @@ public class JobRequestController {
         return ResponseEntity.created(location).body(jobRequest);
     }
 
-    /** Only the requested professional can accept it; this also blocks their agenda for the agreed timeframe. */
+    /**
+     * Only the side that didn't propose can accept it, and this blocks the professional's agenda. A
+     * professional accepting a client's proposal sends the timeframe; a client accepting a professional's
+     * sends no body, and gets the PIN in this response, the only time it appears.
+     */
     @PostMapping("/{id}/accept")
-    public ResponseEntity<JobRequestResponse> acceptJobRequest(@Valid @RequestBody JobRequestAcceptRequest request,
+    public ResponseEntity<JobRequestResponse> acceptJobRequest(@Valid @RequestBody(required = false) JobRequestAcceptRequest request,
                                                                  @PathVariable Long id,
                                                                  Authentication authentication) {
         return ResponseEntity.ok(jobRequestService.acceptJobRequest(id, request, AuthenticatedUser.id(authentication)));
     }
 
-    /** The body, with an optional reason, can be left out. */
+    /** Only the side that didn't propose; the body, with an optional reason, can be left out. */
     @PostMapping("/{id}/reject")
     public ResponseEntity<JobRequestResponse> rejectJobRequest(@Valid @RequestBody(required = false) JobRequestRejectRequest request,
                                                                  @PathVariable Long id,
@@ -120,6 +132,18 @@ public class JobRequestController {
                                                                  @PathVariable Long id,
                                                                  Authentication authentication) {
         return ResponseEntity.ok(jobRequestService.reviewJobRequest(id, request, AuthenticatedUser.id(authentication)));
+    }
+
+    /**
+     * The chat between the job's two sides, in any status of the job: 201 if the conversation is new,
+     * 200 if the pair already had one (from the profile or from another job). Same conversation API as
+     * ConversationController from then on.
+     */
+    @PreAuthorize("hasRole('CLIENT')")
+    @PostMapping("/{id}/conversation")
+    public ResponseEntity<ConversationResponse> openConversation(@PathVariable Long id, Authentication authentication) {
+        return ConversationController.foundOrCreated(
+                chatService.openForJobRequest(id, AuthenticatedUser.id(authentication)));
     }
 
     /** Either party involved in the job can look it up. */

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { fakeJwt } from '../support/ui';
+import { fakeJwt, mockChat } from '../support/ui';
 
 for (const session of ['guest', 'authenticated', 'expired'] as const) {
   test(`home cards ${session === 'authenticated' ? 'show' : 'hide'} the location for ${session} users`, async ({ page }) => {
@@ -11,6 +11,7 @@ for (const session of ['guest', 'authenticated', 'expired'] as const) {
     }
     await page.route('**/api/v1/auth/refresh', route => route.fulfill({ status: 401, json: { error: 'La sesión expiró' } }));
     // The header asks for the user's requests (the "Mis solicitudes" alert): the fake token would be refused
+    await mockChat(page);
     await page.route('**/api/v1/job-requests/mine', route => route.fulfill({ json: [] }));
     await page.route('**/api/v1/trades', route => route.fulfill({ json: [] }));
     await page.route('**/api/v1/professionals/search**', route => route.fulfill({ json: {

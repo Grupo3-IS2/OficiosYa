@@ -6,5 +6,7 @@ public enum JobStatus {
     RESCHEDULE_REQUESTED,
     REJECTED,
     CANCELLED,
-    COMPLETED
+    COMPLETED,
+    /** A proposal nobody answered in time, or whose proposed timeframe already went by. Final, like REJECTED. */
+    EXPIRED
 }

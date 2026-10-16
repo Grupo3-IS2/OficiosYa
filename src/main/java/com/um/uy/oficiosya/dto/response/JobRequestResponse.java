@@ -35,6 +35,12 @@ public class JobRequestResponse {
     private JobStatus status;
     private List<TaskResponse> tasks;
 
+    /** Which side proposed it (CLIENT or PROFESSIONAL): the other side accepts or rejects it. */
+    private Role proposedBy;
+    /** The timeframe the professional offered, while their proposal waits for the client; null otherwise. */
+    private OffsetDateTime proposedStart;
+    private OffsetDateTime proposedEnd;
+
     /** The timeframe the professional agreed to when accepting; null while PROPOSED, REJECTED or CANCELLED. */
     private OffsetDateTime scheduledStart;
     private OffsetDateTime scheduledEnd;
@@ -57,6 +63,9 @@ public class JobRequestResponse {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
-    /** Only populated in the response to the client that just created the job; shown on site to confirm completion. */
+    /**
+     * Only in the response that creates it: to the client that proposed the job, or to the client that
+     * accepts a professional's proposal. Shown on site to confirm completion.
+     */
     private String confirmationPin;
 }

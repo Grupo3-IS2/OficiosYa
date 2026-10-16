@@ -208,4 +208,98 @@ class RequestNotificationServiceTest {
         assertEquals("viernes 16 de octubre, de 13:30 a 15:30", RequestNotificationService.timeframe(CURRENT, CURRENT.plusHours(2)));
         assertEquals("sin horario", RequestNotificationService.timeframe(null, null));
     }
+
+    // --- job changes ---
+
+    private JobRequest job(Role proposedBy) {
+        JobRequest job = JobRequest.builder().id(20L).client(client).professional(professional)
+                .location("Av. Italia 1234").paymentAmount(BigDecimal.TEN).status(JobStatus.PROPOSED)
+                .proposedBy(proposedBy).build();
+        job.getTasks().add(Task.builder().trade(Trade.builder().id(1L).name("Plomería").build()).description("Canilla").build());
+        when(jobRequestRepository.findById(20L)).thenReturn(Optional.of(job));
+        return job;
+    }
+
+    private String mailTo(String email) {
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(emailSender).sendNotification(eq(email), eq("Novedades de un trabajo en OficiosYa"), body.capture());
+        return body.getValue();
+    }
+
+    @Test
+    void aJobTheProfessionalProposed_isMailedToBoth_withTheTimeframeOffered() {
+        JobRequest job = job(Role.PROFESSIONAL);
+        job.setProposedStart(PROPOSED);
+        job.setProposedEnd(PROPOSED.plusHours(2));
+
+        service.notifyJobChanged(20L, null, null);
+
+        String body = mailTo("carla@example.com");
+        assertTrue(body.contains("Pablo propuso un trabajo \"Plomería\" (Av. Italia 1234)."));
+        assertTrue(body.contains("Horario: domingo 18 de octubre, de 10:00 a 12:00"));
+        assertTrue(mailTo("pablo@example.com").contains("Pablo propuso un trabajo"));
+    }
+
+    @Test
+    void aJobTheClientProposed_hasNoTimeframeYet() {
+        job(Role.CLIENT);
+
+        service.notifyJobChanged(20L, null, null);
+
+        String body = mailTo("pablo@example.com");
+        assertTrue(body.contains("Carla propuso un trabajo"));
+        assertTrue(body.contains("Horario: a confirmar"));
+    }
+
+    @Test
+    void aChange_namesWhoeverMadeIt_andTheScheduledTimeframe() {
+        JobRequest job = job(Role.CLIENT);
+        job.getSchedules().add(Schedule.builder().type(ScheduleType.SCHEDULED_JOB)
+                .startTimestamp(CURRENT).endTimestamp(CURRENT.plusHours(2)).build());
+
+        service.notifyJobChanged(20L, JobRequestEvents.Change.ACCEPTED, professional.getPublicId());
+
+        String body = mailTo("carla@example.com");
+        assertTrue(body.contains("Pablo aceptó el trabajo"));
+        assertTrue(body.contains("Horario: viernes 16 de octubre, de 13:30 a 15:30"));
+    }
+
+    @Test
+    void aChangeByTheClient_namesTheClient() {
+        job(Role.CLIENT);
+
+        service.notifyJobChanged(20L, JobRequestEvents.Change.CANCELLED, client.getPublicId());
+
+        assertTrue(mailTo("pablo@example.com").contains("Carla canceló el trabajo"));
+    }
+
+    @Test
+    void anExpiredProposal_hasNoActor() {
+        job(Role.CLIENT);
+
+        service.notifyJobChanged(20L, JobRequestEvents.Change.EXPIRED, null);
+
+        assertTrue(mailTo("carla@example.com").contains("Venció sin respuesta la propuesta de trabajo"));
+    }
+
+    @Test
+    void someoneWithTheEmailsOff_isLeftOut() {
+        job(Role.CLIENT);
+        professional.setEmailNotifications(false);
+
+        service.notifyJobChanged(20L, JobRequestEvents.Change.REJECTED, professional.getPublicId());
+
+        assertTrue(mailTo("carla@example.com").contains("Pablo rechazó el trabajo"));
+        verify(emailSender, never()).sendNotification(eq("pablo@example.com"), anyString(), anyString());
+    }
+
+    @Test
+    void aRescheduleAskedFor_orAJobThatIsGone_mailsNothingHere() {
+        job(Role.CLIENT);
+
+        service.notifyJobChanged(20L, JobRequestEvents.Change.RESCHEDULE_REQUESTED, client.getPublicId());
+        service.notifyJobChanged(99L, JobRequestEvents.Change.ACCEPTED, client.getPublicId());
+
+        verify(emailSender, never()).sendNotification(anyString(), anyString(), anyString());
+    }
 }

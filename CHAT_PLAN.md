@@ -782,10 +782,9 @@ Lo bueno: casi toda la infraestructura ya está.
       es nueva, así que conviene que las entidades salgan bien desde el primer deploy a dev.
 - [ ] **`job_request`:** `update` agrega `proposed_by` (con default `'CLIENT'`, así las filas existentes
       quedan bien) y `proposed_start`/`proposed_end` nullable. Lo que **no** hace es sacar el
-      `NOT NULL` de `confirmation_pin_hash`; hay que correrlo una vez en cada entorno, después del backup
-      y antes de que alguien proponga como profesional:
-      `ALTER TABLE job_request ALTER COLUMN confirmation_pin_hash DROP NOT NULL;`
-      Es inofensivo correrlo antes del deploy (el código viejo siempre lo carga).
+      `NOT NULL` de `confirmation_pin_hash`: lo hace solo `EnumCheckConstraintUpdater` en cada arranque
+      (`ALTER TABLE job_request ALTER COLUMN confirmation_pin_hash DROP NOT NULL`, idempotente), igual
+      que agrega `EXPIRED` al check de `status`. No hay que correr nada a mano.
 - [ ] **Variables nuevas** (en `application.properties`, `docker-compose.yml` y `.env.example`, con
       default):
   - `CHAT_MESSAGE_MAX_LENGTH=2000`

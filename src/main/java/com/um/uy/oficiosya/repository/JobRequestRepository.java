@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,10 +33,12 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
     @Query("SELECT AVG(j.rating) FROM JobRequest j WHERE j.professional.publicId = :professionalPublicId AND j.rating IS NOT NULL")
     Double averageRatingOf(@Param("professionalPublicId") UUID professionalPublicId);
 
-    /** Requests made to the user as a professional that they haven't accepted or rejected yet. */
+    /** Proposals the other side made to the user that they haven't accepted or rejected yet. */
     @Query("""
             SELECT COUNT(j) FROM JobRequest j
-            WHERE j.status = com.um.uy.oficiosya.entity.JobStatus.PROPOSED AND j.professional.publicId = :userPublicId
+            WHERE j.status = com.um.uy.oficiosya.entity.JobStatus.PROPOSED
+            AND ((j.professional.publicId = :userPublicId AND j.proposedBy = com.um.uy.oficiosya.entity.Role.CLIENT)
+              OR (j.client.publicId = :userPublicId AND j.proposedBy = com.um.uy.oficiosya.entity.Role.PROFESSIONAL))
             """)
     long countProposalsAwaitingAnswerFrom(@Param("userPublicId") UUID userPublicId);
 
@@ -52,4 +55,21 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
                   AND (j.rescheduleRequestedBy IS NULL OR j.rescheduleRequestedBy = com.um.uy.oficiosya.entity.Role.CLIENT)))
             """)
     long countReschedulesAwaitingAnswerFrom(@Param("userPublicId") UUID userPublicId);
+
+    /** The jobs between two users (by id), whichever side each one is on. */
+    @Query("""
+            SELECT j FROM JobRequest j
+            WHERE (j.client.id = :userId AND j.professional.id = :otherUserId)
+            OR (j.client.id = :otherUserId AND j.professional.id = :userId)
+            """)
+    List<JobRequest> findBetween(@Param("userId") Long userId, @Param("otherUserId") Long otherUserId);
+
+    /** Proposals still unanswered that were made before {@code createdBefore}, or whose proposed timeframe already started. */
+    @Query("""
+            SELECT j.id FROM JobRequest j
+            WHERE j.status = com.um.uy.oficiosya.entity.JobStatus.PROPOSED
+            AND (j.createdAt < :createdBefore OR j.proposedStart <= :now)
+            """)
+    List<Long> findProposalIdsToExpire(@Param("createdBefore") OffsetDateTime createdBefore,
+                                       @Param("now") OffsetDateTime now);
 }

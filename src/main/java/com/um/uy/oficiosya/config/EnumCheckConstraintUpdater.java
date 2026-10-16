@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class EnumCheckConstraintUpdater implements CommandLineRunner {
 
     static final String STATUS_VALUES =
-            "'PROPOSED', 'ACCEPTED', 'RESCHEDULE_REQUESTED', 'REJECTED', 'CANCELLED', 'COMPLETED'";
+            "'PROPOSED', 'ACCEPTED', 'RESCHEDULE_REQUESTED', 'REJECTED', 'CANCELLED', 'COMPLETED', 'EXPIRED'";
     static final String PAYMENT_STATE_VALUES = "'PENDING', 'RETAINED', 'PAID', 'REFUNDED'";
 
     private static final String DROP_STATUS_CHECK =
@@ -31,6 +31,10 @@ public class EnumCheckConstraintUpdater implements CommandLineRunner {
     private static final String ADD_PAYMENT_STATE_CHECK =
             "ALTER TABLE job_request ADD CONSTRAINT job_request_payment_state_check CHECK (payment_state IN ("
                     + PAYMENT_STATE_VALUES + "))";
+
+    /** Nullable since a professional's proposal has no PIN until the client accepts it; update never drops a NOT NULL. */
+    private static final String PIN_HASH_NULLABLE =
+            "ALTER TABLE job_request ALTER COLUMN confirmation_pin_hash DROP NOT NULL";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -45,5 +49,6 @@ public class EnumCheckConstraintUpdater implements CommandLineRunner {
         jdbcTemplate.execute(ADD_STATUS_CHECK);
         jdbcTemplate.execute(DROP_PAYMENT_STATE_CHECK);
         jdbcTemplate.execute(ADD_PAYMENT_STATE_CHECK);
+        jdbcTemplate.execute(PIN_HASH_NULLABLE);
     }
 }

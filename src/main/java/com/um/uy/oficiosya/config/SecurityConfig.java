@@ -84,6 +84,10 @@ public class SecurityConfig {
                         // Login and registration
                         .requestMatchers("/api/v1/auth/**").permitAll()
 
+                        // The chat's WebSocket handshake: a browser can't send the token on it, so the
+                        // STOMP CONNECT authenticates instead (JwtChannelInterceptor)
+                        .requestMatchers("/ws/**").permitAll()
+
                         // Uploaded profile images are public
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 
@@ -188,17 +192,22 @@ public class SecurityConfig {
     }
 
 
+    /** The frontend's origins, for CORS and for the chat's WebSocket (WebSocketConfig). */
+    static List<String> allowedOriginPatterns(String webUrl) {
+        return List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "https://" + webUrl,
+                "http://" + webUrl
+        );
+    }
+
     /** Allow access in frontend **/
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of(
-                "http://localhost:*",
-                "http://127.0.0.1:*",
-                "https://"+WEB_URL,
-                "http://"+WEB_URL
-        ));
+        configuration.setAllowedOriginPatterns(allowedOriginPatterns(WEB_URL));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowCredentials(true);
         configuration.addAllowedHeader("*");

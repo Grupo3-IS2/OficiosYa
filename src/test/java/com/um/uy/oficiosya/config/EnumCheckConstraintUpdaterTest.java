@@ -34,11 +34,11 @@ class EnumCheckConstraintUpdaterTest {
     }
 
     @Test
-    void run_dropsAndRecreatesBothConstraints() {
+    void run_dropsAndRecreatesBothConstraintsAndMakesThePinHashNullable() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
 
         new EnumCheckConstraintUpdater(jdbcTemplate).run();
 
-        verify(jdbcTemplate, times(4)).execute(anyString());
+        verify(jdbcTemplate, times(5)).execute(anyString());
     }
 }

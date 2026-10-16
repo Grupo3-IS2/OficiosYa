@@ -10,6 +10,7 @@ import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.Conversation;
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.Professional;
+import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.exception.ConversationNotFoundException;
 import com.um.uy.oficiosya.exception.JobRequestNotFoundException;
@@ -21,6 +22,7 @@ import com.um.uy.oficiosya.repository.JobRequestRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.service.interfaces.ChatService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -33,6 +35,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -45,6 +49,7 @@ public class ChatServiceImpl implements ChatService {
     static final int DEFAULT_PAGE_SIZE = 30;
     static final int MAX_PAGE_SIZE = 100;
     static final int PREVIEW_LENGTH = 120;
+    static final String JOB_PROPOSAL_PREVIEW = "Trabajo propuesto";
 
     private final ConversationRepository conversationRepository;
     private final ChatMessageRepository chatMessageRepository;
@@ -53,6 +58,8 @@ public class ChatServiceImpl implements ChatService {
     private final JobRequestRepository jobRequestRepository;
     private final ChatMapper chatMapper;
     private final ChatRateLimiter rateLimiter;
+    private final ChatContentFilter contentFilter;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
     private final int maxMessageLength;
 
@@ -63,6 +70,8 @@ public class ChatServiceImpl implements ChatService {
                            JobRequestRepository jobRequestRepository,
                            ChatMapper chatMapper,
                            ChatRateLimiter rateLimiter,
+                           ChatContentFilter contentFilter,
+                           ApplicationEventPublisher events,
                            Clock clock,
                            @Value("${app.chat.message-max-length}") int maxMessageLength) {
         this.conversationRepository = conversationRepository;
@@ -72,6 +81,8 @@ public class ChatServiceImpl implements ChatService {
         this.jobRequestRepository = jobRequestRepository;
         this.chatMapper = chatMapper;
         this.rateLimiter = rateLimiter;
+        this.contentFilter = contentFilter;
+        this.events = events;
         this.clock = clock;
         this.maxMessageLength = maxMessageLength;
     }
@@ -151,9 +162,19 @@ public class ChatServiceImpl implements ChatService {
         Conversation conversation = findParticipating(conversationId, callerId);
 
         int pageSize = limit == null ? DEFAULT_PAGE_SIZE : Math.clamp(limit, 1, MAX_PAGE_SIZE);
-        return chatMessageRepository.findPage(conversation.getId(), beforeId, PageRequest.of(0, pageSize)).stream()
-                .map(chatMapper::toResponse)
+        List<ChatMessage> page = chatMessageRepository.findPage(conversation.getId(), beforeId, PageRequest.of(0, pageSize));
+
+        // The cards' jobs in one query, instead of one per card when each is mapped
+        List<Long> jobIds = page.stream()
+                .filter(message -> message.getType() == ChatMessageType.JOB_PROPOSAL)
+                .map(message -> message.getJobRequest().getId())
+                .distinct()
                 .toList();
+        if (!jobIds.isEmpty()) {
+            jobRequestRepository.findAllById(jobIds);
+        }
+
+        return page.stream().map(chatMapper::toResponse).toList();
     }
 
     @Override
@@ -176,6 +197,7 @@ public class ChatServiceImpl implements ChatService {
         }
 
         String content = validContent(request.getContent());
+        contentFilter.check(content, conversation);
         JobRequest jobRequest = request.getJobRequestId() == null
                 ? null : jobOfThePair(request.getJobRequestId(), conversation);
 
@@ -193,7 +215,83 @@ public class ChatServiceImpl implements ChatService {
 
         conversationRepository.updateLastMessage(conversationId, OffsetDateTime.now(clock), preview(content));
 
-        return new FoundOrCreated<>(chatMapper.toResponse(message), true);
+        ChatMessageResponse response = chatMapper.toResponse(message);
+        events.publishEvent(new ChatMessageSent(response, participants(conversation)));
+        return new FoundOrCreated<>(response, true);
+    }
+
+    @Override
+    @Transactional
+    public ConversationResponse block(Long conversationId, UUID callerId) {
+        Conversation conversation = findParticipating(conversationId, callerId);
+
+        if (!conversation.isBlockedBy(callerId)) {
+            OffsetDateTime now = OffsetDateTime.now(clock);
+            if (conversation.isClientSide(callerId)) {
+                conversation.setClientBlockedAt(now);
+            } else {
+                conversation.setProfessionalBlockedAt(now);
+            }
+            conversation = conversationRepository.save(conversation);
+        }
+
+        return toResponse(conversation, callerId);
+    }
+
+    @Override
+    @Transactional
+    public ConversationResponse unblock(Long conversationId, UUID callerId) {
+        Conversation conversation = findParticipating(conversationId, callerId);
+
+        if (conversation.isClientSide(callerId)) {
+            conversation.setClientBlockedAt(null);
+        } else {
+            conversation.setProfessionalBlockedAt(null);
+        }
+        conversation = conversationRepository.save(conversation);
+
+        return toResponse(conversation, callerId);
+    }
+
+    @Override
+    @Transactional
+    public void addJobProposal(Long jobRequestId) {
+        JobRequest jobRequest = jobRequestRepository.findById(jobRequestId)
+                .orElseThrow(() -> new IllegalStateException("The job just proposed is missing"));
+        Client client = jobRequest.getClient();
+        Professional professional = jobRequest.getProfessional();
+
+        // Proposing doesn't count against the daily limit of new conversations: it takes much more than a message
+        Conversation conversation = conversationRepository.findBetween(client.getId(), professional.getId())
+                .orElseGet(() -> {
+                    conversationRepository.insertIfAbsent(client.getId(), professional.getId());
+                    return conversationRepository.findBetween(client.getId(), professional.getId())
+                            .orElseThrow(() -> new IllegalStateException("The conversation just created is missing"));
+                });
+
+        ChatMessage message = chatMessageRepository.save(ChatMessage.builder()
+                .conversation(conversation)
+                .sender(jobRequest.getProposedBy() == Role.PROFESSIONAL ? professional : client)
+                .type(ChatMessageType.JOB_PROPOSAL)
+                .jobRequest(jobRequest)
+                .clientMessageId(UUID.randomUUID())
+                .build());
+
+        conversationRepository.updateLastMessage(conversation.getId(), OffsetDateTime.now(clock), JOB_PROPOSAL_PREVIEW);
+        events.publishEvent(new ChatMessageSent(chatMapper.toResponse(message), participants(conversation)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<JobUpdate> getJobUpdate(Long jobRequestId) {
+        return jobRequestRepository.findById(jobRequestId).map(jobRequest -> {
+            Long conversationId = conversationRepository
+                    .findBetween(jobRequest.getClient().getId(), jobRequest.getProfessional().getId())
+                    .map(Conversation::getId)
+                    .orElse(null);
+            return new JobUpdate(conversationId, chatMapper.toSummary(jobRequest),
+                    Set.of(jobRequest.getClient().getPublicId(), jobRequest.getProfessional().getPublicId()));
+        });
     }
 
     @Override
@@ -228,6 +326,10 @@ public class ChatServiceImpl implements ChatService {
         long unread = chatMessageRepository.countUnread(conversation.getId(), viewerId,
                 conversation.lastReadMessageIdOf(viewerId));
         return chatMapper.toResponse(conversation, viewerId, unread);
+    }
+
+    private static Set<UUID> participants(Conversation conversation) {
+        return Set.of(conversation.getClient().getPublicId(), conversation.getProfessional().getPublicId());
     }
 
     private Conversation findParticipating(Long conversationId, UUID callerId) {

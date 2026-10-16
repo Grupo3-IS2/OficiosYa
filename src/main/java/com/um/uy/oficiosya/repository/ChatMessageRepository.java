@@ -3,9 +3,11 @@ package com.um.uy.oficiosya.repository;
 import com.um.uy.oficiosya.entity.ChatMessage;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +55,11 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             GROUP BY m.conversation.id
             """)
     List<UnreadCount> countUnreadByConversation(@Param("userId") UUID userId);
+
+    /** Deletes the messages older than that, cards included (the job stays in Mis solicitudes). */
+    @Modifying
+    @Query("DELETE FROM ChatMessage m WHERE m.createdAt < :before")
+    int deleteOlderThan(@Param("before") OffsetDateTime before);
 
     interface UnreadCount {
         Long getConversationId();

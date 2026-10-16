@@ -30,6 +30,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -72,6 +73,10 @@ class ChatServiceImplTest {
     private JobRequestRepository jobRequestRepository;
     @Mock
     private ChatRateLimiter rateLimiter;
+    @Mock
+    private ChatContentFilter contentFilter;
+    @Mock
+    private ApplicationEventPublisher events;
 
     private static final OffsetDateTime NOW = OffsetDateTime.of(2026, 10, 13, 12, 0, 0, 0, ZoneOffset.UTC);
 
@@ -87,7 +92,7 @@ class ChatServiceImplTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new ChatServiceImpl(conversationRepository, chatMessageRepository, clientRepository,
-                professionalRepository, jobRequestRepository, new ChatMapperImpl(), rateLimiter,
+                professionalRepository, jobRequestRepository, new ChatMapperImpl(), rateLimiter, contentFilter, events,
                 Clock.fixed(Instant.from(NOW), ZoneOffset.UTC), 2000);
         client = Client.builder().id(1L).publicId(clientId).name("Ana").email("ana@example.com").build();
         professional = Professional.builder().id(2L).publicId(professionalId).name("Beto")
@@ -595,5 +600,157 @@ class ChatServiceImplTest {
         assertFalse(forTheProfessional.isCanWrite());
         assertFalse(forTheProfessional.isBlockedByMe());
         verify(conversationRepository, never()).insertIfAbsent(anyLong(), anyLong());
+    }
+
+    // --- block ---
+
+    @Test
+    void block_isTheCallersOwnAndIdempotent_andUnblockLiftsOnlyTheirs() {
+        Conversation conversation = conversation();
+        conversation.setProfessionalBlockedAt(NOW.minusDays(1));
+        when(conversationRepository.save(conversation)).thenReturn(conversation);
+
+        ConversationResponse blocked = service.block(12L, clientId);
+        OffsetDateTime blockedAt = conversation.getClientBlockedAt();
+        service.block(12L, clientId);
+
+        assertEquals(NOW, blockedAt);
+        assertEquals(blockedAt, conversation.getClientBlockedAt());
+        assertTrue(blocked.isBlockedByMe());
+        assertFalse(blocked.isCanWrite());
+
+        ConversationResponse unblocked = service.unblock(12L, clientId);
+
+        assertNull(conversation.getClientBlockedAt());
+        assertFalse(unblocked.isBlockedByMe());
+        // The other side's block is still there
+        assertFalse(unblocked.isCanWrite());
+    }
+
+    @Test
+    void block_someoneOutsideTheConversationIsDenied() {
+        conversation();
+
+        assertThrows(AccessDeniedException.class, () -> service.block(12L, strangerId));
+        assertThrows(AccessDeniedException.class, () -> service.unblock(12L, strangerId));
+    }
+
+    @Test
+    void openWithProfessional_returnsTheBlockedConversationInsteadOfCreatingAnother() {
+        Conversation conversation = conversation();
+        conversation.setProfessionalBlockedAt(NOW);
+        existsBetween(conversation);
+
+        FoundOrCreated<ConversationResponse> result = service.openWithProfessional(professionalId, clientId);
+
+        assertEquals(12L, result.value().getId());
+        assertFalse(result.value().isCanWrite());
+        verify(conversationRepository, never()).insertIfAbsent(anyLong(), anyLong());
+    }
+
+    // --- content filter and push ---
+
+    @Test
+    void sendMessage_isCheckedByTheFilter_andARefusedOneIsNotStored() {
+        Conversation conversation = conversation();
+        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST)).when(contentFilter).check("099 123 456", conversation);
+
+        assertThrows(ResponseStatusException.class, () -> service.sendMessage(12L, message("099 123 456"), clientId));
+        verify(chatMessageRepository, never()).save(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void sendMessage_isPushedToBothSides() {
+        conversation();
+
+        service.sendMessage(12L, message("Hola"), clientId);
+
+        ArgumentCaptor<ChatMessageSent> sent = ArgumentCaptor.forClass(ChatMessageSent.class);
+        verify(events).publishEvent(sent.capture());
+        assertEquals(java.util.Set.of(clientId, professionalId), sent.getValue().recipientIds());
+        assertEquals("Hola", sent.getValue().message().getContent());
+    }
+
+    // --- the proposal's card ---
+
+    @Test
+    void addJobProposal_leavesACardFromWhoeverProposed_movesTheInboxAndPushesIt() {
+        Conversation conversation = conversation();
+        existsBetween(conversation);
+        JobRequest job = job(87L, client, professional, JobStatus.PROPOSED);
+        job.setProposedBy(Role.PROFESSIONAL);
+
+        service.addJobProposal(87L);
+
+        ArgumentCaptor<ChatMessage> saved = ArgumentCaptor.forClass(ChatMessage.class);
+        verify(chatMessageRepository).save(saved.capture());
+        assertEquals(ChatMessageType.JOB_PROPOSAL, saved.getValue().getType());
+        assertEquals(professional, saved.getValue().getSender());
+        assertNull(saved.getValue().getContent());
+        assertEquals(job, saved.getValue().getJobRequest());
+        assertTrue(saved.getValue().isConsistentWithType());
+        verify(conversationRepository).updateLastMessage(12L, NOW, "Trabajo propuesto");
+
+        ArgumentCaptor<ChatMessageSent> sent = ArgumentCaptor.forClass(ChatMessageSent.class);
+        verify(events).publishEvent(sent.capture());
+        assertEquals(87L, sent.getValue().message().getJob().getId());
+    }
+
+    @Test
+    void addJobProposal_createsTheConversationIfThePairHadNone_withoutCountingItAsNew() {
+        Conversation conversation = Conversation.builder().id(12L).client(client).professional(professional).build();
+        job(87L, client, professional, JobStatus.PROPOSED);
+        when(conversationRepository.findBetween(1L, 2L)).thenReturn(Optional.empty(), Optional.of(conversation));
+
+        service.addJobProposal(87L);
+
+        verify(conversationRepository).insertIfAbsent(1L, 2L);
+        verify(rateLimiter, never()).checkNewConversation(any());
+        ArgumentCaptor<ChatMessage> saved = ArgumentCaptor.forClass(ChatMessage.class);
+        verify(chatMessageRepository).save(saved.capture());
+        assertEquals(client, saved.getValue().getSender());
+    }
+
+    @Test
+    void addJobProposal_whenSavingTheCardFails_theErrorReachesTheProposal() {
+        Conversation conversation = conversation();
+        existsBetween(conversation);
+        job(87L, client, professional, JobStatus.PROPOSED);
+        when(chatMessageRepository.save(any(ChatMessage.class))).thenThrow(new IllegalStateException("db down"));
+
+        // The listener is synchronous inside the job's transaction, so this rolls the proposal back
+        assertThrows(IllegalStateException.class, () -> service.addJobProposal(87L));
+    }
+
+    @Test
+    void getMessages_loadsTheCardsJobsInASingleQuery() {
+        Conversation conversation = conversation();
+        JobRequest job = job(87L, client, professional, JobStatus.PROPOSED);
+        ChatMessage card = ChatMessage.builder().id(1L).conversation(conversation).sender(client)
+                .type(ChatMessageType.JOB_PROPOSAL).jobRequest(job).clientMessageId(UUID.randomUUID()).build();
+        ChatMessage again = ChatMessage.builder().id(2L).conversation(conversation).sender(client)
+                .type(ChatMessageType.JOB_PROPOSAL).jobRequest(job).clientMessageId(UUID.randomUUID()).build();
+        when(chatMessageRepository.findPage(eq(12L), any(), any(Pageable.class))).thenReturn(List.of(again, card));
+
+        List<ChatMessageResponse> page = service.getMessages(12L, clientId, null, null);
+
+        verify(jobRequestRepository).findAllById(List.of(87L));
+        assertEquals(JobStatus.PROPOSED, page.get(0).getJob().getStatus());
+    }
+
+    @Test
+    void getJobUpdate_isTheCardAsItIsNow_forBothSides_withoutANewMessage() {
+        Conversation conversation = conversation();
+        existsBetween(conversation);
+        job(87L, client, professional, JobStatus.ACCEPTED);
+
+        var update = service.getJobUpdate(87L).orElseThrow();
+
+        assertEquals(12L, update.conversationId());
+        assertEquals(JobStatus.ACCEPTED, update.job().getStatus());
+        assertEquals(java.util.Set.of(clientId, professionalId), update.recipientIds());
+        verify(chatMessageRepository, never()).save(any());
+        verify(conversationRepository, never()).updateLastMessage(any(), any(), any());
     }
 }

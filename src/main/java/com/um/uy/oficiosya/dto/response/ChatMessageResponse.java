@@ -20,5 +20,7 @@ public class ChatMessageResponse {
     private String content;
     private UUID clientMessageId;
     private Long jobRequestId;
+    /** The job as it is now, on a JOB_PROPOSAL; null on a TEXT message. */
+    private ChatJobSummary job;
     private OffsetDateTime createdAt;
 }

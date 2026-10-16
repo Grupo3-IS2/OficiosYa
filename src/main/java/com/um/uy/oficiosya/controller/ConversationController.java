@@ -24,7 +24,7 @@ import java.util.List;
  * The 1 to 1 chat between a client and a professional. There is one conversation per pair of users,
  * opened from a professional's profile or from a job they share (see JobRequestController). Every
  * endpoint acts as the caller identified by the token, who has to take part in the conversation.
- * Messages are sent here and stored; the other side sees them on their next request.
+ * Messages are sent here and stored; both sides also get them live over STOMP (/user/queue/messages).
  */
 @PreAuthorize("hasRole('CLIENT')")
 @RestController
@@ -94,6 +94,18 @@ public class ConversationController {
                                          Authentication authentication) {
         chatService.markRead(id, request.getLastReadMessageId(), AuthenticatedUser.id(authentication));
         return ResponseEntity.noContent().build();
+    }
+
+    /** The caller blocks the conversation: nobody can write in it or propose a job to the other. Idempotent. */
+    @PostMapping("/{id}/block")
+    public ResponseEntity<ConversationResponse> block(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(chatService.block(id, AuthenticatedUser.id(authentication)));
+    }
+
+    /** Lifts the caller's own block; a block by the other side stays. */
+    @DeleteMapping("/{id}/block")
+    public ResponseEntity<ConversationResponse> unblock(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(chatService.unblock(id, AuthenticatedUser.id(authentication)));
     }
 
     /** 201 with the conversation's location if it was just created, 200 if it already existed. */

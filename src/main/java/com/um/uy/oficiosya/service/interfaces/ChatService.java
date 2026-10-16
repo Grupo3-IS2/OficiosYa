@@ -1,10 +1,13 @@
 package com.um.uy.oficiosya.service.interfaces;
 
 import com.um.uy.oficiosya.dto.request.ChatMessageCreateRequest;
+import com.um.uy.oficiosya.dto.response.ChatJobSummary;
 import com.um.uy.oficiosya.dto.response.ChatMessageResponse;
 import com.um.uy.oficiosya.dto.response.ConversationResponse;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** The 1 to 1 chat: one conversation per pair of users, whatever jobs they have together. */
@@ -34,6 +37,25 @@ public interface ChatService {
 
     /** Marks the conversation read up to that message, never backwards. The other side is not told (no "seen"). */
     void markRead(Long conversationId, Long lastReadMessageId, UUID callerId);
+
+    /** The caller blocks the conversation (idempotent): nobody can write in it or propose a job to the other. */
+    ConversationResponse block(Long conversationId, UUID callerId);
+
+    /** Lifts the caller's own block; if the other side blocked it too, it stays blocked. */
+    ConversationResponse unblock(Long conversationId, UUID callerId);
+
+    /**
+     * Leaves the "Trabajo propuesto" card of a job just proposed in the pair's conversation, creating
+     * the conversation if needed. Runs inside the job's transaction: if it fails, so does the proposal.
+     */
+    void addJobProposal(Long jobRequestId);
+
+    /** The job's card as it is now and who to tell, for the push after a change; empty if the job is gone. */
+    Optional<JobUpdate> getJobUpdate(Long jobRequestId);
+
+    /** {@code conversationId} is null if the pair never opened one (a job from before the chat). */
+    record JobUpdate(Long conversationId, ChatJobSummary job, Set<UUID> recipientIds) {
+    }
 
     /** What a get-or-create returned, and whether it had to create it (201) or it already existed (200). */
     record FoundOrCreated<T>(T value, boolean created) {

@@ -37,6 +37,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -77,7 +78,7 @@ class ConversationControllerTest {
     }
 
     private ChatMessageResponse message(UUID clientMessageId) {
-        return new ChatMessageResponse(345L, 12L, ChatMessageType.TEXT, userId, "Hola", clientMessageId, 87L,
+        return new ChatMessageResponse(345L, 12L, ChatMessageType.TEXT, userId, "Hola", clientMessageId, 87L, null,
                 OffsetDateTime.parse("2026-10-12T21:30:00-03:00"));
     }
 
@@ -358,5 +359,30 @@ class ConversationControllerTest {
                         {"lastReadMessageId":345}"""))
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(chatService);
+    }
+
+    @Test
+    void block_is200WithTheConversationAsTheCallerSeesIt() throws Exception {
+        ConversationResponse blocked = conversation();
+        blocked.setCanWrite(false);
+        blocked.setBlockedByMe(true);
+        when(chatService.block(12L, userId)).thenReturn(blocked);
+
+        mvc.perform(signedIn(post(BASE + "/12/block"), ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canWrite").value(false))
+                .andExpect(jsonPath("$.blockedByMe").value(true));
+    }
+
+    @Test
+    void unblock_is200_andSomeoneOutsideIs403() throws Exception {
+        when(chatService.unblock(12L, userId)).thenReturn(conversation());
+        when(chatService.unblock(13L, userId)).thenThrow(new AccessDeniedException("No"));
+
+        mvc.perform(signedIn(delete(BASE + "/12/block"), ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blockedByMe").value(false));
+        mvc.perform(signedIn(delete(BASE + "/13/block"), ""))
+                .andExpect(status().isForbidden());
     }
 }

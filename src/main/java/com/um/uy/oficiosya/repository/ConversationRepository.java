@@ -88,4 +88,49 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             ORDER BY c.lastMessageAt DESC, c.id DESC
             """)
     List<Conversation> findInbox(@Param("userId") UUID userId);
+
+    /**
+     * Conversations, not blocked, where the client side has messages from the other side unread since
+     * before {@code sentBefore}, newer than the last "unread messages" email, which was sent before
+     * {@code mailedBefore} (or never).
+     */
+    @Query("""
+            SELECT c FROM Conversation c
+            JOIN FETCH c.client
+            JOIN FETCH c.professional
+            WHERE c.clientBlockedAt IS NULL AND c.professionalBlockedAt IS NULL
+            AND (c.clientUnreadMailAt IS NULL OR c.clientUnreadMailAt < :mailedBefore)
+            AND EXISTS (SELECT m FROM ChatMessage m
+                        WHERE m.conversation = c AND m.sender.id <> c.client.id
+                        AND m.id > COALESCE(c.clientLastReadMessageId, 0)
+                        AND m.createdAt <= :sentBefore
+                        AND (c.clientUnreadMailAt IS NULL OR m.createdAt > c.clientUnreadMailAt))
+            """)
+    List<Conversation> findUnreadToMailClientSide(@Param("sentBefore") OffsetDateTime sentBefore,
+                                                  @Param("mailedBefore") OffsetDateTime mailedBefore);
+
+    /** Same as {@link #findUnreadToMailClientSide}, for the professional side. */
+    @Query("""
+            SELECT c FROM Conversation c
+            JOIN FETCH c.client
+            JOIN FETCH c.professional
+            WHERE c.clientBlockedAt IS NULL AND c.professionalBlockedAt IS NULL
+            AND (c.professionalUnreadMailAt IS NULL OR c.professionalUnreadMailAt < :mailedBefore)
+            AND EXISTS (SELECT m FROM ChatMessage m
+                        WHERE m.conversation = c AND m.sender.id <> c.professional.id
+                        AND m.id > COALESCE(c.professionalLastReadMessageId, 0)
+                        AND m.createdAt <= :sentBefore
+                        AND (c.professionalUnreadMailAt IS NULL OR m.createdAt > c.professionalUnreadMailAt))
+            """)
+    List<Conversation> findUnreadToMailProfessionalSide(@Param("sentBefore") OffsetDateTime sentBefore,
+                                                        @Param("mailedBefore") OffsetDateTime mailedBefore);
+
+    /** Takes conversations left without any message (all deleted for being old) out of the inbox; the preview is user text too. */
+    @Modifying
+    @Query("""
+            UPDATE Conversation c SET c.lastMessageAt = NULL, c.lastMessagePreview = NULL
+            WHERE c.lastMessageAt IS NOT NULL
+            AND NOT EXISTS (SELECT m FROM ChatMessage m WHERE m.conversation = c)
+            """)
+    int clearEmptied();
 }

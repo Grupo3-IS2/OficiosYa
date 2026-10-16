@@ -13,7 +13,7 @@ test('edit profile links to the terms, which open in another tab', async ({ page
   const section = page.getByRole('region', { name: 'Términos y condiciones' });
   const [termsPage] = await Promise.all([
     context.waitForEvent('page'),
-    section.getByRole('link', { name: 'Ver términos y condiciones' }).click()
+    section.getByRole('link', { name: /Términos del servicio/ }).click()
   ]);
   await termsPage.waitForLoadState();
 

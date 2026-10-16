@@ -10,10 +10,11 @@ async function openProfile(page: Page) {
   }, fakeJwt());
   await page.goto('/profile/edit');
   await expect(page.getByRole('heading', { name: 'Editar perfil' })).toBeVisible();
-  return page.getByRole('region', { name: 'Avisos por correo' });
+  // The switch is part of the personal data: it is saved with "Guardar cambios".
+  return page.getByRole('region', { name: 'Datos personales' });
 }
 
-test('the emails about requests start on, and switching them off saves it right away', async ({ page }) => {
+test('the emails about requests start on, and switching them off is saved with the personal data', async ({ page }) => {
   let sent: Record<string, unknown> | null = null;
   await page.route('**/api/v1/users/me/notifications', async route => {
     sent = route.request().postDataJSON();
@@ -25,19 +26,23 @@ test('the emails about requests start on, and switching them off saves it right 
 
   await expect(toggle).toBeChecked();
   await toggle.uncheck();
+  expect(sent).toBeNull();
 
-  await expect(section.getByText('Listo: ya no vas a recibir avisos por correo.')).toBeVisible();
+  await section.getByRole('button', { name: 'Guardar cambios' }).click();
+
+  await expect(section.getByText('Datos guardados.')).toBeVisible();
   await expect(toggle).not.toBeChecked();
   expect(sent).toEqual({ emailNotifications: false });
 });
 
-test('if saving fails the switch goes back to how it was and says why', async ({ page }) => {
+test('if saving fails it says why and the change stays to try again', async ({ page }) => {
   await page.route('**/api/v1/users/me/notifications', route => route.fulfill({ status: 503, json: { error: 'Servicio no disponible' } }));
   const section = await openProfile(page);
   const toggle = section.getByRole('switch', { name: /Recibir avisos por correo/ });
 
   await toggle.click();
+  await section.getByRole('button', { name: 'Guardar cambios' }).click();
 
   await expect(section.getByRole('alert')).toContainText('Servicio no disponible');
-  await expect(toggle).toBeChecked();
+  await expect(toggle).not.toBeChecked();
 });

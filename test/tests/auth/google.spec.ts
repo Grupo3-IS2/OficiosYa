@@ -324,12 +324,18 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
     await openProfile(page, { googleLinked: true });
 
     const section = page.locator('section', { has: page.getByRole('heading', { name: 'Cuenta de Google' }) });
+    // The password is asked for only once unlinking was chosen.
+    await expect(section.getByLabel('Contraseña actual')).toHaveCount(0);
     await section.getByRole('button', { name: 'Desvincular de Google' }).click();
+    await expect(section.getByLabel('Contraseña actual')).toBeVisible();
+    expect(unlinkBody).toBeNull();
+
+    await section.getByRole('button', { name: 'Confirmar desvinculación' }).click();
     await expect(section.getByRole('alert')).toContainText('contraseña actual');
     expect(unlinkBody).toBeNull();
 
     await section.getByLabel('Contraseña actual').fill(PASSWORD);
-    await section.getByRole('button', { name: 'Desvincular de Google' }).click();
+    await section.getByRole('button', { name: 'Confirmar desvinculación' }).click();
 
     await expect(section.getByRole('status')).toContainText('desvinculada');
     expect(unlinkBody).toEqual({ currentPassword: PASSWORD });
@@ -391,6 +397,7 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
     await expect(page.getByRole('button', { name: 'Desvincular de Google' })).toBeVisible();
     await expect(page.getByLabel('Contraseña actual')).toHaveCount(0);
     await expect(page.getByLabel('Correo electrónico')).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Cambiar correo' })).toHaveCount(0);
   });
 
   test('UI: una cuenta creada con Google se desvincula creando una contraseña, con un código que pide en el formulario', async ({ page }) => {
@@ -440,6 +447,6 @@ test.describe('Acceso con Google - UI (Google y API simulados)', () => {
     expect(unlinkBody).toEqual({ currentPassword: PASSWORD });
     // Now it signs in with its password: it can change it, and change the email.
     await expect(page.getByRole('heading', { name: 'Seguridad' })).toBeVisible();
-    await expect(page.getByLabel('Correo electrónico')).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Cambiar correo' })).toBeVisible();
   });
 });

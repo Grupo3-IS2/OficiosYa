@@ -1621,7 +1621,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await expect(page).toHaveURL(/\/profile\/edit/);
 
     await page.goto(`${FRONTEND_BASE}/profile/edit`);
-    await page.locator('#profile-email').fill('cambio.uno@qa.test');
+    await page.getByRole('switch', { name: /Recibir avisos por correo/ }).click();
     await page.getByRole('link', { name: /OficiosYa inicio/i }).click();
     await expect(page.locator('.unsaved-modal')).toBeVisible();
     await page.keyboard.press('Escape');

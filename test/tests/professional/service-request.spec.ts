@@ -49,7 +49,11 @@ test('"Solicitar servicio" works without choosing a service first: it is chosen 
   await dialog.getByRole('button', { name: 'Enviar solicitud' }).click();
 
   // Once sent, the dialog is titled after it
-  await expect(page.getByRole('dialog', { name: 'Solicitud enviada' })).toContainText('482731');
+  const success = page.getByRole('dialog', { name: 'Solicitud enviada' });
+  await expect(success).toBeVisible();
+  await expect(success).not.toContainText('482731');
+  await expect(success.getByRole('button', { name: 'Copiar PIN' })).toHaveCount(0);
+  await expect(success.getByRole('button', { name: 'Ver mis solicitudes' })).toBeVisible();
   expect(sent).toMatchObject({ professionalId: profileId, tasks: [{ tradeId: 5, description: 'Cambiar un tomacorriente' }] });
 });
 

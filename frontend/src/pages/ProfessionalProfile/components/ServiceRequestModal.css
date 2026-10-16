@@ -191,8 +191,8 @@
 .service-request-success__pin strong { color: #07984c; font-size: 16px; }
 .service-request-success__pin output { margin: 6px 0 8px; color: #006743; font-size: clamp(42px, 9vw, 55px); font-weight: 800; line-height: 1; letter-spacing: 3px; }
 .service-request-success__pin p { max-width: 430px; margin: 0 auto; color: #5f7185; font-size: 14px; line-height: 1.45; }
-.service-request-success__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 24px; }
-.service-request-success__actions .button { min-height: 48px; border-radius: 8px; font-size: 14px; }
+.service-request-success__actions { display: grid; grid-template-columns: 1fr; justify-items: center; gap: 14px; margin-top: 24px; }
+.service-request-success__actions .button { width: min(100%, 280px); min-height: 48px; border-radius: 8px; font-size: 14px; }
 .service-request-success__actions .button--ghost { color: #526178; background: #eef1f4; }
 .service-request-success__actions .icon { width: 19px; height: 19px; vertical-align: -4px; }
 .service-request-success__feedback { min-height: 20px; margin: 8px 0 -8px; color: #07984c; font-size: 13px; }

@@ -27,7 +27,6 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
     const dialogRef = useRef<HTMLDialogElement>(null)
     const nextTaskId = useRef(2)
     const submissionInFlight = useRef(false)
-    const copyFeedbackTimeout = useRef<number | null>(null)
     const defaultTradeId = initialTradeId(
         professional.expertiseTrades.map(trade => trade.tradeId),
         preferredTradeId,
@@ -40,8 +39,7 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
     const [showErrors, setShowErrors] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [submissionError, setSubmissionError] = useState('')
-    const [confirmationPin, setConfirmationPin] = useState('')
-    const [copyFeedback, setCopyFeedback] = useState('')
+    const [sent, setSent] = useState(false)
     const errors = useMemo(() => validateServiceRequest(value), [value])
 
     useEffect(() => {
@@ -57,7 +55,6 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
         dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus()
 
         return () => {
-            if (copyFeedbackTimeout.current !== null) window.clearTimeout(copyFeedbackTimeout.current)
             dialog.close()
             document.body.style.overflow = previousBodyOverflow
             document.documentElement.style.overflow = previousRootOverflow
@@ -112,7 +109,7 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
             // Scope the PIN to that creator instead of deriving ownership from their account role.
             const creatorId = getCurrentUser()?.id
             if (creatorId) saveJobRequestPin(creatorId, response.id, response.confirmationPin)
-            setConfirmationPin(response.confirmationPin)
+            setSent(true)
         } catch (error) {
             if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
                 setSubmissionError('Necesitás iniciar sesión como cliente para enviar una solicitud.')
@@ -127,29 +124,14 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
         }
     }
 
-    function showCopyFeedback(message: string) {
-        if (copyFeedbackTimeout.current !== null) window.clearTimeout(copyFeedbackTimeout.current)
-        setCopyFeedback(message)
-        copyFeedbackTimeout.current = window.setTimeout(() => setCopyFeedback(''), 2500)
-    }
-
-    async function copyPin() {
-        try {
-            await navigator.clipboard.writeText(confirmationPin)
-            showCopyFeedback('PIN copiado')
-        } catch {
-            showCopyFeedback('No se pudo copiar el PIN')
-        }
-    }
-
     const selectedTrade = professional.expertiseTrades.find(trade => trade.tradeId === defaultTradeId)
 
     return createPortal(
         <dialog
             ref={dialogRef}
-            className={`service-request-modal${confirmationPin ? ' service-request-modal--success' : ''}`}
+            className={`service-request-modal${sent ? ' service-request-modal--success' : ''}`}
             aria-labelledby="service-request-title"
-            aria-describedby={confirmationPin ? undefined : 'service-request-subtitle'}
+            aria-describedby={sent ? undefined : 'service-request-subtitle'}
             aria-busy={submitting}
             onCancel={event => {
                 event.preventDefault()
@@ -159,9 +141,9 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
             <header className="service-request-modal__header">
                 <div>
                     <h2 id="service-request-title">
-                        {confirmationPin ? 'Solicitud enviada' : 'Solicitar servicio'}
+                        {sent ? 'Solicitud enviada' : 'Solicitar servicio'}
                     </h2>
-                    {!confirmationPin && (
+                    {!sent && (
                         <p id="service-request-subtitle">
                             {professional.name}{selectedTrade ? ` · ${selectedTrade.tradeName}` : ''}
                         </p>
@@ -178,26 +160,18 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
                 </button>
             </header>
 
-            {confirmationPin ? (
+            {sent ? (
                 <div className="service-request-success">
                     <span className="service-request-success__icon" aria-hidden="true">
                         <Icon name="check" />
                     </span>
                     <h3>Solicitud enviada</h3>
-                    <section className="service-request-success__pin" aria-label="PIN de confirmación">
-                        <strong>PIN de confirmación</strong>
-                        <output>{confirmationPin}</output>
-                        <p>Guardá este PIN. El profesional lo necesitará para confirmar que el trabajo fue completado.</p>
-                    </section>
+                    <p>El profesional revisará tu solicitud. Podés seguir su estado en Mis solicitudes.</p>
                     <div className="service-request-success__actions">
-                        <Button type="button" variant="ghost" onClick={() => void copyPin()}>
-                            <Icon name="copy" /> Copiar PIN
-                        </Button>
                         <Button type="button" onClick={() => { window.location.href = '/mis-solicitudes' }}>
                             Ver mis solicitudes
                         </Button>
                     </div>
-                    <p className="service-request-success__feedback" aria-live="polite">{copyFeedback}</p>
                 </div>
             ) : (
                 <>

@@ -52,6 +52,37 @@ function tomorrow() {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+test('a pending request hides even a saved PIN and explains when it becomes visible', async ({ page }) => {
+  await page.addInitScript(id => {
+    localStorage.setItem(`oficiosya_job_request_pins:${id}`, JSON.stringify({ 71: '482731' }));
+  }, clientId);
+  const dialog = await openRequests(page, clientId);
+  await expect(dialog.getByText('Una vez que el profesional acepte la solicitud se mostrará el PIN.')).toBeVisible();
+  await expect(dialog).not.toContainText('482731');
+  await expect(dialog).not.toContainText('navegador');
+  await expect(dialog.getByRole('button', { name: 'Copiar PIN' })).toHaveCount(0);
+});
+
+for (const status of ['ACCEPTED', 'RESCHEDULE_REQUESTED']) {
+  test(`the creator can see and copy a saved PIN after acceptance (${status})`, async ({ page }) => {
+    await page.addInitScript(id => {
+      localStorage.setItem(`oficiosya_job_request_pins:${id}`, JSON.stringify({ 71: '482731' }));
+    }, clientId);
+    const dialog = await openRequests(page, clientId, proposedRequest({ status }));
+    await expect(dialog.getByText('482731', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Copiar PIN' })).toBeVisible();
+  });
+}
+
+test('the professional cannot see the client PIN even when it is saved on the same browser', async ({ page }) => {
+  await page.addInitScript(id => {
+    localStorage.setItem(`oficiosya_job_request_pins:${id}`, JSON.stringify({ 71: '482731' }));
+  }, clientId);
+  const dialog = await openRequests(page, professionalId, proposedRequest({ status: 'ACCEPTED' }));
+  await expect(dialog).not.toContainText('482731');
+  await expect(dialog.getByRole('button', { name: 'Copiar PIN' })).toHaveCount(0);
+});
+
 test('the professional accepts a request choosing when to do the job', async ({ page }) => {
   let sent: Record<string, string> | null = null;
   await page.route('**/api/v1/job-requests/71/accept', async route => {

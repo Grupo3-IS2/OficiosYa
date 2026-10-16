@@ -85,6 +85,7 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
     const needsAnswer = !isClient && request.status === 'PROPOSED'
     const canCancel = (isClient ? cancellableByClient : cancellableByProfessional).includes(request.status)
     const answersChange = answersReschedule(request, isClient ? 'CLIENT' : 'PROFESSIONAL')
+    const canShowPin = isClient && (request.status === 'ACCEPTED' || request.status === 'RESCHEDULE_REQUESTED')
 
     useEffect(() => {
         const dialog = dialogRef.current
@@ -107,7 +108,7 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
     }, [])
 
     async function copyPin() {
-        if (!pin) return
+        if (!canShowPin || !pin) return
         try {
             await navigator.clipboard.writeText(pin)
             setCopyFeedback('PIN copiado')
@@ -237,9 +238,11 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                 <section className="request-detail-pin" aria-labelledby="request-pin-title">
                     <div>
                         <h3 id="request-pin-title">PIN de confirmación</h3>
-                        {isClient && pin && <output>{pin}</output>}
+                        {canShowPin && pin && <output>{pin}</output>}
                     </div>
-                    {isClient && pin
+                    {isClient && request.status === 'PROPOSED'
+                        ? <p>Una vez que el profesional acepte la solicitud se mostrará el PIN.</p>
+                        : canShowPin && pin
                         ? <>
                             <p>Mostrale este PIN al profesional cuando el trabajo esté terminado.</p>
                             <Button type="button" variant="ghost" onClick={() => void copyPin()}>
@@ -248,7 +251,7 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                             <span className="request-detail-pin__feedback" aria-live="polite">{copyFeedback}</span>
                         </>
                         : isClient
-                            ? <p>Este PIN solo se entrega al crear la solicitud. No está disponible en este navegador.</p>
+                            ? <p>{canShowPin ? 'No pudimos cargar el PIN de confirmación.' : 'Esta solicitud ya no requiere un PIN de confirmación.'}</p>
                             : <p>El PIN lo conserva el cliente y debe mostrártelo cuando el trabajo esté terminado.</p>}
                 </section>
             </div>

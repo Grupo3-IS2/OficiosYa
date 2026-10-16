@@ -35,11 +35,16 @@ class EnumCheckConstraintUpdaterTest {
     }
 
     @Test
-    void run_dropsAndRecreatesBothConstraintsAndMakesThePinHashNullable() {
+    void purposeConstraint_listsEveryVerificationPurpose() {
+        assertEquals(sqlList(VerificationPurpose.class), EnumCheckConstraintUpdater.PURPOSE_VALUES);
+    }
+
+    @Test
+    void run_dropsAndRecreatesEveryConstraintAndMakesThePinHashNullable() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
 
         new EnumCheckConstraintUpdater(jdbcTemplate).run();
 
-        verify(jdbcTemplate, times(5)).execute(anyString());
+        verify(jdbcTemplate, times(7)).execute(anyString());
     }
 }

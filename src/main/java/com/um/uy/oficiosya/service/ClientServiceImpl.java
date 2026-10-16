@@ -8,6 +8,7 @@ import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.dto.update.AccountDeletionRequest;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.NotificationsUpdateRequest;
+import com.um.uy.oficiosya.dto.update.PasswordSetupRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ClientUpdateRequest;
 import com.um.uy.oficiosya.entity.AuthProvider;

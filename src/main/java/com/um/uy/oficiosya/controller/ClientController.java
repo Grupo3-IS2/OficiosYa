@@ -7,10 +7,12 @@ import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.dto.response.ClientResponse;
+import com.um.uy.oficiosya.dto.update.AccountDeletionRequest;
 import com.um.uy.oficiosya.dto.update.EmailUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 import com.um.uy.oficiosya.dto.update.NotificationsUpdateRequest;
+import com.um.uy.oficiosya.dto.update.PasswordSetupRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ClientUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
@@ -114,6 +116,33 @@ public class ClientController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.create(refreshToken).toString())
                 .build();
+    }
+
+    /**
+     * For an account created with Google: mails a code to its email to give it a password. Asking
+     * again is the resend (it answers 429 inside the cooldown).
+     */
+    @PostMapping("/me/password/setup")
+    public ResponseEntity<PendingVerificationResponse> startPasswordSetup(Authentication authentication,
+                                                                          HttpServletRequest request) {
+        rateLimiter.check(request, PASSWORD_SETUP_BUCKET);
+        return ResponseEntity.accepted().body(clientService.startPasswordSetup(AuthenticatedUser.id(authentication)));
+    }
+
+    /**
+     * The code and the new password: the account gets it, and answers the updated user. Like a
+     * password change, every other device is logged out and this one gets a new refresh cookie.
+     */
+    @PutMapping("/me/password/setup")
+    public ResponseEntity<ClientResponse> completePasswordSetup(@Valid @RequestBody PasswordSetupRequest setupRequest,
+                                                                Authentication authentication,
+                                                                HttpServletRequest request) {
+        rateLimiter.check(request, PASSWORD_SETUP_BUCKET);
+        ClientResponse response = clientService.completePasswordSetup(setupRequest, AuthenticatedUser.id(authentication));
+        String refreshToken = authService.restartSessions(AuthenticatedUser.id(authentication));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.create(refreshToken).toString())
+                .body(response);
     }
 
     /** Turns the emails about the user's requests on or off: a change of timeframe asked of them, requests piling up. */

@@ -57,5 +57,6 @@ public class EnumCheckConstraintUpdater implements CommandLineRunner {
         jdbcTemplate.execute(ADD_PAYMENT_STATE_CHECK);
         jdbcTemplate.execute(DROP_PURPOSE_CHECK);
         jdbcTemplate.execute(ADD_PURPOSE_CHECK);
+        jdbcTemplate.execute(PIN_HASH_NULLABLE);
     }
 }

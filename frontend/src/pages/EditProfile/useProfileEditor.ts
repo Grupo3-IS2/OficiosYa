@@ -52,7 +52,6 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [security, setSecurity] = useState<SecurityData>({ current: '', password: '', confirmation: '' })
     // Whether the account has a password and a linked Google: what the security section offers depends on it.
     const [access, setAccess] = useState<AccountAccess>({ hasPassword: true, googleLinked: false })
-    const [emailNotifications, setEmailNotifications] = useState(true)
     // The selected photo is only uploaded when the personal section is saved.
     const [photo, setPhoto] = useState<File | null>(null)
     const photoPreview = useRef('')
@@ -81,7 +80,6 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             const phone = isProfessionalResponse(response) ? response.phoneNumber : null
             setIsProfessional(response.role === 'PROFESSIONAL')
             setAccess({ hasPassword: response.hasPassword ?? true, googleLinked: response.googleLinked ?? false })
-            setEmailNotifications(response.emailNotifications ?? true)
             setUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             updateStoredUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             const emailNotifications = response.emailNotifications ?? true

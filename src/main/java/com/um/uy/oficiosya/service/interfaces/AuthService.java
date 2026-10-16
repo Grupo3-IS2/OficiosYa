@@ -28,6 +28,9 @@ public interface AuthService {
      */
     String restartSessions(UUID userId);
 
+    /** Ends every session of the user and starts none (the account was deleted). */
+    void endSessions(UUID userId);
+
     record RefreshedLogin(LoginResponse login, String refreshToken) {
     }
 }

@@ -15,6 +15,7 @@ export function fakeJwt(expiresInSeconds = 3600) {
  * 401 to those calls and the frontend expires the session, so UI tests with a session mock them.
  */
 export async function mockHomeApi(page: Page) {
+  await mockChat(page);
   // The header asks for the user's requests, to warn on "Mis solicitudes" if one waits for them.
   // Registered first, so a test that mocks its own requests overrides it.
   await page.route('**/api/v1/job-requests/mine', (route) => route.fulfill({
@@ -39,6 +40,16 @@ export async function mockHomeApi(page: Page) {
  * load Google's script. Cases that don't test Google swap it for an inert one, so the suite
  * never depends on reaching accounts.google.com.
  */
+/**
+ * The header asks for the unread chat messages and opens the chat socket on every page. With a
+ * fakeJwt the real backend answers 401 and the frontend expires the session, so they are mocked too.
+ */
+export async function mockChat(page: Page) {
+  await page.route('**/api/v1/conversations/unread-count', (route) => route.fulfill({ json: { count: 0 } }));
+  // Accepted but silent: it never answers CONNECTED, so the page simply gets no pushes
+  await page.routeWebSocket('**/ws/chat', () => {});
+}
+
 export async function blockGoogleIdentity(page: Page) {
   await page.route('https://accounts.google.com/**', (route) => route.fulfill({
     contentType: 'text/javascript',

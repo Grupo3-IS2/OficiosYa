@@ -12,6 +12,7 @@ import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
 import com.um.uy.oficiosya.dto.update.NotificationsUpdateRequest;
+import com.um.uy.oficiosya.dto.update.PasswordSetupRequest;
 import com.um.uy.oficiosya.dto.update.PasswordUpdateRequest;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
 import com.um.uy.oficiosya.service.interfaces.GoogleAuthService;
@@ -246,5 +247,87 @@ class ClientControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(clientService);
+    }
+
+    // --- password for a Google account ---
+
+    @Test
+    void startPasswordSetup_answers202WithTheCodesTerms() throws Exception {
+        when(clientService.startPasswordSetup(userId)).thenReturn(pending);
+
+        mvc.perform(signedIn(post(BASE + "/password/setup"), ""))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.codeLength").value(6));
+
+        verify(rateLimiter).check(any(), eq("password-setup"));
+    }
+
+    @Test
+    void completePasswordSetup_answersTheUserAndRestartsTheSessions() throws Exception {
+        when(clientService.completePasswordSetup(any(PasswordSetupRequest.class), eq(userId))).thenReturn(updatedUser());
+        when(authService.restartSessions(userId)).thenReturn("fresh-refresh");
+
+        mvc.perform(signedIn(put(BASE + "/password/setup"), """
+                        {"code":"123456","newPassword":"Nueva!Clave1","newPasswordConfirmation":"Nueva!Clave1"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("nueva@example.com"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("oficiosya_refresh=fresh-refresh")));
+    }
+
+    @Test
+    void completePasswordSetup_withAWeakPassword_is400AndChangesNothing() throws Exception {
+        mvc.perform(signedIn(put(BASE + "/password/setup"), """
+                        {"code":"123456","newPassword":"corta","newPasswordConfirmation":"corta"}"""))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(clientService);
+        verify(authService, never()).restartSessions(any());
+    }
+
+    // --- photo and account ---
+
+    @Test
+    void removeProfileImage_answersTheUserWithoutPhoto() throws Exception {
+        when(clientService.removeProfileImage(userId)).thenReturn(updatedUser());
+
+        mvc.perform(signedIn(delete(BASE + "/profile-image"), ""))
+                .andExpect(status().isOk());
+
+        verify(clientService).removeProfileImage(userId);
+    }
+
+    @Test
+    void startAccountDeletion_answers202WithTheCodesTerms() throws Exception {
+        when(clientService.startAccountDeletion(userId)).thenReturn(pending);
+
+        mvc.perform(signedIn(post(BASE + "/deletion-code"), ""))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.codeLength").value(6));
+
+        verify(rateLimiter).check(any(), eq("account-deletion"));
+    }
+
+    @Test
+    void deleteUser_endsEverySessionAndClearsTheCookie() throws Exception {
+        mvc.perform(signedIn(delete(BASE), """
+                        {"currentPassword":"ClaveSegura2026!"}"""))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        verify(clientService).deleteUser(any(AccountDeletionRequest.class), eq(userId));
+        verify(authService).endSessions(userId);
+        verify(rateLimiter).check(any(), eq("account-deletion"));
+    }
+
+    @Test
+    void deleteUser_thatIsRefused_endsNoSession() throws Exception {
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Tenés trabajos en curso"))
+                .when(clientService).deleteUser(any(AccountDeletionRequest.class), eq(userId));
+
+        mvc.perform(signedIn(delete(BASE), """
+                        {"currentPassword":"ClaveSegura2026!"}"""))
+                .andExpect(status().isConflict());
+
+        verify(authService, never()).endSessions(any());
     }
 }

@@ -94,6 +94,16 @@ class ChatContentFilterTest {
         assertEquals(400, refusal(() -> filter.check(content, conversation)));
     }
 
+    @Test
+    void aHugeRunOfDigitsOrDomains_isCheckedWithoutOverflowingTheStack() {
+        pairHas(JobStatus.PROPOSED);
+        String digits = "1 ".repeat(100_000);
+        String email = "a@b" + ".c".repeat(100_000);
+
+        assertDoesNotThrow(() -> filter.check(digits, conversation));
+        assertEquals(400, refusal(() -> filter.check(email, conversation)));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"ACCEPTED", "RESCHEDULE_REQUESTED", "COMPLETED"})
     void contactDetailsWithAnAcceptedJob_pass(String status) {

@@ -59,8 +59,8 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
             throw new MessageDeliveryException(message, "Sesión no autenticada o vencida");
         }
         // The user destinations resolve to the caller's own queues: nobody can listen to someone else's
-        if (command == StompCommand.SUBSCRIBE
-                && (accessor.getDestination() == null || !accessor.getDestination().startsWith(USER_QUEUES))) {
+        String destination = accessor.getDestination();
+        if (command == StompCommand.SUBSCRIBE && (destination == null || !destination.startsWith(USER_QUEUES))) {
             throw new MessageDeliveryException(message, "Solo puedes suscribirte a " + USER_QUEUES + "**");
         }
         return message;

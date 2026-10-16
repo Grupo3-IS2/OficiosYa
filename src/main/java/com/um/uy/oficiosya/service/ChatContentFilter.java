@@ -22,9 +22,13 @@ import java.util.regex.Pattern;
 @Component
 public class ChatContentFilter {
 
-    /** Digits with at most one space, dot or dash between each: "099 123 456", "+598-99.123.456". */
-    private static final Pattern DIGIT_RUN = Pattern.compile("\\+?\\d(?:[\\s.\\-]?\\d)*");
-    private static final Pattern EMAIL = Pattern.compile("[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+");
+    /**
+     * Digits with at most one space, dot or dash between each: "099 123 456", "+598-99.123.456".
+     * The repeated groups are possessive: a plain one recurses per repetition and a long enough
+     * message would overflow the stack.
+     */
+    private static final Pattern DIGIT_RUN = Pattern.compile("\\+?\\d(?:[\\s.\\-]?\\d)*+");
+    private static final Pattern EMAIL = Pattern.compile("[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)++");
     /** Uruguay, separators already removed: mobiles 09x xxx xxx (9x… after +598) and 8 digit landlines. */
     private static final Pattern UY_PHONE = Pattern.compile("(?:598)?(?:0?9\\d{7}|[24]\\d{7})");
     private static final int PIN_LENGTH = 6;

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { personalChanged, professionalChanged, securityChanged, validatePhone, validateProfessional, validateSecurity } from '../src/pages/EditProfile/profileState.ts'
 
-const personal = { name: 'Ana', email: 'ana@example.com', phone: '099123456', avatar: '' }
+const personal = { name: 'Ana', email: 'ana@example.com', phone: '099123456', avatar: '', emailNotifications: true }
 const professional = {
     description: 'Realizo instalaciones eléctricas.',
     workingLocation: 'Montevideo',

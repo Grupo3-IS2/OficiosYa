@@ -2,7 +2,6 @@ import Icon from '../../components/Icon/Icon'
 import PersonalDataSection from './components/PersonalDataSection'
 import SecuritySection from './components/SecuritySection'
 import GoogleAccountSection from './components/GoogleAccountSection'
-import NotificationsSection from './components/NotificationsSection'
 import ProfessionalProfileSection from './components/ProfessionalProfileSection'
 import ScheduleSection from './components/ScheduleSection'
 import BecomeProfessionalCard from './components/BecomeProfessionalCard'
@@ -34,10 +33,9 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                 </div>
                 {editor.error && !editor.errorSection && !navigation.isOpen && <p className="profile-error profile-page-error" role="alert">{editor.error}</p>}
                 <fieldset className="profile-editor-fields" disabled={editor.busy || editor.loadingProfile || editor.profileLoadFailed} aria-busy={editor.busy || editor.loadingProfile}>
-                    <PersonalDataSection value={editor.personal} onChange={editor.setPersonal} onPhotoChange={editor.selectPhoto} onPhotoRemove={editor.removePhoto} onSave={() => editor.saveSection('personal')} message={editor.messages.personal} error={editor.errorSection === 'personal' ? editor.error : ''} emailChanged={editor.personal.email.trim() !== editor.savedPersonalEmail} currentPassword={editor.emailPassword} onCurrentPasswordChange={editor.setEmailPassword} showPhone={editor.isProfessional} emailEditable={editor.access.hasPassword} emailChange={editor.emailChange} currentEmail={editor.savedPersonalEmail} onConfirmEmailChange={editor.confirmEmailChange} onResendEmailChange={editor.resendEmailChange} onCancelEmailChange={editor.cancelEmailChange} />
+                    <PersonalDataSection value={editor.personal} onChange={editor.setPersonal} onPhotoChange={editor.selectPhoto} onPhotoRemove={editor.removePhoto} onSave={() => editor.saveSection('personal')} message={editor.messages.personal} error={editor.errorSection === 'personal' ? editor.error : ''} showPhone={editor.isProfessional} emailEditable={editor.access.hasPassword} onStartEmailChange={editor.requestEmailChange} onConfirmEmailChange={editor.confirmEmailChange}
+                        showNotifications={!editor.loadingProfile && !editor.profileLoadFailed} />
                     {(editor.loadingProfile || editor.access.hasPassword) && <SecuritySection value={editor.security} onChange={editor.setSecurity} onSave={() => editor.saveSection('security')} message={editor.messages.security} error={editor.errorSection === 'security' ? editor.error : ''} />}
-                    {/* Not before the profile says how the switch is */}
-                    {!editor.loadingProfile && !editor.profileLoadFailed && <NotificationsSection enabled={editor.emailNotifications} onChange={editor.setEmailNotifications} />}
                     {editor.isProfessional
                         ? <>
                             <ProfessionalProfileSection value={editor.professional} onChange={editor.setProfessional} onSave={() => editor.saveSection('professional')} message={editor.messages.professional} error={editor.errorSection === 'professional' ? editor.error : ''} trades={editor.trades} tradesLoading={editor.tradesLoading} tradesError={editor.tradesError} />

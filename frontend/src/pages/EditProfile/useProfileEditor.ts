@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCurrentUser, isAuthenticated, updateStoredUser } from '../../services/authService'
-import { addExpertiseTrade, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, resendEmailChangeCode, setProfessionalPublished, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, removeProfileImage, uploadProfileImage, verifyEmailChange } from '../../services/userService'
+import { addExpertiseTrade, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, setProfessionalPublished, updateNotifications, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, removeProfileImage, uploadProfileImage, verifyEmailChange } from '../../services/userService'
 import type { ProfessionalResponse } from '../../services/userService'
 import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
@@ -35,6 +35,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             email: user?.email ?? '',
             phone: '',
             avatar: '',
+            emailNotifications: true,
         }
     })
     const [personal, setPersonal] = useState(savedPersonal)
@@ -49,13 +50,8 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [tradesError, setTradesError] = useState('')
     const [tradesLoading, setTradesLoading] = useState(true)
     const [security, setSecurity] = useState<SecurityData>({ current: '', password: '', confirmation: '' })
-    const [emailPassword, setEmailPassword] = useState('')
-    // A change of email that was started: a code is on its way to the new address and the account
-    // keeps its current email until that code is entered.
-    const [emailChange, setEmailChange] = useState<PendingVerification | null>(null)
     // Whether the account has a password and a linked Google: what the security section offers depends on it.
     const [access, setAccess] = useState<AccountAccess>({ hasPassword: true, googleLinked: false })
-    const [emailNotifications, setEmailNotifications] = useState(true)
     // The selected photo is only uploaded when the personal section is saved.
     const [photo, setPhoto] = useState<File | null>(null)
     const photoPreview = useRef('')
@@ -84,11 +80,11 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             const phone = isProfessionalResponse(response) ? response.phoneNumber : null
             setIsProfessional(response.role === 'PROFESSIONAL')
             setAccess({ hasPassword: response.hasPassword ?? true, googleLinked: response.googleLinked ?? false })
-            setEmailNotifications(response.emailNotifications ?? true)
             setUser({ id: response.id, name: response.name, email: response.email, role: response.role })
             updateStoredUser({ id: response.id, name: response.name, email: response.email, role: response.role })
-            setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar }))
-            setPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar: photoPreview.current ? previous.avatar : avatar }))
+            const emailNotifications = response.emailNotifications ?? true
+            setSavedPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar, emailNotifications }))
+            setPersonal(previous => ({ ...previous, name: response.name, email: response.email, phone: phone ?? previous.phone, avatar: photoPreview.current ? previous.avatar : avatar, emailNotifications }))
             if (isProfessionalResponse(response)) {
                 const professionalData = professionalDataFrom(response)
                 setSavedProfessional(professionalData)
@@ -143,9 +139,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     }
 
     const dirty = {
-        // A started email change is already with the server: leaving the page just abandons it, so it
-        // doesn't count as an unsaved change (what else was typed still does).
-        personal: personalChanged(personal, emailChange ? { ...savedPersonal, email: personal.email } : savedPersonal),
+        personal: personalChanged(personal, savedPersonal),
         security: securityChanged(security),
         professional: isProfessional && professionalChanged(professional, savedProfessional),
     }
@@ -169,16 +163,8 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             }
         }
         if (sections.includes('personal')) {
-            const emailInput = document.createElement('input')
-            emailInput.type = 'email'
-            emailInput.required = true
-            emailInput.value = personal.email.trim()
-            if (!personal.name.trim() || !emailInput.checkValidity()) {
-                setError('Revisa los datos personales: ingresa un nombre y un correo válido.')
-                return false
-            }
-            if (user && !emailChange && personal.email.trim() !== savedPersonal.email && !emailPassword) {
-                setError('Ingresa tu contraseña actual para cambiar el correo.')
+            if (!personal.name.trim()) {
+                setError('Revisa los datos personales: ingresa un nombre.')
                 return false
             }
             if (isProfessional) {
@@ -250,8 +236,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 setMessages(previous => ({ ...previous, professional: 'Perfil profesional actualizado.' }))
             }
             if (sections.includes('personal') && dirty.personal) {
-                let emailStarted = false
-                let saved = { ...personal, name: personal.name.trim(), email: personal.email.trim(), phone: personal.phone.trim() }
+                let saved = { ...personal, name: personal.name.trim(), phone: personal.phone.trim() }
                 if (user) {
                     if (photo) {
                         if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
@@ -268,7 +253,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                         await removeProfileImage()
                         setSavedPersonal(previous => ({ ...previous, avatar: '' }))
                     }
-                    // Los datos propios del rol se guardan en su endpoint; el correo tiene el suyo.
+                    // Los datos propios del rol se guardan en su endpoint; el correo se cambia aparte (EmailChangeModal).
                     const nameChanged = saved.name !== savedPersonal.name
                     const phoneChanged = isProfessional && saved.phone !== savedPersonal.phone
                     if (nameChanged || phoneChanged) {
@@ -287,31 +272,15 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                         setSavedPersonal(previous => ({ ...previous, name: response.name, phone }))
                         setPersonal(previous => ({ ...previous, name: response.name, phone }))
                     }
-                    // The email doesn't change here: this mails a code to the new address, and it
-                    // changes when the code is entered (confirmEmailChange). Once started, saving the
-                    // rest of the section doesn't start it again. With verification off in the
-                    // backend there is no code and it already changed.
-                    if (!emailChange && saved.email !== savedPersonal.email) {
+                    if (saved.emailNotifications !== savedPersonal.emailNotifications) {
                         if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar tus datos personales.')
-                        const started = await startEmailChange({ newEmail: saved.email, currentPassword: emailPassword })
-                        if (started.verificationRequired) {
-                            setEmailChange(started)
-                            emailStarted = true
-                        } else {
-                            applyStoredEmail(started.email)
-                        }
+                        const response = await updateNotifications(saved.emailNotifications)
+                        saved = { ...saved, emailNotifications: response.emailNotifications }
                     }
                 }
-                // The saved email stays the current one while a change waits for its code.
                 setPersonal(saved)
-                setSavedPersonal(emailStarted || emailChange ? { ...saved, email: savedPersonal.email } : saved)
-                setEmailPassword('')
-                setMessages(previous => ({
-                    ...previous,
-                    personal: emailStarted
-                        ? 'Datos guardados. Te enviamos un código al nuevo correo para confirmar el cambio.'
-                        : 'Datos guardados.',
-                }))
+                setSavedPersonal(saved)
+                setMessages(previous => ({ ...previous, personal: 'Datos guardados.' }))
             }
             setErrorSection('')
             return true
@@ -327,44 +296,37 @@ export default function useProfileEditor(professionalOverride?: boolean) {
         }
     }
 
-    /** Keeps the logged-in user's email in sync once it changed without a code. */
-    function applyStoredEmail(email: string) {
+    function applyEmail(email: string) {
         const current = getCurrentUser()
-        if (!current) return
-        const updated = { ...current, email }
-        setUser(updated)
-        updateStoredUser(updated)
-    }
-
-    /** Enters the code that reached the new address: the email changes. Throws the message to show if it doesn't. */
-    async function confirmEmailChange(code: string): Promise<void> {
-        if (!emailChange) return
-        const response = await verifyEmailChange(emailChange.email, code)
-        setUser({ id: response.id, name: response.name, email: response.email, role: response.role })
-        updateStoredUser({ id: response.id, name: response.name, email: response.email, role: response.role })
-        setSavedPersonal(previous => ({ ...previous, email: response.email }))
-        setPersonal(previous => ({ ...previous, email: response.email }))
-        setEmailChange(null)
+        if (current) {
+            const updated = { ...current, email }
+            setUser(updated)
+            updateStoredUser(updated)
+        }
+        setSavedPersonal(previous => ({ ...previous, email }))
+        setPersonal(previous => ({ ...previous, email }))
         setMessages(previous => ({ ...previous, personal: 'Correo actualizado.' }))
     }
 
-    async function resendEmailChange(): Promise<PendingVerification> {
-        if (!emailChange) throw new Error('No hay un cambio de correo en curso.')
-        const renewed = await resendEmailChangeCode(emailChange.email)
-        setEmailChange(renewed)
-        return renewed
+    /**
+     * Mails a code to the new address; the account keeps its email until `confirmEmailChange`. With
+     * verification off in the backend there is no code and it already changed. Throws the message to show.
+     */
+    async function requestEmailChange(newEmail: string, currentPassword: string): Promise<PendingVerification> {
+        const started = await startEmailChange({ newEmail, currentPassword })
+        if (!started.verificationRequired) applyEmail(started.email)
+        return started
     }
 
-    /** Gives up the change: the code on its way is simply never used, and the field goes back to the current email. */
-    function cancelEmailChange() {
-        setEmailChange(null)
-        setPersonal(previous => ({ ...previous, email: savedPersonal.email }))
-        setEmailPassword('')
+    /** Enters the code that reached the new address: the email changes. Throws the message to show if it doesn't. */
+    async function confirmEmailChange(newEmail: string, code: string): Promise<void> {
+        const response = await verifyEmailChange(newEmail, code)
+        applyEmail(response.email)
     }
 
     return {
-        emailChange, confirmEmailChange, resendEmailChange, cancelEmailChange,
-        user, isProfessional, personal, setPersonal, selectPhoto, removePhoto, savedPersonalEmail: savedPersonal.email, emailPassword, setEmailPassword, access, setAccess, emailNotifications, setEmailNotifications, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
+        requestEmailChange, confirmEmailChange,
+        user, isProfessional, personal, setPersonal, selectPhoto, removePhoto, savedPersonalEmail: savedPersonal.email, access, setAccess, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
         busy, loadingProfile, profileLoadFailed, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),
@@ -373,8 +335,6 @@ export default function useProfileEditor(professionalOverride?: boolean) {
             setPersonal(savedPersonal)
             setProfessional(savedProfessional)
             setSecurity({ current: '', password: '', confirmation: '' })
-            setEmailPassword('')
-            setEmailChange(null)
             setPhoto(null)
             releasePhotoPreview()
             setError('')

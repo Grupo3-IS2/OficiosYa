@@ -3,6 +3,7 @@ export interface PersonalData {
     email: string
     phone: string
     avatar: string
+    emailNotifications: boolean
 }
 
 export interface SecurityData {
@@ -31,6 +32,7 @@ export type ProfileSection = 'personal' | 'security' | 'professional'
 export function personalChanged(current: PersonalData, saved: PersonalData) {
     return current.name !== saved.name || current.email !== saved.email
         || current.phone !== saved.phone || current.avatar !== saved.avatar
+        || current.emailNotifications !== saved.emailNotifications
 }
 
 export function professionalChanged(current: ProfessionalData, saved: ProfessionalData) {

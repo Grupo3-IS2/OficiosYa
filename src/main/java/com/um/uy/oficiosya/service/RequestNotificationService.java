@@ -107,10 +107,7 @@ public class RequestNotificationService {
         JobRequest job = jobRequestRepository.findById(jobRequestId).orElse(null);
         if (job == null) return;
 
-        Client actor = change == null
-                ? (job.getProposedBy() == Role.PROFESSIONAL ? job.getProfessional() : job.getClient())
-                : actorId == null ? null
-                : job.getClient().getPublicId().equals(actorId) ? job.getClient() : job.getProfessional();
+        Client actor = actorOf(job, change, actorId);
         String what = switch (change) {
             case null -> "propuso un trabajo";
             case ACCEPTED -> "aceptó el trabajo";
@@ -147,6 +144,17 @@ public class RequestNotificationService {
                     """.formatted(recipient.getName(), event, service(job), job.getLocation(), when, siteUrl) + SIGNATURE;
             emailSender.sendNotification(recipient.getEmail(), "Novedades de un trabajo en OficiosYa", body);
         }
+    }
+
+    /** Who made the change: whoever proposed it for a new job, none when it expired on its own. */
+    private static Client actorOf(JobRequest job, JobRequestEvents.Change change, UUID actorId) {
+        if (change == null) {
+            return job.getProposedBy() == Role.PROFESSIONAL ? job.getProfessional() : job.getClient();
+        }
+        if (actorId == null) {
+            return null;
+        }
+        return job.getClient().getPublicId().equals(actorId) ? job.getClient() : job.getProfessional();
     }
 
     /**

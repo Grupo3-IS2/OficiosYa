@@ -6,6 +6,7 @@ import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.GoogleCredentialRequest;
 import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
+import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.request.LoginRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
@@ -37,6 +38,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
@@ -322,12 +324,26 @@ class AuthControllerTest {
 
     @Test
     void googleRegisterClient_answersTheLogin() throws Exception {
-        when(googleAuthService.registerClient(any(GoogleCredentialRequest.class))).thenReturn(login);
+        when(googleAuthService.registerClient(any(GoogleRegisterRequest.class))).thenReturn(login);
 
         mvc.perform(json("/google/register-client", """
                         {"credential":"id-token"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("ana@example.com"));
+    }
+
+    @Test
+    void googleRegisterClient_acceptsANameButOnlyAFullOne() throws Exception {
+        when(googleAuthService.registerClient(any(GoogleRegisterRequest.class))).thenReturn(login);
+
+        mvc.perform(json("/google/register-client", """
+                        {"credential":"id-token","name":"Ana Pérez"}"""))
+                .andExpect(status().isOk());
+        mvc.perform(json("/google/register-client", """
+                        {"credential":"id-token","name":"Ana"}"""))
+                .andExpect(status().isBadRequest());
+
+        verify(googleAuthService).registerClient(argThat(request -> "Ana Pérez".equals(request.getName())));
     }
 
     @Test

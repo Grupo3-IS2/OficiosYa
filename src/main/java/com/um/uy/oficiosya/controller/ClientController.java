@@ -41,6 +41,8 @@ public class ClientController {
 
     /** The endpoints that mail or check an email-change code share this per-client limit. */
     private static final String EMAIL_CHANGE_BUCKET = "email-change";
+    private static final String PASSWORD_SETUP_BUCKET = "password-setup";
+    private static final String ACCOUNT_DELETION_BUCKET = "account-deletion";
 
     public ClientController(ClientService clientService, GoogleAuthService googleAuthService,
                             RequestRateLimiter rateLimiter, AuthService authService,
@@ -140,10 +142,34 @@ public class ClientController {
         return ResponseEntity.ok(clientService.changeProfileImage(image, AuthenticatedUser.id(authentication)));
     }
 
+    /** Back to no photo. */
+    @DeleteMapping("/me/profile-image")
+    public ResponseEntity<ClientResponse> removeProfileImage(Authentication authentication) {
+        return ResponseEntity.ok(clientService.removeProfileImage(AuthenticatedUser.id(authentication)));
+    }
+
+    /** Mails the code that deleting the account asks for; asking again resends it. */
+    @PostMapping("/me/deletion-code")
+    public ResponseEntity<PendingVerificationResponse> startAccountDeletion(Authentication authentication,
+                                                                            HttpServletRequest request) {
+        rateLimiter.check(request, ACCOUNT_DELETION_BUCKET);
+        return ResponseEntity.accepted().body(clientService.startAccountDeletion(AuthenticatedUser.id(authentication)));
+    }
+
+    /**
+     * Deletes the account (see {@link ClientService#deleteUser}), confirmed with the password or, for
+     * an account created with Google, its email, and the code mailed to it. Every session ends, this one's
+     * cookie too.
+     */
     @DeleteMapping("/me")
-    public ResponseEntity<Void> deleteUser(Authentication authentication) {
-        clientService.deleteUser(AuthenticatedUser.id(authentication));
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<Void> deleteUser(@RequestBody AccountDeletionRequest deletionRequest, Authentication authentication,
+                                           HttpServletRequest request) {
+        rateLimiter.check(request, ACCOUNT_DELETION_BUCKET);
+        clientService.deleteUser(deletionRequest, AuthenticatedUser.id(authentication));
+        authService.endSessions(AuthenticatedUser.id(authentication));
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.clear().toString())
+                .build();
     }
 
 }

@@ -62,13 +62,18 @@ public class EmailSenderServiceImpl implements EmailSenderService {
         return switch (purpose) {
             case REGISTER -> "Confirmá tu cuenta de OficiosYa";
             case EMAIL_CHANGE -> "Confirmá tu nuevo correo de OficiosYa";
+            case PASSWORD_SETUP -> "Creá tu contraseña de OficiosYa";
+            case ACCOUNT_DELETION -> "Confirmá que querés eliminar tu cuenta de OficiosYa";
         };
     }
 
     private String bodyFor(String code, VerificationPurpose purpose) {
-        String action = purpose == VerificationPurpose.REGISTER
-                ? "para activar tu cuenta"
-                : "para confirmar tu nuevo correo";
+        String action = switch (purpose) {
+            case REGISTER -> "para activar tu cuenta";
+            case EMAIL_CHANGE -> "para confirmar tu nuevo correo";
+            case PASSWORD_SETUP -> "para crear la contraseña de tu cuenta";
+            case ACCOUNT_DELETION -> "para eliminar tu cuenta (si no lo pediste vos, ignorá este correo)";
+        };
 
         return """
                 Tu código de verificación %s es: %s

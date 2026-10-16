@@ -29,11 +29,13 @@ jobs:
       with:
         node-version: lts/*
     - name: Install dependencies
-      run: npm ci
+      # No lifecycle scripts: Playwright doesn't need any, its browsers are installed in the next step.
+      run: npm ci --ignore-scripts
     - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
+      # The binary from the lockfile, never one npx would download.
+      run: ./node_modules/.bin/playwright install --with-deps
     - name: Run Playwright tests
-      run: npx playwright test
+      run: ./node_modules/.bin/playwright test
     - name: Backend logs
       if: failure()
       working-directory: .

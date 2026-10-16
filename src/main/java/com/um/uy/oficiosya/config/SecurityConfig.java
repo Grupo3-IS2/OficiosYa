@@ -99,6 +99,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/v1/professionals/search",
+                                "/api/v1/professionals/search/price-range",
                                 "/api/v1/professionals/{id}",
                                 "/api/v1/schedules"
                         ).permitAll()
@@ -115,7 +116,9 @@ public class SecurityConfig {
 
                         .anyRequest().authenticated()
                 )
-                .csrf(AbstractHttpConfigurer::disable)
+                // Safe without CSRF: the API authenticates with a bearer token the browser never sends on its own,
+                // and the only cookie (the refresh token) is SameSite=Strict and scoped to the auth endpoints.
+                .csrf(AbstractHttpConfigurer::disable) // NOSONAR
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -164,7 +167,9 @@ public class SecurityConfig {
             try {
                 publicId = UUID.fromString(subject);
             } catch (IllegalArgumentException e) {
-                throw new UsernameNotFoundException("Invalid user identifier: " + subject);
+                // Not user enumeration: the subject comes from a signed JWT, not from a login form, and
+                // DaoAuthenticationProvider turns this into BadCredentials anyway (hideUserNotFoundExceptions).
+                throw new UsernameNotFoundException("Invalid user identifier: " + subject); // NOSONAR
             }
 
             return clientRepository.findByPublicId(publicId)
@@ -174,7 +179,7 @@ public class SecurityConfig {
                             .roles(Role.of(user).name())
                             .build()
                     )
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + subject));
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + subject)); // NOSONAR (see above)
         };
     }
 

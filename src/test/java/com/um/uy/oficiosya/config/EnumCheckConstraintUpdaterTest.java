@@ -2,6 +2,7 @@ package com.um.uy.oficiosya.config;
 
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.PaymentState;
+import com.um.uy.oficiosya.entity.VerificationPurpose;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 

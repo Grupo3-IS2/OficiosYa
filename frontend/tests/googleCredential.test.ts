@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { emailFromCredential } from '../src/services/googleCredential.ts'
+import { emailFromCredential, profileFromCredential } from '../src/services/googleCredential.ts'
 
 function credentialWith(payload: object): string {
     const encode = (value: string) => Buffer.from(value).toString('base64url')
@@ -26,4 +26,11 @@ test('something that is not a token gives null instead of throwing', () => {
     assert.equal(emailFromCredential('not-a-token'), null)
     assert.equal(emailFromCredential('a.%%%.c'), null)
     assert.equal(emailFromCredential('a.bm90LWpzb24.c'), null)
+})
+
+test('the name and expiry are read too, for filling in the sign-up form', () => {
+    assert.deepEqual(profileFromCredential(credentialWith({ email: 'ana@example.com', name: ' Ana Pérez ', exp: 1_700_000_000 })),
+        { email: 'ana@example.com', name: 'Ana Pérez', expiresAt: 1_700_000_000_000 })
+    assert.deepEqual(profileFromCredential(credentialWith({ email: 'ana@example.com' })), { email: 'ana@example.com', name: '', expiresAt: null })
+    assert.equal(profileFromCredential('not-a-token'), null)
 })

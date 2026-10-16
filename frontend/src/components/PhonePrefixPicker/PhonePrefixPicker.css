@@ -1,0 +1,18 @@
+/* Selectors start at .phone-prefix so the field it sits in (its buttons and inputs) doesn't restyle it. */
+.phone-prefix { position: relative; flex: 0 0 auto; align-self: stretch; display: flex; }
+.phone-prefix .phone-prefix__trigger { display: inline-flex; align-items: center; gap: 7px; padding: 0 10px 0 0; border: 0; border-right: 1px solid #dce4e2; background: transparent; color: #1f2d40; font-size: 14px; }
+.phone-prefix .phone-prefix__trigger::after { content: ''; width: 6px; height: 6px; margin: -3px 0 0 2px; border-right: 1.5px solid #7d8b8d; border-bottom: 1.5px solid #7d8b8d; transform: rotate(45deg); }
+.phone-prefix img { flex: 0 0 auto; border-radius: 2px; box-shadow: 0 0 0 1px rgba(17, 30, 49, .08); object-fit: cover; }
+
+.phone-prefix .phone-prefix__menu { position: absolute; z-index: 20; top: calc(100% + 6px); left: -14px; width: min(320px, calc(100vw - 40px)); border: 1px solid #e2e7ea; border-radius: 14px; padding: 8px; background: #fff; box-shadow: 0 14px 35px rgba(17, 30, 49, .13); }
+.phone-prefix .phone-prefix__menu input { flex: none; width: 100%; box-sizing: border-box; min-height: 38px; border: 1px solid #dce4e2; border-radius: 9px; padding: 8px 11px; outline: 0; background: #fff; font: inherit; font-size: 14px; }
+.phone-prefix .phone-prefix__menu input:focus { border-color: #0ba756; box-shadow: 0 0 0 3px rgba(11, 167, 86, .12); }
+.phone-prefix [role='listbox'] { max-height: 260px; margin-top: 6px; overflow-y: auto; overscroll-behavior: contain; }
+.phone-prefix [role='option'] { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 8px; padding: 8px 9px; background: transparent; color: #263346; font-size: 14px; text-align: left; }
+.phone-prefix [role='option']:hover, .phone-prefix [role='option'][aria-selected='true'] { background: #eefaf2; }
+.phone-prefix [role='option'] span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone-prefix [role='option'] small { color: #6a7688; font-size: 13px; }
+.phone-prefix .phone-prefix__menu p, .phone-prefix .phone-prefix__menu output { margin: 10px 4px; color: #6a7688; font-size: 13px; }
+
+/* Without the list, the prefix is written by hand. */
+.phone-prefix .phone-prefix__manual { flex: 0 0 64px; width: 64px; border-right: 1px solid #dce4e2; padding-right: 8px; }

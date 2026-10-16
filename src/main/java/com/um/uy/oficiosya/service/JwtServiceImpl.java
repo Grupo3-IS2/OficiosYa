@@ -28,6 +28,7 @@ import java.util.function.Function;
 @Service
 public class JwtServiceImpl implements JwtService {
     private static final Logger logger = LoggerFactory.getLogger(JwtServiceImpl.class);
+    private static final String ISSUED_AT_MILLIS = "iat_ms";
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
     @Value("${security.jwt.expiration-time}")
@@ -113,21 +114,29 @@ public class JwtServiceImpl implements JwtService {
     @Override
     public Date extractEmisionDate(String token) {
         try {
-            return this.extractClaim(token, Claims::getIssuedAt);
+            return this.extractClaim(token, JwtServiceImpl::issuedAt);
         } catch (ExpiredJwtException e) {
-            return e.getClaims().getIssuedAt();
+            return issuedAt(e.getClaims());
         } catch (Exception e) {
             logger.error("Error extracting emission date {}", e.getMessage());
             return null;
         }
     }
 
+    /** {@code iat} only has seconds: a token issued in the same second as a password change would outlive it. */
+    private static Date issuedAt(Claims claims) {
+        Long millis = claims.get(ISSUED_AT_MILLIS, Long.class);
+        return millis != null ? new Date(millis) : claims.getIssuedAt();
+    }
+
     private String buildToken(Map<String, Object> extraClaims, String id, long expiration) {
+        long now = System.currentTimeMillis();
         return Jwts.builder()
                 .setClaims(extraClaims)
+                .claim(ISSUED_AT_MILLIS, now)
                 .setSubject(id)
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setIssuedAt(new Date(now))
+                .setExpiration(new Date(now + expiration))
                 .signWith(this.privateKey, SignatureAlgorithm.RS256)
                 .compact();
     }

@@ -25,7 +25,7 @@ jobs:
       # Everything lives in the clone: the repo, the built frontend
       # (frontend/dist, served by the host's nginx) and the backend container.
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f # v1.2.2
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}

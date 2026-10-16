@@ -365,6 +365,41 @@ test.describe('Elegir la zona en el mapa al registrarse', () => {
     await page.locator('form button[type="submit"]').click();
 
     await expect(page.getByRole('heading', { name: 'Ingresá el código' })).toBeVisible();
-    expect(sent).toMatchObject({ workingLocation: 'Cordón, Montevideo', phoneNumber: '099123456' });
+    expect(sent).toMatchObject({ workingLocation: 'Cordón, Montevideo', phoneNumber: '+59899123456' });
+  });
+
+  test('con permiso de ubicación, el campo vacío se llena con la zona donde está la persona', async ({ page, context }) => {
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ latitude: -34.9016, longitude: -56.1779 });
+    const mocks = await mockMaps(page, { reverse: cordon });
+
+    await openProfessionalForm(page);
+
+    await expect(page.locator('#register-location')).toHaveValue('Cordón, Montevideo');
+    // A neighbourhood, not an address: Nominatim's zoom 14.
+    expect(mocks.reverses.at(-1)?.searchParams.get('zoom')).toBe('14');
+  });
+
+  test('lo que se escribe mientras se busca la ubicación no se pisa', async ({ page, context }) => {
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ latitude: -34.9016, longitude: -56.1779 });
+    await mockMaps(page, {});
+    // The name of the position is held until the person has typed.
+    let release: () => void = () => {};
+    const typed = new Promise<void>((resolve) => { release = resolve; });
+    let asked = 0;
+    await page.route('https://nominatim.openstreetmap.org/reverse**', async (route) => {
+      asked++;
+      await typed;
+      await route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(cordon) });
+    });
+
+    await openProfessionalForm(page);
+    await expect.poll(() => asked).toBeGreaterThan(0);
+    await page.locator('#register-location').fill('Salto');
+    release();
+
+    await page.waitForTimeout(500);
+    await expect(page.locator('#register-location')).toHaveValue('Salto');
   });
 });

@@ -109,17 +109,20 @@ export async function googleLink(credential: string, password: string): Promise<
   return response
 }
 
+/** `name` only when the user changed the one on the Google account: without it, the backend uses Google's. */
 export async function googleRegister(
   credential: string,
   accountType: AccountType,
   professional?: { phoneNumber: string; workingLocation: string },
+  name?: string,
 ): Promise<LoginResponse> {
   const isProfessional = accountType === 'professional'
+  const named = name ? { credential, name } : { credential }
   const response = await apiRequest<LoginResponse>(
     isProfessional ? '/auth/google/register-professional' : '/auth/google/register-client',
     {
       method: 'POST',
-      body: JSON.stringify(isProfessional ? { credential, ...professional } : { credential }),
+      body: JSON.stringify(isProfessional ? { ...named, ...professional } : named),
     },
   )
 

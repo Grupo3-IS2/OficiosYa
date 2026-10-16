@@ -1,4 +1,5 @@
 import { apiRequest } from './api'
+import { clearSession } from './session'
 import type { PendingVerification } from '../types/Auth'
 import type { ExpertiseTrade, Trade } from '../types/Professional'
 
@@ -107,11 +108,29 @@ export function resendEmailChangeCode(newEmail: string): Promise<PendingVerifica
   })
 }
 
+/** For an account created with Google: mails a code to its email to give it a password. Called again, it resends. */
+export function startPasswordSetup(): Promise<PendingVerification> {
+  return apiRequest<PendingVerification>('/users/me/password/setup', { method: 'POST' })
+}
+
+/** The code and the new password: the account gets it, and comes back with `hasPassword` on. */
+export function completePasswordSetup(code: string, newPassword: string, newPasswordConfirmation: string): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/password/setup', {
+    method: 'PUT',
+    body: JSON.stringify({ code, newPassword, newPasswordConfirmation }),
+  })
+}
+
 export async function changePassword(request: PasswordUpdateRequest): Promise<void> {
   await apiRequest<void>('/users/me/password', {
     method: 'PUT',
     body: JSON.stringify(request),
   })
+}
+
+/** Back to no photo. */
+export function removeProfileImage(): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/profile-image', { method: 'DELETE' })
 }
 
 export function uploadProfileImage(image: File): Promise<AuthenticatedUserResponse> {
@@ -168,8 +187,19 @@ export function setProfessionalPublished(published: boolean): Promise<Profession
   })
 }
 
-export async function deleteUser(): Promise<void> {
+/** Mails the code that deleting the account asks for. Called again, it resends. */
+export function startAccountDeletion(): Promise<PendingVerification> {
+  return apiRequest<PendingVerification>('/users/me/deletion-code', { method: 'POST' })
+}
+
+/**
+ * Deletes the account, confirmed with the current password or, for an account created with Google, its
+ * email, and the code mailed to it. Every session of the user ends; this one is cleared here too.
+ */
+export async function deleteUser(confirmation: { currentPassword?: string; email?: string; code: string }): Promise<void> {
   await apiRequest<void>('/users/me', {
     method: 'DELETE',
+    body: JSON.stringify(confirmation),
   })
+  clearSession()
 }

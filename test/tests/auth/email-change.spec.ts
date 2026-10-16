@@ -230,10 +230,13 @@ test.describe('Cambio de correo con código', () => {
     return account;
   }
 
+  /** The email is changed in its own modal, apart from the profile form. */
   async function askForTheChange(page: Page, newEmail: string) {
-    await page.locator('#profile-email').fill(newEmail);
-    await page.locator('#profile-email-password').fill(PASSWORD);
-    await page.getByRole('button', { name: /guardar cambios/i }).first().click();
+    await page.getByRole('button', { name: 'Cambiar correo' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Cambiar correo' });
+    await dialog.locator('#email-modal-new').fill(newEmail);
+    await dialog.locator('#email-modal-password').fill(PASSWORD);
+    await dialog.getByRole('button', { name: 'Enviar código' }).click();
   }
 
   test('UI: cambiar el correo pide el código, y con el código correcto el correo queda actualizado', async ({ page, request }) => {
@@ -247,14 +250,14 @@ test.describe('Cambio de correo con código', () => {
     await expect(page.locator('#email-change-help')).toContainText(account.email);
     // Not applied yet.
     expect(await currentEmail(request, account)).toBe(account.email);
-    await expect(page.locator('#profile-email-password')).toHaveCount(0);
+    await expect(page.locator('#email-modal-password')).toHaveCount(0);
 
     await expect(page.getByRole('button', { name: 'Confirmar el nuevo correo' })).toBeDisabled();
     await page.locator('#email-change-code').fill(await waitForVerificationCode(request, newEmail));
     await page.getByRole('button', { name: 'Confirmar el nuevo correo' }).click();
 
     await expect(page.getByRole('status').filter({ hasText: 'Correo actualizado.' })).toBeVisible();
-    await expect(page.locator('#email-change-code')).toHaveCount(0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.locator('#profile-email')).toHaveValue(newEmail);
     expect(await currentEmail(request, account)).toBe(newEmail);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('oficiosya_user')!).email)).toBe(newEmail);
@@ -293,7 +296,7 @@ test.describe('Cambio de correo con código', () => {
     await askForTheChange(page, newEmail);
     await page.locator('#email-change-code').waitFor();
 
-    const resend = page.locator('.email-change__actions button').nth(1);
+    const resend = page.getByRole('dialog').locator('.email-change__actions button').nth(1);
     await expect(resend).toBeDisabled();
     await expect(resend).toHaveText(/Reenviar código en \d+:\d{2}/);
     const [, minutes, seconds] = /(\d+):(\d{2})/.exec(await resend.innerText())!;

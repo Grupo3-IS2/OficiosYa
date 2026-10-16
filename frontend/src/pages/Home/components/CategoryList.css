@@ -1,0 +1,26 @@
+.category-list .category-list__item { display: flex; flex: 1 1 140px; min-width: 0; }
+.category-list .category-list__item .category-card { flex: 1 1 auto; }
+
+/* Desktop: only the first rows until "Ver todos". */
+.category-list.category-list--collapsed .category-list__item--extra { display: none; }
+
+.category-list__toggle { display: block; margin: 12px auto 0; border: 0; padding: 6px 4px; background: transparent; color: #07984c; font-size: 14px; font-weight: 750; }
+.category-list__toggle:hover { color: #087f41; text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 800px) {
+  .category-list .category-list__item { flex: 1 1 calc(50% - 6px); min-width: 130px; }
+
+  /* Phones: one row that scrolls sideways, with every trade in it. */
+  .category-list.category-list--collapsed {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    padding: 4px 1px 8px;
+    scrollbar-width: thin;
+  }
+  .category-list.category-list--collapsed .category-list__item { flex: 0 0 150px; scroll-snap-align: start; }
+  .category-list.category-list--collapsed .category-list__item--extra { display: flex; }
+  .category-list.category-list--collapsed .category-card:hover,
+  .category-list.category-list--collapsed .category-card--selected { transform: none; }
+}

@@ -1,0 +1,14 @@
+.date-range-calendar { margin-top: 12px; border: 1px solid #dfe5e8; border-radius: 14px; padding: 12px; }
+.date-range-calendar__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.date-range-calendar__header strong { color: #263346; font-size: 14px; }
+.date-range-calendar__header button { width: 32px; height: 32px; border: 0; border-radius: 50%; background: #f1f5f3; color: #415065; font-size: 20px; line-height: 1; }
+.date-range-calendar__header button:hover:not(:disabled) { background: #e5f5eb; color: #087f41; }
+.date-range-calendar__header button:disabled { opacity: .35; cursor: not-allowed; }
+.date-range-calendar__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.date-range-calendar__weekday { padding: 4px 0; color: #8993a1; font-size: 11px; font-weight: 750; text-align: center; }
+.date-range-calendar__grid button { aspect-ratio: 1; min-width: 0; border: 0; border-radius: 9px; background: transparent; color: #263346; font-size: 13px; }
+.date-range-calendar__grid button:hover:not(:disabled) { background: #eefaf2; }
+.date-range-calendar__grid button:disabled { color: #c3cad1; cursor: not-allowed; }
+.date-range-calendar__grid button.in-range { background: #e7f7ed; color: #077a40; }
+.date-range-calendar__grid button.edge { background: #07984c; color: #fff; font-weight: 750; }
+.date-range-calendar__hint { display: block; margin-top: 8px; color: #8993a1; font-size: 11px; }

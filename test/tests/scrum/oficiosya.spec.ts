@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { mockProfessionalSearch } from '../support/professionalSearch';
 import { waitForVerificationCode } from '../support/registration';
 import { fakeJwt, mockHomeApi, mockVerifiedSession, mockProfileViewer } from '../support/ui';
 
@@ -139,38 +140,31 @@ async function mockHomeTradeResults(page: Page) {
       { id: 3, name: 'Carpintería' }
     ])
   }));
-  await page.route('**/api/v1/professionals/search**', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      content: [
-        {
-          id: '44444444-4444-4444-8444-444444444444',
-          name: 'Ana Multioficio',
-          profileImageUrl: null,
-          workingLocation: 'Montevideo',
-          description: 'Electricidad y plomería.',
-          rating: 8.5,
-          expertiseTrades: [
-            { id: 41, tradeId: 1, tradeName: 'Electricista', minimumHourlyWage: 350, maximumHourlyWage: 600 },
-            { id: 42, tradeId: 2, tradeName: 'Plomería', minimumHourlyWage: 450, maximumHourlyWage: 700 }
-          ]
-        },
-        {
-          id: '55555555-5555-4555-8555-555555555555',
-          name: 'Bruno Plomero',
-          profileImageUrl: null,
-          workingLocation: 'Canelones',
-          description: 'Servicio de plomería.',
-          rating: null,
-          expertiseTrades: [
-            { id: 51, tradeId: 2, tradeName: 'Plomería', minimumHourlyWage: 500, maximumHourlyWage: 800 }
-          ]
-        }
-      ],
-      totalPages: 1
-    })
-  }));
+  await mockProfessionalSearch(page, [
+    {
+      id: '44444444-4444-4444-8444-444444444444',
+      name: 'Ana Multioficio',
+      profileImageUrl: null,
+      workingLocation: 'Montevideo',
+      description: 'Electricidad y plomería.',
+      rating: 8.5,
+      expertiseTrades: [
+        { id: 41, tradeId: 1, tradeName: 'Electricista', minimumHourlyWage: 350, maximumHourlyWage: 600 },
+        { id: 42, tradeId: 2, tradeName: 'Plomería', minimumHourlyWage: 450, maximumHourlyWage: 700 }
+      ]
+    },
+    {
+      id: '55555555-5555-4555-8555-555555555555',
+      name: 'Bruno Plomero',
+      profileImageUrl: null,
+      workingLocation: 'Canelones',
+      description: 'Servicio de plomería.',
+      rating: null,
+      expertiseTrades: [
+        { id: 51, tradeId: 2, tradeName: 'Plomería', minimumHourlyWage: 500, maximumHourlyWage: 800 }
+      ]
+    }
+  ]);
 }
 
 async function createPublishedProfessional(request: APIRequestContext, payload: {
@@ -1627,7 +1621,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await expect(page).toHaveURL(/\/profile\/edit/);
 
     await page.goto(`${FRONTEND_BASE}/profile/edit`);
-    await page.locator('#profile-email').fill('cambio.uno@qa.test');
+    await page.getByRole('switch', { name: /Recibir avisos por correo/ }).click();
     await page.getByRole('link', { name: /OficiosYa inicio/i }).click();
     await expect(page.locator('.unsaved-modal')).toBeVisible();
     await page.keyboard.press('Escape');
@@ -1835,9 +1829,11 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await page.goto(FRONTEND_BASE);
     const tradeCard = page.locator('.category-card').filter({ hasText: professional.tradeName }).first();
     await expect(tradeCard).toBeVisible();
+    // The search is done by the server, a page at a time: the trade goes in it.
+    const byTrade = page.waitForRequest((request) => request.url().includes('/professionals/search?')
+      && new URL(request.url()).searchParams.getAll('tradeIds').includes(String(professional.tradeId)));
     await tradeCard.click();
-
-    await expect(page.getByRole('heading', { name: professional.name }).first()).toBeVisible();
+    await byTrade;
 
     await page.getByRole('button', { name: /filtros/i }).click();
     await page.getByLabel('Ciudad o barrio').fill(workingLocation);

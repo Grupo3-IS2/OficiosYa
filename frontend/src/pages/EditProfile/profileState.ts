@@ -3,6 +3,7 @@ export interface PersonalData {
     email: string
     phone: string
     avatar: string
+    emailNotifications: boolean
 }
 
 export interface SecurityData {
@@ -31,6 +32,7 @@ export type ProfileSection = 'personal' | 'security' | 'professional'
 export function personalChanged(current: PersonalData, saved: PersonalData) {
     return current.name !== saved.name || current.email !== saved.email
         || current.phone !== saved.phone || current.avatar !== saved.avatar
+        || current.emailNotifications !== saved.emailNotifications
 }
 
 export function professionalChanged(current: ProfessionalData, saved: ProfessionalData) {
@@ -75,7 +77,7 @@ const PHONE_FORMAT = /^(\+\d{1,3})?\d{9}$/
 export function validatePhone(phone: string): string {
     const value = phone.trim()
     if (!value) return 'Ingresa tu número de teléfono.'
-    if (!PHONE_FORMAT.test(value)) return 'Ingresa un teléfono válido: 9 dígitos, con prefijo internacional opcional.'
+    if (!PHONE_FORMAT.test(value)) return 'Ingresa un número de teléfono válido, sin el código del país.'
     return ''
 }
 

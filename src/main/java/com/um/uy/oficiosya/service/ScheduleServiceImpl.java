@@ -8,7 +8,7 @@ import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.entity.Schedule;
 import com.um.uy.oficiosya.entity.ScheduleType;
 import com.um.uy.oficiosya.exception.ScheduleNotFoundException;
-import com.um.uy.oficiosya.exception.UserNotFoundException;
+import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.mapper.ScheduleMapper;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.ScheduleRepository;
@@ -54,8 +54,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                     BLOCK_STARTS_AFTER_END);
         }
 
-        Professional professional = professionalRepository.findByPublicId(professionalId)
-                .orElseThrow(() -> new UserNotFoundException("Profesional no encontrado."));
+        Professional professional = professionalRepository.findByPublicIdForUpdate(professionalId)
+                .orElseThrow(() -> new ClientNotFoundException("Profesional no encontrado."));
 
         if (scheduleRepository.existsOverlapping(professionalId, scheduleRequest.getStartTimestamp(),
                 scheduleRequest.getEndTimestamp(), 0L)) {
@@ -76,7 +76,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .orElseThrow(() -> new ScheduleNotFoundException("Bloque de agenda no encontrado."));
 
         if (!schedule.getProfessional().getPublicId().equals(professionalId)) {
-            throw new AccessDeniedException("No tenés permiso para modificar este bloque de agenda");
+            throw new AccessDeniedException("No tienes permiso para modificar este bloque de agenda");
         }
 
         if (schedule.getType() == ScheduleType.SCHEDULED_JOB) {
@@ -94,6 +94,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                     BLOCK_STARTS_AFTER_END);
         }
 
+        lockAgenda(professionalId);
         if (scheduleRepository.existsOverlapping(professionalId, start, end, id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
         }
@@ -115,6 +116,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         Professional professional = jobRequest.getProfessional();
 
+        lockAgenda(professional.getPublicId());
         if (scheduleRepository.existsOverlapping(professional.getPublicId(), start, end, 0L)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
         }
@@ -131,6 +133,38 @@ public class ScheduleServiceImpl implements ScheduleService {
         // Keeps the in-memory job in sync, so the accept response already carries the timeframe.
         jobRequest.getSchedules().add(schedule);
         return scheduleMapper.toResponse(schedule);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void checkJobSlotAvailable(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
+        requireJobSlotFree(jobRequest, start, end);
+    }
+
+    @Override
+    @Transactional
+    public ScheduleResponse moveJobSchedule(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
+        lockAgenda(jobRequest.getProfessional().getPublicId());
+        requireJobSlotFree(jobRequest, start, end);
+
+        Schedule schedule = jobBlock(jobRequest);
+        schedule.setStartTimestamp(start);
+        schedule.setEndTimestamp(end);
+
+        schedule = scheduleRepository.save(schedule);
+        return scheduleMapper.toResponse(schedule);
+    }
+
+    /** The job's own block doesn't count as an overlap, since it's the one that would move. */
+    private void requireJobSlotFree(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end) {
+        if (start == null || end == null || !start.isBefore(end)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, BLOCK_STARTS_AFTER_END);
+        }
+
+        if (scheduleRepository.existsOverlapping(jobRequest.getProfessional().getPublicId(), start, end,
+                jobBlock(jobRequest).getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
+        }
     }
 
     @Override
@@ -151,7 +185,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 ? professionalRepository.existsByPublicId(professionalId)
                 : professionalRepository.existsByPublicIdAndPublishedTrue(professionalId);
         if (!visible) {
-            throw new UserNotFoundException("Profesional no encontrado.");
+            throw new ClientNotFoundException("Profesional no encontrado.");
         }
 
         return scheduleRepository.findAgenda(professionalId, from, to).stream()
@@ -180,7 +214,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .orElseThrow(() -> new ScheduleNotFoundException("Bloque de agenda no encontrado."));
 
         if (!schedule.getProfessional().getPublicId().equals(professionalId)) {
-            throw new AccessDeniedException("No tenés permiso para eliminar este bloque de agenda");
+            throw new AccessDeniedException("No tienes permiso para eliminar este bloque de agenda");
         }
 
         if (schedule.getType() == ScheduleType.SCHEDULED_JOB) {
@@ -189,5 +223,17 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         scheduleRepository.delete(schedule);
+    }
+
+    /** See {@link ProfessionalRepository#findByPublicIdForUpdate}: serializes overlap checks per professional. */
+    private void lockAgenda(UUID professionalId) {
+        professionalRepository.findByPublicIdForUpdate(professionalId);
+    }
+
+    private Schedule jobBlock(JobRequest jobRequest) {
+        return jobRequest.getSchedules().stream()
+                .filter(schedule -> schedule.getType() == ScheduleType.SCHEDULED_JOB)
+                .findFirst()
+                .orElseThrow(() -> new ScheduleNotFoundException("El trabajo no tiene un horario agendado."));
     }
 }

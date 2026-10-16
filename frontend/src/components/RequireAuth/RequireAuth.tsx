@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { ApiError } from '../../services/api'
 import { verifyToken } from '../../services/authService'
 import { expireSession, getToken, isTokenUsable } from '../../services/session'
+import { isTokenFresh, renewSession } from '../../services/sessionRenewal'
 
 type Status = 'checking' | 'verified' | 'unavailable'
 
@@ -16,23 +17,35 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
             window.location.href = '/login'
             return
         }
-        if (!isTokenUsable(token)) {
-            expireSession()
-            return
-        }
 
         let active = true
-        verifyToken()
-            .then(response => {
+        const check = async () => {
+            // An expired access token is not the end of the session: the refresh cookie may renew it
+            if (!isTokenFresh(token)) {
+                const outcome = await renewSession(token)
+                if (!active) return
+                if (outcome === 'expired') {
+                    expireSession()
+                    return
+                }
+                if (outcome === 'unavailable' && !isTokenUsable(getToken())) {
+                    setStatus('unavailable')
+                    return
+                }
+            }
+
+            try {
+                const response = await verifyToken()
                 if (!active) return
                 if (response.verified) setStatus('verified')
                 else expireSession()
-            })
-            .catch(reason => {
+            } catch (reason) {
                 if (!active) return
                 if (reason instanceof ApiError && (reason.status === 401 || reason.status === 403)) expireSession()
                 else setStatus('unavailable')
-            })
+            }
+        }
+        void check()
         return () => { active = false }
     }, [token])
 

@@ -10,7 +10,7 @@ updates:
   # 2. Backend (Java Spring / Maven)
   # Nota: si usas Gradle en lugar de Maven, cambia "maven" por "gradle"
   - package-ecosystem: "maven"
-    directory: "/backend" # Cambia por la carpeta donde está tu pom.xml o build.gradle
+    directory: "/" # El pom.xml del backend está en la raíz del repositorio.
     schedule:
       interval: "weekly"
     target-branch: "dev"

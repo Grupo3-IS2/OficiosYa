@@ -15,6 +15,13 @@ export function fakeJwt(expiresInSeconds = 3600) {
  * 401 to those calls and the frontend expires the session, so UI tests with a session mock them.
  */
 export async function mockHomeApi(page: Page) {
+  // The header asks for the user's requests, to warn on "Mis solicitudes" if one waits for them.
+  // Registered first, so a test that mocks its own requests overrides it.
+  await page.route('**/api/v1/job-requests/mine', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '[]'
+  }));
   await page.route('**/api/v1/trades', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -94,4 +101,18 @@ export async function mockVerifiedSession(page: Page, user: MockedUser) {
       googleLinked: user.googleLinked ?? false
     })
   }));
+}
+
+/** Authenticated viewer for isolated profile UI tests. Real integration tests use real tokens. */
+export async function mockProfileViewer(page: Page) {
+  await mockVerifiedSession(page, { name: 'Cliente Perfil QA', email: 'profile.viewer@qa.test', role: 'CLIENT' });
+  await page.addInitScript(token => {
+    if (!window.location.pathname.startsWith('/profesionales/')) return;
+    localStorage.setItem('oficiosya_token', token);
+    localStorage.setItem('oficiosya_user', JSON.stringify({
+      id: '33333333-3333-3333-3333-333333333333',
+      name: 'Cliente Perfil QA', email: 'profile.viewer@qa.test', role: 'CLIENT',
+    }));
+  }, fakeJwt());
+  await page.route('**/api/v1/schedules?**', route => route.fulfill({ json: [] }));
 }

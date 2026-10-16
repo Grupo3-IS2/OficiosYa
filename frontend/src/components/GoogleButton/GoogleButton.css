@@ -1,8 +1,18 @@
 .google-button {
   display: flex;
   justify-content: center;
+  align-items: center;
   width: 100%;
-  min-height: 44px;
+  height: 44px;
+  overflow: hidden;
+  contain: layout paint;
+  opacity: 1;
+  transition: opacity 200ms ease;
+}
+
+.google-button[data-ready='false'] {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .google-button-error {

@@ -1,15 +1,18 @@
 package com.um.uy.oficiosya.controller;
 
+import com.um.uy.oficiosya.config.RefreshTokenCookie;
 import com.um.uy.oficiosya.config.RequestRateLimiter;
 import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.GoogleCredentialRequest;
 import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
+import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.request.LoginRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
+import com.um.uy.oficiosya.dto.response.MessageResponse;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
@@ -21,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import jakarta.servlet.http.Cookie;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,15 +34,20 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,9 +76,11 @@ class AuthControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         mvc = MockMvcBuilders
-                .standaloneSetup(new AuthController(authService, registrationService, googleAuthService, rateLimiter))
+                .standaloneSetup(new AuthController(authService, registrationService, googleAuthService, rateLimiter,
+                        new RefreshTokenCookie(true, 7)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+        when(authService.startSession(any())).thenReturn("refresh-token");
     }
 
     private static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder json(String path, String body) {
@@ -88,9 +100,25 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.codeLength").value(6))
                 .andExpect(jsonPath("$.expiresInSeconds").value(900))
                 .andExpect(jsonPath("$.resendCooldownSeconds").value(60))
-                .andExpect(jsonPath("$.token").doesNotExist());
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
 
         verify(rateLimiter).check(any(), eq("registration"));
+        verify(authService, never()).startSession(any());
+    }
+
+    @Test
+    void registerClient_thatCompletesWithoutACode_setsTheRefreshCookieToo() throws Exception {
+        PendingVerificationResponse completed = PendingVerificationResponse.builder()
+                .email("ana@example.com").message("OK").session(login).build();
+        when(registrationService.startRegistration(any(ClientCreateRequest.class))).thenReturn(completed);
+
+        mvc.perform(json("/register-client", """
+                        {"name":"Ana Perez","email":"ana@example.com","password":"ClaveSegura2026!"}"""))
+                .andExpect(status().isAccepted())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("oficiosya_refresh=refresh-token")));
+
+        verify(authService).startSession(login.getId());
     }
 
     @Test
@@ -189,13 +217,72 @@ class AuthControllerTest {
     // --- login ---
 
     @Test
-    void login_answersTheLogin() throws Exception {
+    void login_answersTheLoginAndSetsTheRefreshCookie() throws Exception {
         when(authService.login(any(LoginRequest.class))).thenReturn(login);
 
         mvc.perform(json("/login", """
                         {"email":"ana@example.com","password":"ClaveSegura2026!"}"""))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt"));
+                .andExpect(jsonPath("$.token").value("jwt"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, allOf(
+                        containsString("oficiosya_refresh=refresh-token"),
+                        containsString("Path=/api/v1/auth"),
+                        containsString("HttpOnly"),
+                        containsString("Secure"),
+                        containsString("SameSite=Strict"))));
+
+        verify(authService).startSession(login.getId());
+    }
+
+    @Test
+    void login_withWrongCredentials_startsNoSession() throws Exception {
+        when(authService.login(any(LoginRequest.class)))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email o contraseña incorrectos"));
+
+        mvc.perform(json("/login", """
+                        {"email":"ana@example.com","password":"ClaveSegura2026!"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        verify(authService, never()).startSession(any());
+    }
+
+    // --- refresh and logout ---
+
+    @Test
+    void refresh_answersANewAccessTokenAndRotatesTheCookie() throws Exception {
+        when(authService.refresh("old-refresh"))
+                .thenReturn(new AuthService.RefreshedLogin(login, "new-refresh"));
+
+        mvc.perform(post(BASE + "/refresh").cookie(new Cookie("oficiosya_refresh", "old-refresh")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("jwt"))
+                .andExpect(jsonPath("$.role").value("CLIENT"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("oficiosya_refresh=new-refresh")));
+    }
+
+    @Test
+    void refresh_withADeadOrMissingCookie_is401AndDropsTheCookie() throws Exception {
+        when(authService.refresh(isNull()))
+                .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "La sesión expiró"));
+
+        mvc.perform(post(BASE + "/refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("La sesión expiró"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, allOf(
+                        containsString("oficiosya_refresh="),
+                        containsString("Max-Age=0"))));
+    }
+
+    @Test
+    void logout_passesTheRefreshCookieAndDropsIt() throws Exception {
+        when(authService.logout(any(), eq("refresh-token"))).thenReturn(new MessageResponse("Sesión cerrada correctamente"));
+
+        mvc.perform(post(BASE + "/logout").cookie(new Cookie("oficiosya_refresh", "refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        verify(authService).logout(any(), eq("refresh-token"));
     }
 
     // --- Google ---
@@ -207,7 +294,8 @@ class AuthControllerTest {
         mvc.perform(json("/google/login", """
                         {"credential":"id-token"}"""))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt"));
+                .andExpect(jsonPath("$.token").value("jwt"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("oficiosya_refresh=refresh-token")));
 
         verify(rateLimiter).check(any(), eq("google"));
     }
@@ -236,12 +324,26 @@ class AuthControllerTest {
 
     @Test
     void googleRegisterClient_answersTheLogin() throws Exception {
-        when(googleAuthService.registerClient(any(GoogleCredentialRequest.class))).thenReturn(login);
+        when(googleAuthService.registerClient(any(GoogleRegisterRequest.class))).thenReturn(login);
 
         mvc.perform(json("/google/register-client", """
                         {"credential":"id-token"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("ana@example.com"));
+    }
+
+    @Test
+    void googleRegisterClient_acceptsANameButOnlyAFullOne() throws Exception {
+        when(googleAuthService.registerClient(any(GoogleRegisterRequest.class))).thenReturn(login);
+
+        mvc.perform(json("/google/register-client", """
+                        {"credential":"id-token","name":"Ana Pérez"}"""))
+                .andExpect(status().isOk());
+        mvc.perform(json("/google/register-client", """
+                        {"credential":"id-token","name":"Ana"}"""))
+                .andExpect(status().isBadRequest());
+
+        verify(googleAuthService).registerClient(argThat(request -> "Ana Pérez".equals(request.getName())));
     }
 
     @Test

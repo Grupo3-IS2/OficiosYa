@@ -26,7 +26,7 @@ import java.util.List;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Professional extends User {
+public class Professional extends Client {
     @NotBlank
     @Column(nullable = false)
     private String workingLocation;

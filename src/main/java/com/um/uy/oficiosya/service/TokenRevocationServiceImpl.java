@@ -46,7 +46,7 @@ public class TokenRevocationServiceImpl implements TokenRevocationService {
 
     @Override
     public void revokeSessions(UUID publicId) {
-        revokedSessions.put(publicId.toString(), new Date(System.currentTimeMillis() / 1000L * 1000L));
+        revokedSessions.put(publicId.toString(), new Date());
     }
 
     @Override

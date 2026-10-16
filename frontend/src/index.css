@@ -12,9 +12,13 @@
   box-sizing: border-box;
 }
 
+/* "clip", not "hidden": hidden turns the body into a scroll box, and a menu that opens below a short page
+   (no results) was cut off at its end, under a white band. "hidden" stays first only for browsers without
+   "clip" (Safari before 16), which ignore the second line. */
 html,
 body {
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {

@@ -4,6 +4,8 @@ import Register from './pages/Register/Register'
 import EditProfilePage from './pages/EditProfile/EditProfilePage'
 import RequireAuth from './components/RequireAuth/RequireAuth'
 import ProfessionalProfilePage from './pages/ProfessionalProfile/ProfessionalProfilePage'
+import RequestsPage from './pages/Requests/RequestsPage'
+import TermsPage from './pages/Terms/TermsPage'
 
 function App() {
     const currentPath = window.location.pathname
@@ -17,10 +19,12 @@ function App() {
             : null
 
         return (
-            <ProfessionalProfilePage
-                professionalId={decodeURIComponent(professionalProfileMatch[1])}
-                initialTradeId={initialTradeId}
-            />
+            <RequireAuth>
+                <ProfessionalProfilePage
+                    professionalId={decodeURIComponent(professionalProfileMatch[1])}
+                    initialTradeId={initialTradeId}
+                />
+            </RequireAuth>
         )
     }
 
@@ -32,12 +36,24 @@ function App() {
         )
     }
 
+    if (currentPath === '/mis-solicitudes') {
+        return (
+            <RequireAuth>
+                <RequestsPage />
+            </RequireAuth>
+        )
+    }
+
     if (currentPath === '/login') {
         return <Login />
     }
 
     if (currentPath === '/register') {
         return <Register />
+    }
+
+    if (currentPath === '/terminos') {
+        return <TermsPage />
     }
 
     return <Home />

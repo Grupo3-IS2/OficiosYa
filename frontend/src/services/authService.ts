@@ -4,11 +4,11 @@ import {
   TOKEN_KEY,
   USER_KEY,
   clearSession,
-  expireSession,
   getToken,
-  getTokenExpiration,
   isTokenUsable,
+  storeLogin,
 } from './session'
+import { keepSessionFresh } from './sessionRenewal'
 import type {
   AccountType,
   LoginRequest,
@@ -20,18 +20,11 @@ import type {
   TokenResponse,
 } from '../types/Auth'
 
-// setTimeout overflows past this delay (~24.8 days) and would fire immediately.
-const MAX_TIMEOUT_DELAY = 2 ** 31 - 1
-
+/** A new login: the cached profile belonged to whoever was logged in before. */
 function storeSession(response: LoginResponse): void {
-  localStorage.setItem(TOKEN_KEY, response.token)
-  localStorage.setItem(USER_KEY, JSON.stringify({
-    id: response.id,
-    email: response.email,
-    name: response.name,
-    role: response.role,
-  }))
+  storeLogin(response)
   localStorage.removeItem(PROFILE_KEY)
+  keepSessionFresh()
 }
 
 export async function login(request: LoginRequest): Promise<LoginResponse> {
@@ -47,7 +40,8 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
 
 /**
  * Starts a registration: the backend mails a code and creates nothing yet, so there is no
- * session to store. `verifyEmail` finishes it.
+ * session to store. `verifyEmail` finishes it. With verification off the account is created
+ * right away and its session comes back, already stored.
  */
 export async function register(
   request: RegisterRequest,
@@ -65,10 +59,14 @@ export async function register(
       }
     : request
 
-  return apiRequest<PendingVerification>(endpoint, {
+  const response = await apiRequest<PendingVerification>(endpoint, {
     method: 'POST',
     body: JSON.stringify(body),
   })
+
+  if (response.session) storeSession(response.session)
+
+  return response
 }
 
 /** Creates the account once the code is right, and leaves the user logged in. */
@@ -111,17 +109,20 @@ export async function googleLink(credential: string, password: string): Promise<
   return response
 }
 
+/** `name` only when the user changed the one on the Google account: without it, the backend uses Google's. */
 export async function googleRegister(
   credential: string,
   accountType: AccountType,
   professional?: { phoneNumber: string; workingLocation: string },
+  name?: string,
 ): Promise<LoginResponse> {
   const isProfessional = accountType === 'professional'
+  const named = name ? { credential, name } : { credential }
   const response = await apiRequest<LoginResponse>(
     isProfessional ? '/auth/google/register-professional' : '/auth/google/register-client',
     {
       method: 'POST',
-      body: JSON.stringify(isProfessional ? { credential, ...professional } : { credential }),
+      body: JSON.stringify(isProfessional ? { ...named, ...professional } : named),
     },
   )
 
@@ -141,19 +142,26 @@ export async function verifyToken(): Promise<TokenResponse> {
   return apiRequest<TokenResponse>('/auth/verify')
 }
 
-export function logout(): void {
+/**
+ * Revokes the session on the backend before dropping it here, so a copy of a token stops working
+ * too. It goes even if the access token expired: the refresh cookie says whose session it is.
+ * The local session is cleared even if that call fails: the user asked to leave.
+ */
+export async function logout(): Promise<void> {
+  try {
+    await apiRequest<unknown>('/auth/logout', { method: 'POST' })
+  } catch { /* already invalid or backend unreachable: clearing locally is all that is left */ }
   clearSession()
 }
 
-/** Ends the session on its own when the token expires, even if the tab is left open. */
-export function scheduleSessionExpiry(): void {
-  const token = getToken()
-  if (!isTokenUsable(token)) return
-
-  const delay = getTokenExpiration(token!)! - Date.now()
-  if (delay <= MAX_TIMEOUT_DELAY) {
-    window.setTimeout(expireSession, delay)
-  }
+/** Follows a logout done in another tab: localStorage changes there fire `storage` here. */
+export function watchSessionFromOtherTabs(): void {
+  window.addEventListener('storage', event => {
+    if (event.storageArea !== localStorage) return
+    if ((event.key === TOKEN_KEY || event.key === null) && event.oldValue !== null && !getToken()) {
+      window.location.href = '/login'
+    }
+  })
 }
 
 export function updateStoredUser(user: StoredUser): void {
@@ -161,7 +169,10 @@ export function updateStoredUser(user: StoredUser): void {
   localStorage.removeItem(PROFILE_KEY)
 }
 
-/** Local check only: the token exists and has not expired. The backend has the final word. */
+/**
+ * Local check only: the token exists and has not expired. The backend has the final word. An open
+ * tab renews the token before it expires (keepSessionFresh), so a live session stays authenticated.
+ */
 export function isAuthenticated(): boolean {
   return isTokenUsable(getToken())
 }

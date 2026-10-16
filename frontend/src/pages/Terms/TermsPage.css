@@ -1,0 +1,24 @@
+.terms-page { min-height: 100vh; box-sizing: border-box; padding: 28px 6% 48px; background: #fbfdfc; color: #152235; }
+.terms-header { display: flex; align-items: center; justify-content: space-between; width: min(100%, 820px); margin: 0 auto; }
+.terms-brand { display: inline-flex; align-items: center; gap: 3px; color: #142238; font-size: 27px; font-weight: 800; letter-spacing: -1.2px; text-decoration: none; }
+.terms-brand b { color: #07984c; }
+.terms-brand > span { display: grid; place-items: center; margin-right: 4px; color: #07984c; }
+.terms-brand > span .icon { width: 25px; height: 25px; }
+.terms-back { display: inline-flex; align-items: center; gap: 8px; color: #546477; font-size: 14px; text-decoration: none; }
+.terms-back .icon { width: 18px; height: 18px; color: #07984c; }
+
+.terms-card { width: min(100%, 820px); box-sizing: border-box; margin: 32px auto 0; padding: 40px 56px; border: 1px solid #e6ece9; border-radius: 20px; background: #fff; box-shadow: 0 16px 45px rgba(34, 63, 50, .07); }
+.terms-card h1 { margin: 0; color: #122136; font-size: 32px; letter-spacing: -.8px; }
+.terms-updated { margin: 8px 0 24px; color: #718092; font-size: 14px; }
+.terms-card h2 { margin: 28px 0 8px; color: #122136; font-size: 18px; }
+.terms-card p { margin: 0 0 14px; color: #3d4b5e; font-size: 15px; line-height: 1.65; }
+.terms-card [role='alert'] { color: #b42318; }
+
+@media (max-width: 680px) {
+  .terms-page { padding: 20px 18px 32px; }
+  .terms-brand { font-size: 24px; }
+  .terms-back { font-size: 0; }
+  .terms-back .icon { width: 21px; height: 21px; }
+  .terms-card { margin-top: 24px; padding: 26px 22px; }
+  .terms-card h1 { font-size: 26px; }
+}

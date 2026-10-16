@@ -7,6 +7,7 @@ import {
     isAuthenticated,
     logout,
 } from '../../services/authService'
+import { useAwaitingAnswers } from './useAwaitingAnswers'
 import './Header.css'
 
 function Header() {
@@ -19,20 +20,22 @@ function Header() {
         : isProfessional
             ? 'Panel profesional'
             : 'Convertirse en profesional'
+    const requestsActive = window.location.pathname === '/mis-solicitudes'
+    const awaiting = useAwaitingAnswers(authenticated)
 
     const toggleMenu = () => {
         setIsMenuOpen((isOpen) => !isOpen)
     }
 
-    const handleLogout = () => {
-        logout()
+    const handleLogout = async () => {
+        await logout()
         setAuthenticated(false)
         window.location.href = '/'
     }
 
     return (
         <header className="site-header">
-            <a className="brand" href="#top" aria-label="OficiosYa inicio">
+            <a className="brand" href="/" aria-label="OficiosYa inicio">
                 <span className="brand-mark">
                     <Icon name="wrench" />
                 </span>
@@ -62,15 +65,22 @@ function Header() {
                 className={isMenuOpen ? 'is-open' : ''}
                 aria-label="Navegación principal"
             >
-                <button className="nav-item" type="button">
-                    <Icon name="location" />
-                    <span>Montevideo</span>
-                    <span className="nav-chevron" aria-hidden="true" />
-                </button>
-                <button className="nav-item" type="button">
-                    <Icon name="document" />
-                    <span>Mis solicitudes</span>
-                </button>
+                {authenticated && (
+                    <a
+                        className={`nav-item${requestsActive ? ' is-active' : ''}`}
+                        href="/mis-solicitudes"
+                        aria-current={requestsActive ? 'page' : undefined}
+                    >
+                        <span className="nav-item__icon">
+                            <Icon name="document" />
+                            {awaiting > 0 && <b className="nav-alert" aria-hidden="true">!</b>}
+                        </span>
+                        <span>Mis solicitudes</span>
+                        {awaiting > 0 && <span className="nav-alert-text">
+                            {awaiting === 1 ? '(1 solicitud espera tu respuesta)' : `(${awaiting} solicitudes esperan tu respuesta)`}
+                        </span>}
+                    </a>
+                )}
 
                 {authenticated ? (
                     <div className="profile-menu">

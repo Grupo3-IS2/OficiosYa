@@ -1,4 +1,5 @@
 import { apiRequest } from './api'
+import { clearSession } from './session'
 import type { PendingVerification } from '../types/Auth'
 import type { ExpertiseTrade, Trade } from '../types/Professional'
 
@@ -13,6 +14,8 @@ export interface UserResponse {
   hasPassword: boolean
   /** Whether a Google account is linked to this one. */
   googleLinked: boolean
+  /** Whether the user gets emails about their requests (a change of timeframe, requests piling up). */
+  emailNotifications: boolean
 }
 
 export interface ProfessionalResponse extends UserResponse {
@@ -35,8 +38,6 @@ export function isProfessionalResponse(
 export interface UserUpdateRequest {
   name?: string
 }
-
-export type ClientUpdateRequest = UserUpdateRequest
 
 export interface ProfessionalUpdateRequest extends UserUpdateRequest {
   phoneNumber?: string
@@ -66,6 +67,14 @@ export function unlinkGoogle(currentPassword: string): Promise<AuthenticatedUser
   return apiRequest<AuthenticatedUserResponse>('/users/me/google', {
     method: 'DELETE',
     body: JSON.stringify({ currentPassword }),
+  })
+}
+
+/** Turns the emails about the user's requests on or off; it takes effect right away. */
+export function updateNotifications(emailNotifications: boolean): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/notifications', {
+    method: 'PUT',
+    body: JSON.stringify({ emailNotifications }),
   })
 }
 
@@ -99,11 +108,29 @@ export function resendEmailChangeCode(newEmail: string): Promise<PendingVerifica
   })
 }
 
+/** For an account created with Google: mails a code to its email to give it a password. Called again, it resends. */
+export function startPasswordSetup(): Promise<PendingVerification> {
+  return apiRequest<PendingVerification>('/users/me/password/setup', { method: 'POST' })
+}
+
+/** The code and the new password: the account gets it, and comes back with `hasPassword` on. */
+export function completePasswordSetup(code: string, newPassword: string, newPasswordConfirmation: string): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/password/setup', {
+    method: 'PUT',
+    body: JSON.stringify({ code, newPassword, newPasswordConfirmation }),
+  })
+}
+
 export async function changePassword(request: PasswordUpdateRequest): Promise<void> {
   await apiRequest<void>('/users/me/password', {
     method: 'PUT',
     body: JSON.stringify(request),
   })
+}
+
+/** Back to no photo. */
+export function removeProfileImage(): Promise<AuthenticatedUserResponse> {
+  return apiRequest<AuthenticatedUserResponse>('/users/me/profile-image', { method: 'DELETE' })
 }
 
 export function uploadProfileImage(image: File): Promise<AuthenticatedUserResponse> {
@@ -116,8 +143,8 @@ export function uploadProfileImage(image: File): Promise<AuthenticatedUserRespon
   })
 }
 
-export function updateClient(request: ClientUpdateRequest): Promise<UserResponse> {
-  return apiRequest<UserResponse>('/clients/me', {
+export function updateUser(request: UserUpdateRequest): Promise<UserResponse> {
+  return apiRequest<UserResponse>('/users/me', {
     method: 'PATCH',
     body: JSON.stringify(request),
   })
@@ -160,8 +187,19 @@ export function setProfessionalPublished(published: boolean): Promise<Profession
   })
 }
 
-export async function deleteUser(): Promise<void> {
+/** Mails the code that deleting the account asks for. Called again, it resends. */
+export function startAccountDeletion(): Promise<PendingVerification> {
+  return apiRequest<PendingVerification>('/users/me/deletion-code', { method: 'POST' })
+}
+
+/**
+ * Deletes the account, confirmed with the current password or, for an account created with Google, its
+ * email, and the code mailed to it. Every session of the user ends; this one is cleared here too.
+ */
+export async function deleteUser(confirmation: { currentPassword?: string; email?: string; code: string }): Promise<void> {
   await apiRequest<void>('/users/me', {
     method: 'DELETE',
+    body: JSON.stringify(confirmation),
   })
+  clearSession()
 }

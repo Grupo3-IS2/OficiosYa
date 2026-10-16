@@ -1,25 +1,34 @@
 import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
 import type { Professional } from '../../../types/Professional'
+import type { Schedule } from '../../../types/Schedule'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
-import { getCurrentUser } from '../../../services/authService'
+import { getCurrentUser, isAuthenticated } from '../../../services/authService'
+import { professionalAvailability } from '../professionalAvailability'
+import { tradesFor } from '../professionalFilters'
 import Rating from './Rating'
 import './ProfessionalCard.css'
 
 interface ProfessionalCardProps {
     professional: Professional
-    selectedTradeId?: number | null
+    selectedTradeIds?: readonly number[]
+    /** This week's schedules, loaded by the page (they also filter): undefined while loading, null if they failed. */
+    schedules?: Schedule[] | null
 }
 
-function ProfessionalCard({ professional, selectedTradeId = null }: ProfessionalCardProps) {
+function ProfessionalCard({ professional, selectedTradeIds = [], schedules }: ProfessionalCardProps) {
+    const availability = schedules === undefined ? 'Cargando disponibilidad...'
+        : schedules === null ? 'No pudimos cargar la disponibilidad'
+            : professionalAvailability(schedules)
+
     const currentUser = getCurrentUser()
     const isOwnProfile = currentUser?.id === professional.id
-    const profilePath = selectedTradeId === null
+    const relevantTrades = tradesFor(professional, selectedTradeIds)
+    // The profile opens on one trade: the first chosen one this professional does.
+    const profileTradeId = selectedTradeIds.length > 0 ? relevantTrades[0]?.tradeId : undefined
+    const profilePath = profileTradeId === undefined
         ? `/profesionales/${professional.id}`
-        : `/profesionales/${professional.id}?tradeId=${selectedTradeId}`
-    const relevantTrades = selectedTradeId === null
-        ? professional.expertiseTrades
-        : professional.expertiseTrades.filter(trade => trade.tradeId === selectedTradeId)
+        : `/profesionales/${professional.id}?tradeId=${profileTradeId}`
     const price = relevantTrades.length
         ? Math.min(...relevantTrades.map(trade => trade.minimumHourlyWage))
         : null
@@ -35,18 +44,18 @@ function ProfessionalCard({ professional, selectedTradeId = null }: Professional
                 <h3>{professional.name}</h3>
                 {professional.expertiseTrades.length > 0 && (
                     <div className="professional-trades" aria-label="Rubros">
-                        {professional.expertiseTrades.map(trade => <span className={trade.tradeId === selectedTradeId ? 'selected' : ''} key={trade.tradeId}>{trade.tradeName}</span>)}
+                        {professional.expertiseTrades.map(trade => <span className={selectedTradeIds.includes(trade.tradeId) ? 'selected' : ''} key={trade.tradeId}>{trade.tradeName}</span>)}
                     </div>
                 )}
                 <Rating value={professional.rating} />
-                {professional.workingLocation && (
+                {isAuthenticated() && professional.workingLocation && (
                     <p className="meta"><Icon name="location" /> {professional.workingLocation}</p>
                 )}
-                <p className="meta"><Icon name="calendar" /> Disponibilidad a confirmar</p>
+                <p className="meta"><Icon name="calendar" /> {availability}</p>
             </div>
 
-            <div className="professional-action">
-                {price !== null && <span>
+            <div className={`professional-action${isOwnProfile ? ' professional-action--own' : ''}`}>
+                {!isOwnProfile && price !== null && <span>
                     Desde / hora
                     <strong>${price.toLocaleString('es-UY')}</strong>
                 </span>}

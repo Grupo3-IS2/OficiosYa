@@ -96,6 +96,12 @@
   }
 }
 
+@media (max-width: 700px) {
+  .hero {
+    min-height: 0;
+  }
+}
+
 /* Category cards reflow naturally and expand the final row. */
 .filters button:disabled {
   cursor: not-allowed;
@@ -214,6 +220,9 @@
 .active-filters button span { margin-left: 4px; font-size: 16px; line-height: 0; }
 .active-filters .active-filters__clear { margin-left: 3px; padding-inline: 5px; background: transparent; color: #667386; text-decoration: underline; text-underline-offset: 3px; }
 
+/* Room under the controls for the "Ordenar por" menu, even when there are no results to fill it. */
+.professionals { min-height: 380px; }
+
 .professionals-empty { padding: 38px 20px; border: 1px dashed #d9e1df; border-radius: 17px; background: #fafcfb; text-align: center; }
 .professionals-empty h3 { margin: 0; font-size: 18px; }
 .professionals-empty p { margin: 7px 0 16px; color: #687587; }
@@ -244,3 +253,7 @@
   .sort-control__trigger { justify-content: space-between; }
   .sort-control__trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* Under the list: where the next page is noticed coming into view, and says it is loading. */
+.professionals-more { min-height: 1px; padding: 14px 0 4px; color: #657387; text-align: center; }
+.professionals-more button { border: 0; background: none; color: #078f4a; font-weight: 750; text-decoration: underline; cursor: pointer; }

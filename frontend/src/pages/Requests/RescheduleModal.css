@@ -1,0 +1,33 @@
+.reschedule-modal { width: min(440px, calc(100% - 32px)); margin: auto; padding: 0; border: 1px solid #dfe7e4; border-radius: 12px; background: #fff; color: #101f68; }
+.reschedule-modal::backdrop { background: rgb(24 38 48 / 60%); }
+.reschedule-modal__body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 26px 24px 22px; }
+.reschedule-modal h2 { grid-column: 1 / -1; margin: 0; font-size: 22px; letter-spacing: -.5px; }
+.reschedule-modal__body > p { grid-column: 1 / -1; margin: 0; color: #68758a; font-size: 14px; line-height: 1.55; }
+.reschedule-modal__field { display: grid; gap: 6px; color: #435166; font-size: 14px; font-weight: 600; }
+.reschedule-modal__field--wide { grid-column: 1 / -1; }
+.reschedule-modal__field input { min-height: 44px; border: 1px solid #d6dfe0; border-radius: 8px; padding: 0 12px; color: #101f68; background: #fff; font: inherit; font-weight: 400; }
+.reschedule-modal__field input:focus-visible { outline: 2px solid #07984c; outline-offset: 1px; }
+.reschedule-modal .reschedule-modal__error { color: #b42318; }
+.reschedule-modal__actions { display: grid; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+.reschedule-modal__actions > button { min-height: 44px; border-radius: 8px; font: inherit; font-weight: 600; }
+.reschedule-modal__actions > button:first-child { border: 1px solid #d6dfe0; background: #fff; color: #4f5e64; }
+.reschedule-modal button:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 420px) { .reschedule-modal__actions { grid-template-columns: 1fr; } }
+.reschedule-review__comparison { display: grid; grid-column: 1 / -1; grid-template-columns: 1fr auto 1fr; align-items: stretch; gap: 10px; }
+.reschedule-review__timeframe { display: grid; align-content: start; gap: 4px; border: 1px solid #dfe7e4; border-radius: 10px; padding: 14px; }
+.reschedule-review__title { color: #7380ae; font-size: 12px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+.reschedule-review__timeframe strong { font-size: 15px; }
+.reschedule-review__timeframe strong::first-letter { text-transform: uppercase; }
+.reschedule-review__timeframe p { margin: 0; color: #435166; font-size: 14px; }
+.reschedule-review__timeframe--current { background: #f7f9fa; }
+.reschedule-review__timeframe--current strong, .reschedule-review__timeframe--current p { color: #68758a; }
+.reschedule-review__timeframe--current .reschedule-review__changed { color: #b42318; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.reschedule-review__timeframe--proposed { border-color: #b9e6cc; background: #eef9f2; }
+.reschedule-review__timeframe--proposed .reschedule-review__changed { color: #078f4a; font-weight: 700; }
+.reschedule-review__arrow { align-self: center; color: #7380ae; font-size: 20px; }
+.reschedule-modal .reschedule-modal__reject { background: #c64e56; }
+.reschedule-modal .reschedule-modal__reject:hover { box-shadow: 0 8px 18px rgb(198 78 86 / 22%); }
+@media (max-width: 420px) {
+  .reschedule-review__comparison { grid-template-columns: 1fr; }
+  .reschedule-review__arrow { justify-self: center; transform: rotate(90deg); }
+}

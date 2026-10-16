@@ -1,29 +1,70 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
+import ZonePicker from '../../../components/ZonePicker/ZonePicker'
+import DateRangeCalendar from './DateRangeCalendar'
+import { getPriceRange } from '../../../services/professionalService'
+import type { Trade } from '../../../types/Professional'
+import { dayKey, presetRanges, rangeLabel, type DayRange } from '../professionalAvailability'
 import type { PriceRange, ProfessionalFilters } from '../professionalFilters'
-import { emptyProfessionalFilters } from '../professionalFilters'
+import { emptyProfessionalFilters, toggleTrade, tradeSelectionName } from '../professionalFilters'
 import './FilterPanel.css'
 
 interface Props {
     filters: ProfessionalFilters
-    priceRange: PriceRange | null
-    tradeName?: string
-    onApply: (filters: ProfessionalFilters) => void
+    trades: Trade[]
+    /** The trades chosen: none means every trade. */
+    tradeIds: readonly number[]
+    /** The name searched for: the price range is of the professionals it finds. */
+    query: string
+    onApply: (filters: ProfessionalFilters, tradeIds: number[]) => void
     onClose: () => void
 }
 
 const formatPrice = (price: number) => `$${price.toLocaleString('es-UY')}`
+/** How far ahead the calendar goes: agendas are not filled in much further. */
+const CALENDAR_DAYS = 90
 
-export default function FilterPanel({ filters, priceRange, tradeName, onApply, onClose }: Props) {
+export default function FilterPanel({ filters, trades, tradeIds, query, onApply, onClose }: Props) {
     const dialog = useRef<HTMLDialogElement>(null)
     const [draft, setDraft] = useState(filters)
+    const [now] = useState(() => new Date())
+    const presets = presetRanges(now)
+    const today = dayKey(now)
+    const lastDay = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + CALENDAR_DAYS))
+    // "Personalizar" opens the calendar; a quick choice or "Limpiar filtros" closes it.
+    const [calendarOpen, setCalendarOpen] = useState(false)
+    const presetChosen = presets.some(({ range }) => draft.availability?.from === range.from && draft.availability.to === range.to)
+    const customChosen = draft.availability !== null && !presetChosen
+    function chooseAvailability(availability: DayRange | null) {
+        setDraft(current => ({ ...current, availability }))
+        setCalendarOpen(false)
+    }
+    const [draftTradeIds, setDraftTradeIds] = useState<number[]>([...tradeIds])
+    // The rates on offer for the trades being chosen, from the server: undefined while it answers.
+    const [priceRange, setPriceRange] = useState<PriceRange | null | undefined>(undefined)
+    const tradeName = tradeSelectionName(trades.filter(trade => draftTradeIds.includes(trade.id)).map(trade => trade.name))
     const [drawerTop, setDrawerTop] = useState(0)
     const rangeMinimum = priceRange?.minimum ?? 0
     const rangeMaximum = priceRange?.maximum ?? 0
-    const [minimumInput, setMinimumInput] = useState(String(filters.minimumPrice ?? rangeMinimum))
-    const [maximumInput, setMaximumInput] = useState(String(filters.maximumPrice ?? rangeMaximum))
+    // Empty means "from the range's edge": filled in when the range arrives.
+    const [minimumInput, setMinimumInput] = useState(filters.minimumPrice === null ? '' : String(filters.minimumPrice))
+    const [maximumInput, setMaximumInput] = useState(filters.maximumPrice === null ? '' : String(filters.maximumPrice))
+
+    useEffect(() => {
+        let active = true
+        setPriceRange(undefined)
+        getPriceRange(draftTradeIds, query)
+            .then(range => {
+                if (!active) return
+                setPriceRange(range)
+                setMinimumInput(current => current === '' && range ? String(range.minimum) : current)
+                setMaximumInput(current => current === '' && range ? String(range.maximum) : current)
+            })
+            .catch(() => { if (active) setPriceRange(null) })
+        return () => { active = false }
+    }, [draftTradeIds, query])
     const normalizedMinimum = Math.min(rangeMaximum, Math.max(rangeMinimum, Number(minimumInput) || rangeMinimum))
     const normalizedMaximum = Math.min(rangeMaximum, Math.max(rangeMinimum, Number(maximumInput) || rangeMaximum))
     const selectedMinimum = Math.min(normalizedMinimum, normalizedMaximum)
@@ -51,13 +92,22 @@ export default function FilterPanel({ filters, priceRange, tradeName, onApply, o
         onApply({
             ...draft,
             location: draft.location.trim(),
-            minimumPrice: selectedMinimum === rangeMinimum ? null : selectedMinimum,
-            maximumPrice: selectedMaximum === rangeMaximum ? null : selectedMaximum,
-        })
+            // Without the range yet (or at all) the prices go as they are: one already chosen is kept.
+            minimumPrice: !priceRange ? (minimumInput === '' ? null : Number(minimumInput)) : selectedMinimum === rangeMinimum ? null : selectedMinimum,
+            maximumPrice: !priceRange ? (maximumInput === '' ? null : Number(maximumInput)) : selectedMaximum === rangeMaximum ? null : selectedMaximum,
+        }, draftTradeIds)
+    }
+
+    /** Other trades have another price range: the price goes back to the whole of the new one. */
+    function chooseTrades(nextTradeIds: number[]) {
+        setDraftTradeIds(nextTradeIds)
+        setMinimumInput('')
+        setMaximumInput('')
     }
 
     function clearFilters() {
         setDraft(emptyProfessionalFilters)
+        setCalendarOpen(false)
         setMinimumInput(String(rangeMinimum))
         setMaximumInput(String(rangeMaximum))
     }
@@ -84,14 +134,25 @@ export default function FilterPanel({ filters, priceRange, tradeName, onApply, o
                         <div className="location-controls">
                             <label className="filter-field">
                                 <span>Ciudad o barrio</span>
-                                <input value={draft.location} onChange={event => setDraft({ ...draft, location: event.target.value })} placeholder="Ej. Montevideo" />
+                                <input value={draft.location} onChange={event => setDraft(current => ({ ...current, location: event.target.value }))} placeholder="Ej. Montevideo" />
                             </label>
                             <label className="filter-field filter-field--disabled">
                                 <span>Radio</span>
                                 <select disabled><option>Cualquier distancia</option></select>
                             </label>
                         </div>
+                        <ZonePicker query={draft.location} onChoose={location => setDraft(current => ({ ...current, location }))} locateSaved mapLabel="Mapa para elegir la zona donde necesitás el servicio" />
                         <small className="filter-note">La búsqueda por kilómetros estará disponible próximamente.</small>
+                    </section>
+
+                    <section className="filter-group">
+                        <div className="filter-group__heading"><Icon name="wrench" /><div><h3>Rubros</h3><p>Podés elegir varios rubros a la vez.</p></div></div>
+                        {trades.length === 0 ? <p className="filter-empty">No hay rubros disponibles.</p> : (
+                            <div className="trade-options" role="group" aria-label="Rubros">
+                                <button type="button" className={draftTradeIds.length === 0 ? 'active' : ''} aria-pressed={draftTradeIds.length === 0} onClick={() => chooseTrades([])}>Todos los rubros</button>
+                                {trades.map(trade => <button key={trade.id} type="button" className={draftTradeIds.includes(trade.id) ? 'active' : ''} aria-pressed={draftTradeIds.includes(trade.id)} onClick={() => chooseTrades(toggleTrade(draftTradeIds, trade.id))}>{trade.name}</button>)}
+                            </div>
+                        )}
                     </section>
 
                     <section className="filter-group">
@@ -106,17 +167,29 @@ export default function FilterPanel({ filters, priceRange, tradeName, onApply, o
                                 <input aria-label="Precio mínimo" type="range" min={rangeMinimum} max={rangeMaximum} step="1" value={selectedMinimum} onChange={event => setMinimumInput(String(Math.min(Number(event.target.value), selectedMaximum)))} />
                                 <input aria-label="Precio máximo" type="range" min={rangeMinimum} max={rangeMaximum} step="1" value={selectedMaximum} onChange={event => setMaximumInput(String(Math.max(Number(event.target.value), selectedMinimum)))} />
                             </div>
-                            <div className="price-available"><span>{formatPrice(rangeMinimum)}</span><small>Rango total disponible</small><span>{formatPrice(rangeMaximum)}</span></div>
-                        </> : <p className="filter-empty">No hay precios disponibles para este rubro.</p>}
+                            <div className="price-available"><span>{formatPrice(rangeMinimum)}</span><span>{formatPrice(rangeMaximum)}</span></div>
+                        </> : priceRange === undefined ? <output className="filter-empty">Cargando precios…</output>
+                            : <p className="filter-empty">No hay precios disponibles para este rubro.</p>}
                     </section>
 
                     <section className="filter-group">
                         <div className="filter-group__heading"><Icon name="calendar" /><div><h3>Disponibilidad</h3><p>Elegí cuándo necesitás el servicio.</p></div></div>
-                        <label className="filter-field filter-field--disabled">
-                            <span>Cuándo</span>
-                            <select disabled><option>Sin preferencia</option><option>Disponible hoy</option><option>Disponible mañana</option><option>Esta semana</option></select>
-                        </label>
-                        <small className="filter-note">La agenda de profesionales estará disponible próximamente.</small>
+                        <div className="rating-options" role="group" aria-label="Cuándo">
+                            <button type="button" className={draft.availability === null ? 'active' : ''} aria-pressed={draft.availability === null} onClick={() => chooseAvailability(null)}>Sin preferencia</button>
+                            {presets.map(({ label, range }) => {
+                                const chosen = draft.availability?.from === range.from && draft.availability.to === range.to
+                                return <button key={label} type="button" className={chosen ? 'active' : ''} aria-pressed={chosen} onClick={() => chooseAvailability(range)}>{label}</button>
+                            })}
+                            <button type="button" className={`availability-custom${customChosen || calendarOpen ? ' active' : ''}`} aria-expanded={calendarOpen} aria-controls="availability-calendar" onClick={() => setCalendarOpen(open => !open)}>
+                                {customChosen && !calendarOpen && draft.availability ? `Personalizar: ${rangeLabel(draft.availability, now)}` : 'Personalizar'}
+                            </button>
+                        </div>
+                        {calendarOpen && (
+                            <div id="availability-calendar" className="availability-menu">
+                                <DateRangeCalendar value={draft.availability} min={today} max={lastDay} onChange={availability => setDraft(current => ({ ...current, availability }))} />
+                                <button type="button" className="availability-menu__done" onClick={() => setCalendarOpen(false)}>Listo</button>
+                            </div>
+                        )}
                     </section>
 
                     <section className="filter-group">

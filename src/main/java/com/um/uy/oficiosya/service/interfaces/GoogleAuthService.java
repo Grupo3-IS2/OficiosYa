@@ -3,8 +3,9 @@ package com.um.uy.oficiosya.service.interfaces;
 import com.um.uy.oficiosya.dto.request.GoogleCredentialRequest;
 import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
+import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
-import com.um.uy.oficiosya.dto.response.UserResponse;
+import com.um.uy.oficiosya.dto.response.ClientResponse;
 import com.um.uy.oficiosya.dto.update.GoogleLinkUpdateRequest;
 import com.um.uy.oficiosya.dto.update.GoogleUnlinkRequest;
 
@@ -26,13 +27,13 @@ public interface GoogleAuthService {
     /** The user's "yes, link it": checks the account's password, links Google to it and logs in. */
     LoginResponse link(GoogleLinkRequest request);
 
-    LoginResponse registerClient(GoogleCredentialRequest request);
+    LoginResponse registerClient(GoogleRegisterRequest request);
 
     LoginResponse registerProfessional(GoogleProfessionalRegisterRequest request);
 
     /** From the profile: links Google to the logged-in user's account. The Google account must have the account's own email. */
-    UserResponse linkToUser(UUID userId, GoogleLinkUpdateRequest request);
+    ClientResponse linkToUser(UUID userId, GoogleLinkUpdateRequest request);
 
     /** From the profile: unlinks Google. Only for accounts with a password of their own. */
-    UserResponse unlinkFromUser(UUID userId, GoogleUnlinkRequest request);
+    ClientResponse unlinkFromUser(UUID userId, GoogleUnlinkRequest request);
 }

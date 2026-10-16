@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
+import BackNavigation from '../../components/BackNavigation/BackNavigation'
 import Header from '../../components/Header/Header'
 import { ApiError } from '../../services/api'
 import { getProfessional } from '../../services/professionalService'
+import { getProfessionalSchedule } from '../../services/scheduleService'
 import type { Professional } from '../../types/Professional'
+import type { Schedule } from '../../types/Schedule'
 import ProfessionalProfileHeader from './components/ProfessionalProfileHeader'
 import ProfessionalServices from './components/ProfessionalServices'
 import ReviewsSection from './components/ReviewsSection'
+import ServiceRequestModal from './components/ServiceRequestModal'
 import WorkZone from './components/WorkZone'
 import WeeklyAvailability from './components/WeeklyAvailability'
+import { currentWeek } from './scheduleCalendar'
 import './ProfessionalProfile.css'
 
 interface ProfessionalProfilePageProps {
@@ -15,11 +20,23 @@ interface ProfessionalProfilePageProps {
     initialTradeId: number | null
 }
 
+interface ScheduleState {
+    professionalId: string
+    schedules: Schedule[]
+    status: 'loading' | 'ready' | 'error'
+}
+
 function ProfessionalProfilePage({ professionalId, initialTradeId }: ProfessionalProfilePageProps) {
     const [professional, setProfessional] = useState<Professional | null>(null)
     const [selectedTradeId, setSelectedTradeId] = useState<number | null>(initialTradeId)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+    const [requestModalOpen, setRequestModalOpen] = useState(false)
+    const [scheduleState, setScheduleState] = useState<ScheduleState>({
+        professionalId,
+        schedules: [],
+        status: 'loading',
+    })
 
     useEffect(() => {
         let active = true
@@ -33,6 +50,22 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                     : 'No pudimos cargar este perfil. Intentá de nuevo más tarde.')
             })
             .finally(() => { if (active) setLoading(false) })
+
+        return () => { active = false }
+    }, [professionalId])
+
+    useEffect(() => {
+        let active = true
+        const week = currentWeek()
+
+        void getProfessionalSchedule(professionalId, week.start, week.end)
+            .then(response => {
+                if (active) setScheduleState({ professionalId, schedules: response, status: 'ready' })
+            })
+            .catch(() => {
+                if (!active) return
+                setScheduleState({ professionalId, schedules: [], status: 'error' })
+            })
 
         return () => { active = false }
     }, [professionalId])
@@ -56,9 +89,7 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
         <div id="top" className="professional-profile-page">
             <Header />
             <main className="profile-content">
-                <button className="profile-back" type="button" onClick={goBack}>
-                    <span aria-hidden="true">←</span> Volver a profesionales
-                </button>
+                <BackNavigation onClick={goBack}>Volver a profesionales</BackNavigation>
 
                 {loading && <output className="profile-status">Cargando perfil...</output>}
                 {!loading && error && (
@@ -68,7 +99,11 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                     </div>
                 )}
                 {!loading && professional && <>
-                    <ProfessionalProfileHeader professional={professional} selectedTrade={selectedTrade} />
+                    <ProfessionalProfileHeader
+                        professional={professional}
+                        selectedTrade={selectedTrade}
+                        onRequestService={() => setRequestModalOpen(true)}
+                    />
 
                     <section className="public-profile-section profile-about" aria-labelledby="about-heading">
                         <h2 id="about-heading">Sobre mí</h2>
@@ -81,8 +116,19 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                         onSelect={selectTrade}
                     />
                     <WorkZone workingLocation={professional.workingLocation} />
-                    <WeeklyAvailability />
+                    <WeeklyAvailability
+                        schedules={scheduleState.professionalId === professionalId ? scheduleState.schedules : []}
+                        loading={scheduleState.professionalId !== professionalId || scheduleState.status === 'loading'}
+                        error={scheduleState.professionalId === professionalId && scheduleState.status === 'error'}
+                    />
                     <ReviewsSection rating={professional.rating} />
+                    {requestModalOpen && (
+                        <ServiceRequestModal
+                            professional={professional}
+                            preferredTradeId={selectedTrade?.tradeId ?? null}
+                            onClose={() => setRequestModalOpen(false)}
+                        />
+                    )}
                 </>}
             </main>
         </div>

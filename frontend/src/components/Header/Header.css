@@ -57,10 +57,61 @@
   background: transparent;
   font-size: 14px;
   transition: color 0.2s ease;
+  text-decoration: none;
+}
+
+/* Something in Mis solicitudes waits for the user's answer: a "!" on the corner of its icon. */
+.site-header .nav-item .nav-item__icon {
+  position: relative;
+  display: inline-flex;
+  align-self: center;
+}
+
+.site-header .nav-item .nav-alert {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #07984c;
+  border-radius: 50%;
+  color: #fff;
+  background: #ec8a00;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* For screen readers only: the "!" alone says nothing to them. */
+.site-header .nav-item .nav-alert-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .nav-item:hover {
   color: #c9f0d7;
+}
+
+.nav-item.is-active {
+  position: relative;
+  color: #fff;
+}
+
+.nav-item.is-active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -21px;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: #fff;
 }
 
 .auth-login-button {
@@ -202,6 +253,12 @@
     padding: 4px 6px;
     color: #fff;
     font-size: 11px;
+  }
+
+  .site-header nav .nav-item.is-active::after {
+    right: 24%;
+    bottom: -8px;
+    left: 24%;
   }
 
   .profile-menu {

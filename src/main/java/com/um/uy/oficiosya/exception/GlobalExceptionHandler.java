@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.AuthenticationException;
@@ -47,14 +48,14 @@ public class GlobalExceptionHandler {
     }
 
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
+    @ExceptionHandler(ClientNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleClientNotFound(ClientNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), null);
     }
 
     @ResponseStatus(HttpStatus.CONFLICT)
-    @ExceptionHandler(UserAlreadyExists.class)
-    public ResponseEntity<ErrorResponse> handleUserAlreadyExists(UserAlreadyExists ex) {
+    @ExceptionHandler(ClientAlreadyExists.class)
+    public ResponseEntity<ErrorResponse> handleClientAlreadyExists(ClientAlreadyExists ex) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), null);
     }
 
@@ -167,7 +168,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
-        return build(HttpStatus.FORBIDDEN, "No tenés permiso para realizar esta acción", null);
+        return build(HttpStatus.FORBIDDEN, "No tienes permiso para realizar esta acción", null);
     }
 
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
@@ -186,6 +187,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex) {
         return build(HttpStatus.CONFLICT, "Los datos violan una restricción de la base de datos", null);
+    }
+
+    /** Someone else changed the same record in between (e.g. a job cancelled while it was being accepted). */
+    @ResponseStatus(HttpStatus.CONFLICT)
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        return build(HttpStatus.CONFLICT, "Otra acción modificó estos datos al mismo tiempo; recargá e intentá de nuevo", null);
     }
 
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)

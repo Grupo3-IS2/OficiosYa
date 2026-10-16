@@ -14,7 +14,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProfessionalResponse extends UserResponse {
+public class ProfessionalResponse extends ClientResponse {
     private String phoneNumber;
     private String workingLocation;
     private String description;

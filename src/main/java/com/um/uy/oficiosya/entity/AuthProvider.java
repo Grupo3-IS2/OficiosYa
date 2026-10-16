@@ -1,9 +1,9 @@
 package com.um.uy.oficiosya.entity;
 
-/** How an account was created. Says nothing about whether Google is linked to it: see {@code User.isGoogleLinked}. */
+/** How an account was created. Says nothing about whether Google is linked to it: see {@code Client.isGoogleLinked}. */
 public enum AuthProvider {
-    /** Registered with an email and a password of its own. */
+    /** Has a password of its own: registered with one, or created with Google and given one later. */
     LOCAL,
-    /** Created through Google: the stored password is random and nobody knows it. */
+    /** Created through Google and still without a password: the stored one is random and nobody knows it. */
     GOOGLE
 }

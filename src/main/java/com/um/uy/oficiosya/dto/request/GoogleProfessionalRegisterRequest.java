@@ -12,7 +12,7 @@ import lombok.experimental.SuperBuilder;
 @Data
 @SuperBuilder
 @NoArgsConstructor
-public class GoogleProfessionalRegisterRequest extends GoogleCredentialRequest {
+public class GoogleProfessionalRegisterRequest extends GoogleRegisterRequest {
     @NotBlank(message = "El teléfono es obligatorio")
     @PhoneNumber
     private String phoneNumber;

@@ -1,4 +1,5 @@
-import { expireSession, getToken, isTokenUsable } from './session'
+import { clearSession, expireSession, getToken, isTokenUsable } from './session'
+import { isTokenFresh, renewSession } from './sessionRenewal'
 
 const API_BASE_URL = '/api/v1'
 
@@ -37,11 +38,31 @@ function errorMessageFrom(body: unknown): string {
   return DEFAULT_ERROR_MESSAGE
 }
 
-export async function apiRequest<T>(
+/**
+ * The auth endpoints answer 401 for bad credentials, not for a dead session, and must not trigger
+ * a renewal. /auth/verify is the exception: it checks the session, so it wants a live token.
+ */
+function usesSession(path: string): boolean {
+  return !path.startsWith('/auth/') || path === '/auth/verify'
+}
+
+async function request<T>(
   path: string,
   options: RequestInit = {},
+  useSession = true,
+  retried = false,
 ): Promise<T> {
-  const token = getToken()
+  let token = useSession ? getToken() : null
+  const renews = token !== null && usesSession(path)
+
+  // A token about to expire is renewed first instead of letting the request fail with it
+  if (renews && !isTokenFresh(token)) {
+    const outcome = await renewSession(token)
+    // Over: public endpoints still answer anonymously, protected ones send the user to log in below
+    if (outcome === 'expired') clearSession()
+    token = getToken()
+  }
+
   const headers = new Headers(options.headers)
 
   // The browser has to set the multipart Content-Type itself, boundary included.
@@ -57,6 +78,7 @@ export async function apiRequest<T>(
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    cache: 'no-store',
     headers,
   })
 
@@ -65,18 +87,44 @@ export async function apiRequest<T>(
   }
 
   const contentType = response.headers.get('content-type') ?? ''
-  const body = contentType.includes('application/json')
-    ? await response.json()
-    : await response.text()
+  const isJson = contentType.includes('application/json')
+  const body = isJson ? await response.json() : await response.text()
 
-  // A 401 on /auth/* means bad credentials, not a dead session, so it stays with the caller.
-  if (response.status === 401 && token && !path.startsWith('/auth/')) {
-    expireSession()
+  // The token can be rejected before its time (revoked by a password change): renew it and try
+  // once more. A 401 on /auth/* means bad credentials, not a dead session, so it stays with the caller.
+  if (response.status === 401 && renews && !path.startsWith('/auth/')) {
+    // Without a token left the renewal before the request already found the session over
+    const outcome = retried || token === null ? 'expired' : await renewSession(token)
+    if (outcome === 'refreshed') return request<T>(path, options, useSession, true)
+    if (outcome === 'expired') expireSession()
   }
 
   if (!response.ok) {
     throw new ApiError(errorMessageFrom(body), response.status)
   }
 
+  // Every endpoint answers JSON or 204. Anything else is not the backend
+  if (!isJson) {
+    throw new ApiError(DEFAULT_ERROR_MESSAGE, response.status)
+  }
+
   return body as T
+}
+
+export function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return request<T>(path, options)
+}
+
+/**
+ * Calls an endpoint that is public by contract without attaching the current session.
+ * A failure in optional public data must not invalidate an otherwise valid login.
+ */
+export function publicApiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return request<T>(path, options, false)
 }

@@ -41,17 +41,39 @@ public class EmailSenderServiceImpl implements EmailSenderService {
         }
     }
 
+    @Override
+    public boolean sendNotification(String to, String subject, String body) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromAddress);
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(body);
+
+        try {
+            mailSender.send(message);
+            return true;
+        } catch (MailException e) {
+            log.error("Failed to send a notification email to {}", to, e);
+            return false;
+        }
+    }
+
     private String subjectFor(VerificationPurpose purpose) {
         return switch (purpose) {
             case REGISTER -> "Confirmá tu cuenta de OficiosYa";
             case EMAIL_CHANGE -> "Confirmá tu nuevo correo de OficiosYa";
+            case PASSWORD_SETUP -> "Creá tu contraseña de OficiosYa";
+            case ACCOUNT_DELETION -> "Confirmá que querés eliminar tu cuenta de OficiosYa";
         };
     }
 
     private String bodyFor(String code, VerificationPurpose purpose) {
-        String action = purpose == VerificationPurpose.REGISTER
-                ? "para activar tu cuenta"
-                : "para confirmar tu nuevo correo";
+        String action = switch (purpose) {
+            case REGISTER -> "para activar tu cuenta";
+            case EMAIL_CHANGE -> "para confirmar tu nuevo correo";
+            case PASSWORD_SETUP -> "para crear la contraseña de tu cuenta";
+            case ACCOUNT_DELETION -> "para eliminar tu cuenta (si no lo pediste vos, ignorá este correo)";
+        };
 
         return """
                 Tu código de verificación %s es: %s

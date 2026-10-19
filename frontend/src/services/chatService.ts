@@ -1,4 +1,4 @@
-import { apiRequest } from './api'
+import { apiRequest } from './api.ts'
 
 export interface Conversation {
   id: number

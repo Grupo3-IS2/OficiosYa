@@ -1,4 +1,4 @@
-import { apiRequest } from './api'
+import { apiRequest } from './api.ts'
 import {
   PROFILE_KEY,
   TOKEN_KEY,
@@ -7,8 +7,8 @@ import {
   getToken,
   isTokenUsable,
   storeLogin,
-} from './session'
-import { keepSessionFresh } from './sessionRenewal'
+} from './session.ts'
+import { keepSessionFresh } from './sessionRenewal.ts'
 import type {
   AccountType,
   LoginRequest,
@@ -18,7 +18,7 @@ import type {
   RegistrationProfile,
   StoredUser,
   TokenResponse,
-} from '../types/Auth'
+} from '../types/Auth.ts'
 
 /** A new login: the cached profile belonged to whoever was logged in before. */
 function storeSession(response: LoginResponse): void {

@@ -1,6 +1,6 @@
-import { clearSession, expireSession, getToken, getTokenExpiration, storeLogin } from './session'
-import { RENEW_MARGIN_MS, createSessionRefresher, type RefreshOutcome } from './sessionRefresher'
-import type { LoginResponse } from '../types/Auth'
+import { clearSession, expireSession, getToken, getTokenExpiration, storeLogin } from './session.ts'
+import { RENEW_MARGIN_MS, createSessionRefresher, type RefreshOutcome } from './sessionRefresher.ts'
+import type { LoginResponse } from '../types/Auth.ts'
 
 const REFRESH_URL = '/api/v1/auth/refresh'
 

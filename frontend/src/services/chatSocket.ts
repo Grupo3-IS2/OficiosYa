@@ -1,5 +1,5 @@
-import { getToken } from './session'
-import { isTokenFresh, renewSession } from './sessionRenewal'
+import { getToken } from './session.ts'
+import { isTokenFresh, renewSession } from './sessionRenewal.ts'
 
 /**
  * - message: a chat message arrived (/user/queue/messages)

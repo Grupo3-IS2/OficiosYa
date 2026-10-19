@@ -9,9 +9,16 @@ export function useUnreadChats(enabled: boolean): number {
     useEffect(() => {
         if (!enabled) return
         // Without the count there is just no alert: the header works the same
-        const refresh = () => { getUnreadCount().then(setCount).catch(() => {}) }
+        let active = true
+        let generation = 0
+        const refresh = () => {
+            const request = ++generation
+            getUnreadCount().then(value => { if (active && request === generation) setCount(value) }).catch(() => {})
+        }
         refresh()
-        return onChatEvent(event => { if (event !== 'job') refresh() })
+        window.addEventListener('oficiosya:chat-read', refresh)
+        const unsubscribe = onChatEvent(event => { if (event !== 'job') refresh() })
+        return () => { active = false; unsubscribe(); window.removeEventListener('oficiosya:chat-read', refresh) }
     }, [enabled])
 
     return enabled ? count : 0

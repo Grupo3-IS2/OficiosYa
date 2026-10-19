@@ -4,6 +4,7 @@ import Icon from '../../../components/Icon/Icon'
 import type { ExpertiseTrade, Professional } from '../../../types/Professional'
 import { openConversation } from '../../../services/chatService'
 import { toast } from 'sonner'
+import { getCurrentUser } from '../../../services/authService'
 
 interface ProfessionalProfileHeaderProps {
     professional: Professional
@@ -48,7 +49,7 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                         type="button"
                         variant="ghost"
                         className="profile-summary__chat"
-                        onClick={() => openConversation(professional.id)
+                        onClick={() => openConversation(professional.id, getCurrentUser()?.id)
                             .then(conversation => window.location.assign(`/chat?c=${conversation.id}`))
                             .catch((error: Error) => toast.error(error.message))}
                     >

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { publishAwaitingAnswers } from '../../components/Header/useAwaitingAnswers'
 import { toast } from 'sonner'
 import BackNavigation from '../../components/BackNavigation/BackNavigation'
@@ -86,6 +86,7 @@ const statusContent: Record<JobStatus, { label: string; tone: string; detail?: (
     COMPLETED: { label: 'Completada', tone: 'completed' },
     CANCELLED: { label: 'Cancelada', tone: 'cancelled' },
     REJECTED: { label: 'Rechazada', tone: 'cancelled' },
+    EXPIRED: { label: 'Vencida', tone: 'cancelled' },
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-UY', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Montevideo' })
@@ -197,6 +198,7 @@ export default function RequestsPage() {
     const [activeFilter, setActiveFilter] = useState<RequestFilter>('all')
     const [order, setOrder] = useState<RequestOrder>('newest')
     const [viewing, setViewing] = useState<JobRequest | null>(null)
+    const linkedRequestId = useRef(Number(new URLSearchParams(window.location.search).get('request')) || null)
     // Which answer form the detail opens with, when it comes from the card's "Aceptar" or "Rechazar"
     const [viewingResponse, setViewingResponse] = useState<ResponseMode | undefined>()
     const [rescheduling, setRescheduling] = useState<JobRequest | null>(null)
@@ -233,7 +235,15 @@ export default function RequestsPage() {
         let active = true
         void getMyJobRequests()
             .then(response => {
-                if (active) setRequests(response)
+                if (active) {
+                    setRequests(response)
+                    if (linkedRequestId.current) {
+                        const linked = response.find(request => request.id === linkedRequestId.current)
+                        if (linked) setViewing(linked)
+                        else toast.error('No encontramos esa solicitud entre tus solicitudes.')
+                        linkedRequestId.current = null
+                    }
+                }
             })
             .catch(() => {
                 if (active) setLoadError(true)

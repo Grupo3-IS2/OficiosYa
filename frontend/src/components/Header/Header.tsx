@@ -114,7 +114,7 @@ function Header() {
                 {authenticated && (
                     <Button type="button">
                         <Icon name="user" />
-                        {professionalLabel}
+                        <span>{professionalLabel}</span>
                     </Button>
                 )}
             </nav>

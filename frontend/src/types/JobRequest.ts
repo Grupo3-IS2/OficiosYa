@@ -1,4 +1,4 @@
-export type JobStatus = 'PROPOSED' | 'ACCEPTED' | 'RESCHEDULE_REQUESTED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'
+export type JobStatus = 'PROPOSED' | 'ACCEPTED' | 'RESCHEDULE_REQUESTED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED' | 'EXPIRED'
 export type PaymentState = 'PENDING' | 'RETAINED' | 'PAID' | 'REFUNDED'
 export type RequestParty = 'CLIENT' | 'PROFESSIONAL'
 

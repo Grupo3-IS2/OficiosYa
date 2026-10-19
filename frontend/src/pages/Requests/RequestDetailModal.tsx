@@ -19,6 +19,7 @@ const statusLabels: Record<JobStatus, string> = {
     REJECTED: 'Rechazada',
     CANCELLED: 'Cancelada',
     COMPLETED: 'Completada',
+    EXPIRED: 'Vencida',
 }
 
 const paymentLabels: Record<PaymentState, string> = {

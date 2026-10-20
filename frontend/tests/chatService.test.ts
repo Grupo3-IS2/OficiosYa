@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict'
-import { registerHooks } from 'node:module'
 import { after, beforeEach, test } from 'node:test'
 import type { Conversation } from '../src/services/chatService.ts'
+import {
+    getConversations,
+    getMessages,
+    getUnreadCount,
+    markRead,
+    openConversation,
+    recalledConversation,
+    sendMessage,
+    setConversationBlocked,
+} from '../src/services/chatService.ts'
 
-// Match Vite's local TS resolution without starting Vite, a browser or a real backend.
-const hooks = registerHooks({ resolve(specifier, context, nextResolve) {
-    try { return nextResolve(specifier, context) }
-    catch (error) {
-        if (specifier.startsWith('.') && !/\.[a-z]+$/i.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-        throw error
-    }
-} })
-const service = await import('../src/services/chatService.ts')
 const storage = new Map<string, string>()
 const originalFetch = globalThis.fetch
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
@@ -43,36 +43,35 @@ after(() => {
         if (descriptor) Object.defineProperty(globalThis, name, descriptor)
         else Reflect.deleteProperty(globalThis, name)
     }
-    hooks.deregister()
 })
 
 test('history uses the real before/limit cursor contract', async () => {
-    await service.getMessages(12, 345, 40)
+    await getMessages(12, 345, 40)
     assert.equal(calls[0].url, '/api/v1/conversations/12/messages?limit=40&before=345')
 })
 test('send and retry carry the same caller-provided id without spoofing sender or recipient', async () => {
     status = 400; responseBody = { message: 'Error de envío' }
-    await assert.rejects(service.sendMessage(12, 'Hola', 'stable-id'), /Error de envío/)
+    await assert.rejects(sendMessage(12, 'Hola', 'stable-id'), /Error de envío/)
     status = 201; responseBody = { id: 345 }
-    await service.sendMessage(12, 'Hola', 'stable-id')
+    await sendMessage(12, 'Hola', 'stable-id')
     assert.deepEqual(JSON.parse(calls[0].options.body as string), { content: 'Hola', clientMessageId: 'stable-id' })
     assert.equal(calls[0].options.body, calls[1].options.body)
 })
 test('opening an empty conversation preserves its actual participant data across navigation', async () => {
     responseBody = conversation
-    await service.openConversation('professional-uuid', 'viewer-uuid')
-    assert.deepEqual(service.recalledConversation('viewer-uuid', 12), conversation)
-    assert.equal(service.recalledConversation('different-viewer', 12), null)
+    await openConversation('professional-uuid', 'viewer-uuid')
+    assert.deepEqual(recalledConversation('viewer-uuid', 12), conversation)
+    assert.equal(recalledConversation('different-viewer', 12), null)
     assert.deepEqual(JSON.parse(calls[0].options.body as string), { professionalId: 'professional-uuid' })
 })
 test('malformed session data does not break chat selection', () => {
     storage.set('oficiosya_chat_viewer_12', '{bad')
-    assert.equal(service.recalledConversation('viewer', 12), null)
+    assert.equal(recalledConversation('viewer', 12), null)
 })
 test('block and unblock use POST and DELETE on the existing endpoint', async () => {
     responseBody = conversation
-    await service.setConversationBlocked(12, true)
-    await service.setConversationBlocked(12, false)
+    await setConversationBlocked(12, true)
+    await setConversationBlocked(12, false)
     assert.deepEqual(calls.map(call => [call.url, call.options.method]), [
         ['/api/v1/conversations/12/block', 'POST'], ['/api/v1/conversations/12/block', 'DELETE'],
     ])
@@ -83,11 +82,43 @@ test('read publishes a count-refresh event only after a successful backend ackno
     events.addEventListener('oficiosya:chat-read', follow)
     try {
         status = 400; responseBody = { message: 'No pertenece a la conversación' }
-        await assert.rejects(service.markRead(12, 345))
+        await assert.rejects(markRead(12, 345))
         assert.equal(changes, 0)
         status = 204
-        await service.markRead(12, 345)
+        await markRead(12, 345)
         assert.equal(changes, 1)
         assert.deepEqual(JSON.parse(calls[1].options.body as string), { lastReadMessageId: 345 })
     } finally { events.removeEventListener('oficiosya:chat-read', follow) }
+})
+
+test('chat services call the expected endpoints and payloads', async () => {
+    globalThis.fetch = async (url, init) => {
+        calls.push({ url: String(url), options: init ?? {} })
+        if (String(url).endsWith('/unread-count')) return Response.json({ count: 4 })
+        if (String(url).endsWith('/messages?limit=40')) return Response.json([])
+        if (String(url).endsWith('/messages')) return Response.json({ id: 9 })
+        if (String(url).endsWith('/read')) return new Response(null, { status: 204 })
+        return Response.json([])
+    }
+
+    await openConversation('professional-1')
+    await getConversations()
+    await getMessages(12)
+    await sendMessage(12, 'Hola')
+    await markRead(12, 9)
+    assert.equal(await getUnreadCount(), 4)
+
+    assert.deepEqual(calls.map(request => request.url), [
+        '/api/v1/conversations',
+        '/api/v1/conversations',
+        '/api/v1/conversations/12/messages?limit=40',
+        '/api/v1/conversations/12/messages',
+        '/api/v1/conversations/12/read',
+        '/api/v1/conversations/unread-count',
+    ])
+    assert.deepEqual(JSON.parse(String(calls[0].options.body)), { professionalId: 'professional-1' })
+    const sent = JSON.parse(String(calls[3].options.body))
+    assert.equal(sent.content, 'Hola')
+    assert.match(sent.clientMessageId, /^[0-9a-f-]{36}$/)
+    assert.deepEqual(JSON.parse(String(calls[4].options.body)), { lastReadMessageId: 9 })
 })

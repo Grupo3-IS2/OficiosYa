@@ -1,5 +1,5 @@
-import { clearSession, expireSession, getToken, isTokenUsable } from './session'
-import { isTokenFresh, renewSession } from './sessionRenewal'
+import { clearSession, expireSession, getToken, isTokenUsable } from './session.ts'
+import { isTokenFresh, renewSession } from './sessionRenewal.ts'
 
 const API_BASE_URL = '/api/v1'
 

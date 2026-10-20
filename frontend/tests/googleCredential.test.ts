@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { emailFromCredential, profileFromCredential } from '../src/services/googleCredential.ts'
+import { emailFromCredential, handOverGoogleSignup, profileFromCredential, takeGoogleSignup } from '../src/services/googleCredential.ts'
 
 function credentialWith(payload: object): string {
     const encode = (value: string) => Buffer.from(value).toString('base64url')
@@ -10,7 +10,6 @@ function credentialWith(payload: object): string {
 test('the email is read from the token payload', () => {
     assert.equal(emailFromCredential(credentialWith({ email: 'ana@example.com', sub: '1' })), 'ana@example.com')
 })
-
 test('accented characters survive the decoding', () => {
     assert.equal(emailFromCredential(credentialWith({ email: 'ñandú@example.com' })), 'ñandú@example.com')
 })
@@ -33,4 +32,26 @@ test('the name and expiry are read too, for filling in the sign-up form', () => 
         { email: 'ana@example.com', name: 'Ana Pérez', expiresAt: 1_700_000_000_000 })
     assert.deepEqual(profileFromCredential(credentialWith({ email: 'ana@example.com' })), { email: 'ana@example.com', name: '', expiresAt: null })
     assert.equal(profileFromCredential('not-a-token'), null)
+})
+
+test('handing over Google token to signup stores and takes it once', () => {
+    const memory = new Map<string, string>()
+    const originalSessionStorage = globalThis.sessionStorage
+    globalThis.sessionStorage = {
+        getItem: (k: string) => memory.get(k) ?? null,
+        setItem: (k: string, v: string) => memory.set(k, v),
+        removeItem: (k: string) => memory.delete(k),
+        clear: () => memory.clear(),
+        key: () => null,
+        length: memory.size,
+    } as unknown as Storage
+
+    try {
+        const dummyToken = 'header.payload.signature'
+        handOverGoogleSignup(dummyToken)
+        assert.equal(takeGoogleSignup(), dummyToken)
+        assert.equal(takeGoogleSignup(), null)
+    } finally {
+        globalThis.sessionStorage = originalSessionStorage
+    }
 })

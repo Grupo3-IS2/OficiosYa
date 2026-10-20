@@ -1,4 +1,4 @@
-import type { LoginResponse } from '../types/Auth'
+import type { LoginResponse } from '../types/Auth.ts'
 
 export const TOKEN_KEY = 'oficiosya_token'
 export const USER_KEY = 'oficiosya_user'

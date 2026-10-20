@@ -1,4 +1,4 @@
-import { apiRequest } from './api'
+import { apiRequest } from './api.ts'
 import type { JobStatus, JobTask, RequestParty } from '../types/JobRequest'
 
 export interface Conversation {

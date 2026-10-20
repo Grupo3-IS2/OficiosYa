@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { emptyScheduleDraft, quarterHourOptions, repeatedScheduleDates, scheduleDraftDates, scheduleDraftFrom } from '../src/pages/EditProfile/scheduleForm.ts'
+import { emptyScheduleDraft, quarterHourOptions, repeatedScheduleDates, scheduleDraftDates, scheduleDraftFrom, scheduleRecurrence } from '../src/pages/EditProfile/scheduleForm.ts'
 
 test('a new schedule starts with the selected day and sensible work hours', () => {
     assert.deepEqual(emptyScheduleDraft(new Date(2030, 4, 6)), {
@@ -65,4 +65,33 @@ test('monthly and yearly repetition keep the selected weekday', () => {
     assert.ok(year.length > month.length)
     assert.ok(year.every(item => item.start.getDay() === month[0].start.getDay()))
     assert.ok(year.every(item => item.start.getFullYear() === 2030))
+})
+
+test('scheduleRecurrence builds RFC 5545 RRULE strings for each repeat mode', () => {
+    const draft = { date: '2030-05-08', startTime: '09:00', endTime: '10:00' }
+
+    const never = scheduleRecurrence(draft, 'NEVER')
+    assert.ok(never)
+    assert.equal(never.rruleText, null)
+    assert.equal(never.start.getDate(), 8)
+
+    const week = scheduleRecurrence(draft, 'WEEK')
+    assert.ok(week)
+    assert.equal(week.start.getDate(), 6)
+    assert.equal(week.rruleText, 'FREQ=DAILY;COUNT=7')
+
+    const weekdays = scheduleRecurrence(draft, 'WEEKDAYS')
+    assert.ok(weekdays)
+    assert.equal(weekdays.start.getDate(), 6)
+    assert.equal(weekdays.rruleText, 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;COUNT=5')
+
+    const month = scheduleRecurrence(draft, 'MONTH_WEEKDAY')
+    assert.ok(month)
+    assert.equal(month.start.getDate(), 8)
+    assert.match(month.rruleText ?? '', /^FREQ=WEEKLY;BYDAY=WE;UNTIL=\d{8}T\d{6}Z$/)
+
+    const year = scheduleRecurrence(draft, 'YEAR_WEEKDAY')
+    assert.ok(year)
+    assert.equal(year.start.getDate(), 8)
+    assert.match(year.rruleText ?? '', /^FREQ=WEEKLY;BYDAY=WE;UNTIL=\d{8}T\d{6}Z$/)
 })

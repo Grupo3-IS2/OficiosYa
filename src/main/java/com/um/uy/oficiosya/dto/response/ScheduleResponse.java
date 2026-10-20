@@ -18,4 +18,5 @@ public class ScheduleResponse {
     private ScheduleType type;
     private OffsetDateTime startTimestamp;
     private OffsetDateTime endTimestamp;
+    private String rruleText;
 }

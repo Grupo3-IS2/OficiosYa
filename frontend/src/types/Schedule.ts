@@ -7,4 +7,5 @@ export interface Schedule {
     type: ScheduleType
     startTimestamp: string
     endTimestamp: string
+    rruleText?: string | null
 }

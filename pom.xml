@@ -159,6 +159,12 @@
             <version>1.85</version>
         </dependency>
 
+        <!-- RRULE (RFC 5545) -->
+        <dependency>
+            <groupId>org.dmfs</groupId>
+            <artifactId>lib-recur</artifactId>
+            <version>0.17.1</version>
+        </dependency>
 
     </dependencies>
 

@@ -90,11 +90,12 @@ async function createAvailableBlock(
   token: string,
   startTimestamp: string,
   endTimestamp: string,
-  type = 'URGENT_AVAILABLE'
+  type = 'URGENT_AVAILABLE',
+  rruleText?: string
 ): Promise<APIResponse> {
   return request.post(SCHEDULES_URL, {
     headers: authHeaders(token),
-    data: { type, startTimestamp, endTimestamp }
+    data: { type, startTimestamp, endTimestamp, ...(rruleText ? { rruleText } : {}) }
   });
 }
 
@@ -137,6 +138,31 @@ test.describe('Agenda profesional', () => {
       includedBlock.id,
       outsideBlock.id
     ]);
+  });
+
+  test('expande horarios recurrentes con RRULE previos al inicio del rango consultado', async ({ request }) => {
+    const professional = await registerProfessional(request, 'agenda.rrule');
+    const created = await createAvailableBlock(
+      request,
+      professional.token,
+      '2035-05-01T09:00:00-03:00',
+      '2035-05-01T10:00:00-03:00',
+      'URGENT_AVAILABLE',
+      'FREQ=DAILY;COUNT=4'
+    );
+    expect(created.status()).toBe(201);
+    const recurringBlock = await created.json();
+    expect(recurringBlock.rruleText).toBe('FREQ=DAILY;COUNT=4');
+
+    const response = await getAgenda(request, professional.id, {
+      from: '2035-05-02T00:00:00-03:00',
+      to: '2035-05-04T00:00:00-03:00'
+    });
+    expect(response.status()).toBe(200);
+    const agenda = await response.json();
+    expect(agenda).toHaveLength(2);
+    expect(Date.parse(agenda[0].startTimestamp)).toBe(Date.parse('2035-05-02T09:00:00-03:00'));
+    expect(Date.parse(agenda[1].startTimestamp)).toBe(Date.parse('2035-05-03T09:00:00-03:00'));
   });
 
   test('solo el dueño puede editar o eliminar disponibilidad propia', async ({ request }) => {

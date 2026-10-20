@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.um.uy.oficiosya.entity.ScheduleType;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -18,4 +19,7 @@ public class ScheduleCreateRequest {
 
     @NotNull(message = "El fin del bloque es obligatorio")
     private OffsetDateTime endTimestamp;
+
+    @JsonAlias("rrule_text")
+    private String rruleText;
 }

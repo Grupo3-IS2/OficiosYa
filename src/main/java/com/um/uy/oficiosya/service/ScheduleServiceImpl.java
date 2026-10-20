@@ -13,14 +13,23 @@ import com.um.uy.oficiosya.mapper.ScheduleMapper;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.ScheduleRepository;
 import com.um.uy.oficiosya.service.interfaces.ScheduleService;
+import org.dmfs.rfc5545.DateTime;
+import org.dmfs.rfc5545.recur.InvalidRecurrenceRuleException;
+import org.dmfs.rfc5545.recur.RecurrenceRule;
+import org.dmfs.rfc5545.recur.RecurrenceRuleIterator;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.UUID;
 
 @Service
@@ -28,6 +37,8 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     private static final String BLOCK_STARTS_AFTER_END = "El inicio del bloque debe ser anterior al fin";
     private static final String BLOCK_OVERLAPS = "Ya existe un bloque de agenda en ese horario";
+    private static final String INVALID_RRULE = "La regla de recurrencia (RRULE) no es válida";
+    private static final int MAX_OCCURRENCES = 500;
 
     private final ScheduleRepository scheduleRepository;
     private final ProfessionalRepository professionalRepository;
@@ -54,15 +65,17 @@ public class ScheduleServiceImpl implements ScheduleService {
                     BLOCK_STARTS_AFTER_END);
         }
 
+        String rruleText = normalizeAndValidateRrule(scheduleRequest.getRruleText(),
+                scheduleRequest.getStartTimestamp());
+
         Professional professional = professionalRepository.findByPublicIdForUpdate(professionalId)
                 .orElseThrow(() -> new ClientNotFoundException("Profesional no encontrado."));
 
-        if (scheduleRepository.existsOverlapping(professionalId, scheduleRequest.getStartTimestamp(),
-                scheduleRequest.getEndTimestamp(), 0L)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
-        }
+        requireNoOverlap(professionalId, scheduleRequest.getStartTimestamp(),
+                scheduleRequest.getEndTimestamp(), rruleText, 0L);
 
         Schedule schedule = scheduleMapper.toEntity(scheduleRequest);
+        schedule.setRruleText(rruleText);
         schedule.setProfessional(professional);
 
         schedule = scheduleRepository.save(schedule);
@@ -94,13 +107,16 @@ public class ScheduleServiceImpl implements ScheduleService {
                     BLOCK_STARTS_AFTER_END);
         }
 
+        String rruleText = scheduleRequest.getRruleText() != null
+                ? normalizeAndValidateRrule(scheduleRequest.getRruleText(), start)
+                : normalizeAndValidateRrule(schedule.getRruleText(), start);
+
         lockAgenda(professionalId);
-        if (scheduleRepository.existsOverlapping(professionalId, start, end, id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
-        }
+        requireNoOverlap(professionalId, start, end, rruleText, id);
 
         schedule.setStartTimestamp(start);
         schedule.setEndTimestamp(end);
+        schedule.setRruleText(rruleText);
 
         schedule = scheduleRepository.save(schedule);
         return scheduleMapper.toResponse(schedule);
@@ -117,9 +133,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         Professional professional = jobRequest.getProfessional();
 
         lockAgenda(professional.getPublicId());
-        if (scheduleRepository.existsOverlapping(professional.getPublicId(), start, end, 0L)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
-        }
+        requireNoOverlap(professional.getPublicId(), start, end, null, 0L);
 
         Schedule schedule = Schedule.builder()
                 .professional(professional)
@@ -161,10 +175,8 @@ public class ScheduleServiceImpl implements ScheduleService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, BLOCK_STARTS_AFTER_END);
         }
 
-        if (scheduleRepository.existsOverlapping(jobRequest.getProfessional().getPublicId(), start, end,
-                jobBlock(jobRequest).getId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
-        }
+        requireNoOverlap(jobRequest.getProfessional().getPublicId(), start, end, null,
+                jobBlock(jobRequest).getId());
     }
 
     @Override
@@ -188,7 +200,8 @@ public class ScheduleServiceImpl implements ScheduleService {
             throw new ClientNotFoundException("Profesional no encontrado.");
         }
 
-        return scheduleRepository.findAgenda(professionalId, from, to).stream()
+        List<Schedule> rawSchedules = scheduleRepository.findAgenda(professionalId, to);
+        return expandSchedulesInRange(rawSchedules, from, to).stream()
                 .map(scheduleMapper::toResponse)
                 .peek(schedule -> {
                     // Which job a block belongs to is not for the public to know
@@ -235,5 +248,171 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .filter(schedule -> schedule.getType() == ScheduleType.SCHEDULED_JOB)
                 .findFirst()
                 .orElseThrow(() -> new ScheduleNotFoundException("El trabajo no tiene un horario agendado."));
+    }
+
+    private void requireNoOverlap(UUID professionalId, OffsetDateTime start, OffsetDateTime end,
+                                  String rruleText, Long excludeId) {
+        Schedule candidate = Schedule.builder()
+                .startTimestamp(start)
+                .endTimestamp(end)
+                .rruleText(rruleText)
+                .build();
+        List<Schedule> candidateOccurrences = expandSchedule(candidate, start, null);
+        if (candidateOccurrences.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, INVALID_RRULE);
+        }
+
+        for (int i = 0; i < candidateOccurrences.size(); i++) {
+            for (int j = i + 1; j < candidateOccurrences.size(); j++) {
+                if (overlaps(candidateOccurrences.get(i), candidateOccurrences.get(j))) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
+                }
+            }
+        }
+
+        OffsetDateTime rangeStart = candidateOccurrences.getFirst().getStartTimestamp();
+        OffsetDateTime rangeEnd = candidateOccurrences.getLast().getEndTimestamp();
+
+        List<Schedule> existingBeforeEnd = scheduleRepository.findBeforeEndExcluding(professionalId, rangeEnd, excludeId);
+        List<Schedule> existingOccurrences = expandSchedulesInRange(existingBeforeEnd, rangeStart, rangeEnd);
+
+        for (Schedule cand : candidateOccurrences) {
+            for (Schedule existing : existingOccurrences) {
+                if (overlaps(cand, existing)) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
+                }
+            }
+        }
+    }
+
+    private boolean overlaps(Schedule a, Schedule b) {
+        return a.getStartTimestamp().isBefore(b.getEndTimestamp())
+                && a.getEndTimestamp().isAfter(b.getStartTimestamp());
+    }
+
+    private List<Schedule> expandSchedulesInRange(List<Schedule> schedules, OffsetDateTime from, OffsetDateTime to) {
+        return schedules.stream()
+                .flatMap(schedule -> expandSchedule(schedule, from, to).stream())
+                .sorted(Comparator.comparing(Schedule::getStartTimestamp))
+                .toList();
+    }
+
+    private List<Schedule> expandSchedule(Schedule schedule, OffsetDateTime from, OffsetDateTime to) {
+        OffsetDateTime start = schedule.getStartTimestamp();
+        OffsetDateTime end = schedule.getEndTimestamp();
+        if (start == null || end == null || !start.isBefore(end)) {
+            return List.of();
+        }
+        if (to != null && !start.isBefore(to)) {
+            return List.of();
+        }
+
+        String rruleText = schedule.getRruleText();
+        if (rruleText == null || rruleText.isBlank()) {
+            if (from != null && !end.isAfter(from)) {
+                return List.of();
+            }
+            return List.of(schedule);
+        }
+
+        RecurrenceRule rule = parseRrule(rruleText);
+        Duration duration = Duration.between(start, end);
+        RecurrenceRuleIterator iterator = rule.iterator(toDmfsDateTime(start, rule));
+
+        OffsetDateTime effectiveTo = to;
+        if (effectiveTo == null && rule.isInfinite()) {
+            OffsetDateTime anchor = (from != null && from.isAfter(start)) ? from : start;
+            effectiveTo = anchor.plusYears(1);
+        }
+
+        List<Schedule> occurrences = new ArrayList<>();
+        int generated = 0;
+        while (iterator.hasNext() && generated < MAX_OCCURRENCES) {
+            DateTime nextDt = iterator.nextDateTime();
+            generated++;
+            OffsetDateTime occStart = toOffsetDateTime(nextDt, start);
+            if (effectiveTo != null && !occStart.isBefore(effectiveTo)) {
+                break;
+            }
+            OffsetDateTime occEnd = occStart.plus(duration).withOffsetSameInstant(end.getOffset());
+            if (from == null || occEnd.isAfter(from)) {
+                occurrences.add(Schedule.builder()
+                        .id(schedule.getId())
+                        .professional(schedule.getProfessional())
+                        .jobRequest(schedule.getJobRequest())
+                        .type(schedule.getType())
+                        .startTimestamp(occStart)
+                        .endTimestamp(occEnd)
+                        .rruleText(schedule.getRruleText())
+                        .build());
+            }
+        }
+        return occurrences;
+    }
+
+    private String normalizeAndValidateRrule(String rruleText, OffsetDateTime start) {
+        if (rruleText == null || rruleText.isBlank()) {
+            return null;
+        }
+        String normalized = rruleText.trim();
+        if (normalized.regionMatches(true, 0, "RRULE:", 0, 6)) {
+            normalized = normalized.substring(6).trim();
+        }
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        RecurrenceRule rule = parseRrule(normalized);
+        try {
+            rule.iterator(toDmfsDateTime(start, rule));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, INVALID_RRULE);
+        }
+        return normalized;
+    }
+
+    private RecurrenceRule parseRrule(String rruleText) {
+        try {
+            return new RecurrenceRule(rruleText);
+        } catch (InvalidRecurrenceRuleException | IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, INVALID_RRULE);
+        }
+    }
+
+    private DateTime toDmfsDateTime(OffsetDateTime odt, RecurrenceRule rule) {
+        if (rule.getUntil() != null && rule.getUntil().isFloating()) {
+            return new DateTime(
+                    odt.getYear(),
+                    odt.getMonthValue() - 1,
+                    odt.getDayOfMonth(),
+                    odt.getHour(),
+                    odt.getMinute(),
+                    odt.getSecond()
+            );
+        }
+        TimeZone timeZone = TimeZone.getTimeZone(odt.getOffset());
+        return new DateTime(
+                timeZone,
+                odt.getYear(),
+                odt.getMonthValue() - 1,
+                odt.getDayOfMonth(),
+                odt.getHour(),
+                odt.getMinute(),
+                odt.getSecond()
+        );
+    }
+
+    private OffsetDateTime toOffsetDateTime(DateTime dt, OffsetDateTime referenceStart) {
+        ZoneOffset offset = referenceStart.getOffset();
+        DateTime shifted = dt.isFloating() ? dt : dt.shiftTimeZone(TimeZone.getTimeZone(offset));
+        return OffsetDateTime.of(
+                shifted.getYear(),
+                shifted.getMonth() + 1,
+                shifted.getDayOfMonth(),
+                shifted.getHours(),
+                shifted.getMinutes(),
+                shifted.getSeconds(),
+                referenceStart.getNano(),
+                offset
+        );
     }
 }

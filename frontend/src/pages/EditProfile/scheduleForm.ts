@@ -66,6 +66,47 @@ function datesForDay(day: Date, start: Date, end: Date): { start: Date; end: Dat
     }
 }
 
+export interface ScheduleRecurrence {
+    start: Date
+    end: Date
+    rruleText: string | null
+}
+
+const rruleWeekdays = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const
+
+function utcRruleTimestamp(date: Date): string {
+    return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`
+}
+
+export function scheduleRecurrence(draft: ScheduleDraft, repeat: ScheduleRepeat): ScheduleRecurrence | null {
+    const base = scheduleDraftDates(draft)
+    if (!base) return null
+    if (repeat === 'NEVER') return { ...base, rruleText: null }
+
+    const day = new Date(base.start.getFullYear(), base.start.getMonth(), base.start.getDate())
+
+    if (repeat === 'WEEK' || repeat === 'WEEKDAYS') {
+        const monday = new Date(day)
+        monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+        const { start, end } = datesForDay(monday, base.start, base.end)
+        const rruleText = repeat === 'WEEK'
+            ? 'FREQ=DAILY;COUNT=7'
+            : 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;COUNT=5'
+        return { start, end, rruleText }
+    }
+
+    const byDay = rruleWeekdays[base.start.getDay()]
+    const until = repeat === 'MONTH_WEEKDAY'
+        ? new Date(base.start.getFullYear(), base.start.getMonth() + 1, 0, 23, 59, 59)
+        : new Date(base.start.getFullYear(), 11, 31, 23, 59, 59)
+
+    return {
+        start: base.start,
+        end: base.end,
+        rruleText: `FREQ=WEEKLY;BYDAY=${byDay};UNTIL=${utcRruleTimestamp(until)}`,
+    }
+}
+
 export function repeatedScheduleDates(draft: ScheduleDraft, repeat: ScheduleRepeat): { start: Date; end: Date }[] {
     const base = scheduleDraftDates(draft)
     if (!base) return []

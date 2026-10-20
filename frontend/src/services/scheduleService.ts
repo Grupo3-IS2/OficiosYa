@@ -13,23 +13,25 @@ export function getProfessionalSchedule(
     return publicApiRequest<Schedule[]>(`/schedules?${query.toString()}`)
 }
 
-export function createAvailability(start: Date, end: Date): Promise<Schedule> {
+export function createAvailability(start: Date, end: Date, rruleText?: string | null): Promise<Schedule> {
     return apiRequest<Schedule>('/schedules', {
         method: 'POST',
         body: JSON.stringify({
             type: 'URGENT_AVAILABLE',
             startTimestamp: start.toISOString(),
             endTimestamp: end.toISOString(),
+            ...(rruleText ? { rruleText } : {}),
         }),
     })
 }
 
-export function updateAvailability(id: number, start: Date, end: Date): Promise<Schedule> {
+export function updateAvailability(id: number, start: Date, end: Date, rruleText?: string | null): Promise<Schedule> {
     return apiRequest<Schedule>(`/schedules/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({
             startTimestamp: start.toISOString(),
             endTimestamp: end.toISOString(),
+            ...(rruleText !== undefined ? { rruleText } : {}),
         }),
     })
 }

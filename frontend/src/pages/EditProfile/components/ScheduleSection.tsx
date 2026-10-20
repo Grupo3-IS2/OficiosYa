@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import Button from '../../../components/Button/Button'
 import { createAvailability, deleteAvailability, getProfessionalSchedule, updateAvailability } from '../../../services/scheduleService'
 import type { Schedule } from '../../../types/Schedule'
-import { emptyScheduleDraft, repeatedScheduleDates, scheduleDraftDates, scheduleDraftFrom } from '../scheduleForm'
+import { emptyScheduleDraft, scheduleDraftDates, scheduleDraftFrom, scheduleRecurrence } from '../scheduleForm'
 import type { ScheduleDraft, ScheduleRepeat } from '../scheduleForm'
 import ScheduleDatePicker from './ScheduleDatePicker'
 import ScheduleDeleteModal from './ScheduleDeleteModal'
@@ -85,9 +85,9 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
     }
 
     async function saveSchedule() {
-        const dates = editingId === null ? repeatedScheduleDates(draft, repeat) : []
+        const recurrence = editingId === null ? scheduleRecurrence(draft, repeat) : null
         const editedDates = editingId !== null ? scheduleDraftDates(draft) : null
-        if ((editingId === null && dates.length === 0) || (editingId !== null && !editedDates)) {
+        if ((editingId === null && !recurrence) || (editingId !== null && !editedDates)) {
             setError('Elegí una fecha y un horario de fin posterior al horario de inicio.')
             return
         }
@@ -98,26 +98,26 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
         try {
             if (editingId !== null && editedDates) {
                 const saved = await updateAvailability(editingId, editedDates.start, editedDates.end)
-                setSchedules(current => [...current.filter(schedule => schedule.id !== saved.id), saved]
-                    .sort((first, second) => first.startTimestamp.localeCompare(second.startTimestamp)))
+                if (saved.rruleText) {
+                    const refreshed = await getProfessionalSchedule(professionalId, beginningOfToday())
+                    setSchedules(refreshed.filter(schedule => schedule.type === 'URGENT_AVAILABLE'))
+                } else {
+                    setSchedules(current => [...current.filter(schedule => schedule.id !== saved.id), saved]
+                        .sort((first, second) => first.startTimestamp.localeCompare(second.startTimestamp)))
+                }
                 setMessage('Horario actualizado.')
                 resetForm()
-            } else {
-                const results = await Promise.allSettled(dates.map(date => createAvailability(date.start, date.end)))
-                const created = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
-                const failed = results.filter(result => result.status === 'rejected')
-                if (created.length > 0) {
-                    setSchedules(current => [...current, ...created]
+            } else if (recurrence) {
+                const saved = await createAvailability(recurrence.start, recurrence.end, recurrence.rruleText)
+                if (saved.rruleText) {
+                    const refreshed = await getProfessionalSchedule(professionalId, beginningOfToday())
+                    setSchedules(refreshed.filter(schedule => schedule.type === 'URGENT_AVAILABLE'))
+                } else {
+                    setSchedules(current => [...current, saved]
                         .sort((first, second) => first.startTimestamp.localeCompare(second.startTimestamp)))
-                    setMessage(created.length === 1 ? 'Horario agregado.' : `${created.length} horarios agregados.`)
-                    resetForm()
                 }
-                if (failed.length > 0) {
-                    const firstReason = failed[0].status === 'rejected' ? failed[0].reason : null
-                    setError(created.length > 0
-                        ? `${failed.length} horarios no pudieron agregarse porque se superponen o no son válidos.`
-                        : firstReason instanceof Error ? firstReason.message : 'No pudimos guardar los horarios.')
-                }
+                setMessage('Horario agregado.')
+                resetForm()
             }
         } catch (reason) {
             setError(reason instanceof Error ? reason.message : 'No pudimos guardar el horario.')
@@ -142,7 +142,7 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
 
     async function confirmRemoval() {
         if (!pendingDeletion) return
-        const ids = pendingDeletion.ids
+        const ids = [...new Set(pendingDeletion.ids)]
         setBusy(true)
         setError('')
         setMessage('')
@@ -170,10 +170,13 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
         })
     }
 
+    const sortedSchedules = [...schedules].sort((first, second) => first.startTimestamp.localeCompare(second.startTimestamp))
+    const uniqueScheduleIds = [...new Set(sortedSchedules.map(schedule => schedule.id))]
+
     function toggleAll() {
-        setSelectedIds(current => current.size === schedules.length
+        setSelectedIds(current => current.size === uniqueScheduleIds.length
             ? new Set()
-            : new Set(schedules.map(schedule => schedule.id)))
+            : new Set(uniqueScheduleIds))
     }
 
     function requestSelectedRemoval() {
@@ -184,8 +187,6 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
             description: `Vas a eliminar ${ids.length} ${ids.length === 1 ? 'horario seleccionado' : 'horarios seleccionados'}. Esta acción no se puede deshacer.`,
         })
     }
-
-    const sortedSchedules = [...schedules].sort((first, second) => first.startTimestamp.localeCompare(second.startTimestamp))
 
     return <section className="profile-section schedule-editor" aria-labelledby="schedule-title">
         <h2 id="schedule-title">Horarios de atención</h2>
@@ -216,7 +217,7 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
             <div className="schedule-editor__list-heading">
                 <h3>Próximos horarios</h3>
                 {!loading && sortedSchedules.length > 0 && <button type="button" onClick={toggleAll} disabled={busy}>
-                    {selectedIds.size === sortedSchedules.length ? 'Quitar selección' : 'Seleccionar todos'}
+                    {selectedIds.size === uniqueScheduleIds.length ? 'Quitar selección' : 'Seleccionar todos'}
                 </button>}
             </div>
             {selectedIds.size > 0 && <div className="schedule-editor__bulk-actions">
@@ -230,7 +231,7 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
                     : <div className="schedule-editor__cards">
                         {sortedSchedules.map(schedule => {
                             const card = scheduleCard(schedule)
-                            return <article className={`schedule-editor__item${selectedIds.has(schedule.id) ? ' is-selected' : ''}`} key={schedule.id}>
+                            return <article className={`schedule-editor__item${selectedIds.has(schedule.id) ? ' is-selected' : ''}`} key={`${schedule.id}-${schedule.startTimestamp}`}>
                                 <input
                                     className="schedule-editor__select"
                                     type="checkbox"

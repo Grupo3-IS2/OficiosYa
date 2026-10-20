@@ -53,7 +53,7 @@ export function calendarBlocks(schedules: Schedule[], week: WeekRange): Calendar
             if (clippedStart >= clippedEnd) continue
 
             blocks.push({
-                key: `${schedule.id}-${day}`,
+                key: `${schedule.id}-${schedule.startTimestamp}-${day}`,
                 day,
                 startHour: clippedStart.getTime() === dayStart.getTime() ? 0 : hourOfDay(clippedStart),
                 endHour: clippedEnd.getTime() === dayEnd.getTime() ? 24 : hourOfDay(clippedEnd),

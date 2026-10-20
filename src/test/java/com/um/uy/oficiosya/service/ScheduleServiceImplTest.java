@@ -55,6 +55,7 @@ class ScheduleServiceImplTest {
         service = new ScheduleServiceImpl(scheduleRepository, professionalRepository, new ScheduleMapperImpl());
         professional = Professional.builder().id(1L).publicId(professionalId).name("Beto").build();
         when(scheduleRepository.save(any(Schedule.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(scheduleRepository.findBeforeEndExcluding(any(), any(), anyLong())).thenReturn(List.of());
     }
 
     private ScheduleCreateRequest createRequest(ScheduleType type, OffsetDateTime from, OffsetDateTime to) {
@@ -87,6 +88,27 @@ class ScheduleServiceImplTest {
     }
 
     @Test
+    void createSchedule_withValidRrule_savesNormalizedRruleText() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
+        request.setRruleText("RRULE:FREQ=DAILY;COUNT=3");
+
+        ScheduleResponse response = service.createSchedule(request, professionalId);
+
+        assertEquals("FREQ=DAILY;COUNT=3", response.getRruleText());
+    }
+
+    @Test
+    void createSchedule_withInvalidRrule_isRejected() {
+        ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
+        request.setRruleText("NOT_AN_RRULE");
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.createSchedule(request, professionalId));
+        assertEquals(400, e.getStatusCode().value());
+    }
+
+    @Test
     void createSchedule_scheduledJob_cannotBeCreatedByHand() {
         ScheduleCreateRequest request = createRequest(ScheduleType.SCHEDULED_JOB, start, end);
 
@@ -111,7 +133,23 @@ class ScheduleServiceImplTest {
     @Test
     void createSchedule_overlapping_isAConflict() {
         when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
-        when(scheduleRepository.existsOverlapping(professionalId, start, end, 0L)).thenReturn(true);
+        Schedule existing = Schedule.builder().id(10L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start).endTimestamp(end).build();
+        when(scheduleRepository.findBeforeEndExcluding(professionalId, end, 0L)).thenReturn(List.of(existing));
+        ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.createSchedule(request, professionalId));
+        assertEquals(409, e.getStatusCode().value());
+    }
+
+    @Test
+    void createSchedule_overlappingRecurringOccurrence_isAConflict() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        Schedule existingRecurring = Schedule.builder().id(10L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start.minusDays(2)).endTimestamp(end.minusDays(2))
+                .rruleText("FREQ=DAILY;COUNT=5").build();
+        when(scheduleRepository.findBeforeEndExcluding(professionalId, end, 0L)).thenReturn(List.of(existingRecurring));
         ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
@@ -183,7 +221,9 @@ class ScheduleServiceImplTest {
     @Test
     void updateSchedule_overlapping_isAConflict() {
         block(ScheduleType.USER_RESERVED);
-        when(scheduleRepository.existsOverlapping(professionalId, start, end, 5L)).thenReturn(true);
+        Schedule existing = Schedule.builder().id(10L).professional(professional).type(ScheduleType.USER_RESERVED)
+                .startTimestamp(start).endTimestamp(end).build();
+        when(scheduleRepository.findBeforeEndExcluding(professionalId, end, 5L)).thenReturn(List.of(existing));
         ScheduleUpdateRequest request = new ScheduleUpdateRequest();
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
@@ -217,7 +257,9 @@ class ScheduleServiceImplTest {
     @Test
     void createJobSchedule_overlapping_isAConflict() {
         JobRequest job = JobRequest.builder().professional(professional).build();
-        when(scheduleRepository.existsOverlapping(eq(professionalId), any(), any(), anyLong())).thenReturn(true);
+        Schedule existing = Schedule.builder().id(10L).professional(professional).type(ScheduleType.USER_RESERVED)
+                .startTimestamp(start).endTimestamp(end).build();
+        when(scheduleRepository.findBeforeEndExcluding(eq(professionalId), any(), anyLong())).thenReturn(List.of(existing));
 
         assertThrows(ResponseStatusException.class, () -> service.createJobSchedule(job, start, end));
     }
@@ -246,7 +288,7 @@ class ScheduleServiceImplTest {
         ScheduleResponse response = service.moveJobSchedule(job, newStart, newStart.plusHours(2));
 
         verify(professionalRepository).findByPublicIdForUpdate(professionalId);
-        verify(scheduleRepository).existsOverlapping(professionalId, newStart, newStart.plusHours(2), 7L);
+        verify(scheduleRepository).findBeforeEndExcluding(professionalId, newStart.plusHours(2), 7L);
         assertEquals(newStart, response.getStartTimestamp());
         assertEquals(newStart, job.getSchedules().getFirst().getStartTimestamp());
     }
@@ -254,9 +296,11 @@ class ScheduleServiceImplTest {
     @Test
     void moveJobSchedule_overlapping_isAConflict() {
         JobRequest job = acceptedJob();
-        when(scheduleRepository.existsOverlapping(eq(professionalId), any(), any(), eq(7L))).thenReturn(true);
         OffsetDateTime newStart = start.plusDays(1);
         OffsetDateTime newEnd = newStart.plusHours(2);
+        Schedule existing = Schedule.builder().id(10L).professional(professional).type(ScheduleType.USER_RESERVED)
+                .startTimestamp(newStart).endTimestamp(newEnd).build();
+        when(scheduleRepository.findBeforeEndExcluding(eq(professionalId), any(), eq(7L))).thenReturn(List.of(existing));
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
                 () -> service.moveJobSchedule(job, newStart, newEnd));
@@ -302,7 +346,7 @@ class ScheduleServiceImplTest {
     @Test
     void getAgenda_owner_seesWhichJobEachBlockBelongsTo() {
         when(professionalRepository.existsByPublicId(professionalId)).thenReturn(true);
-        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock()));
+        when(scheduleRepository.findAgenda(professionalId, null)).thenReturn(List.of(jobBlock()));
 
         List<ScheduleResponse> agenda = service.getAgenda(professionalId, null, null, true);
 
@@ -312,11 +356,47 @@ class ScheduleServiceImplTest {
     @Test
     void getAgenda_public_hidesTheJob() {
         when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
-        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock()));
+        when(scheduleRepository.findAgenda(professionalId, null)).thenReturn(List.of(jobBlock()));
 
         List<ScheduleResponse> agenda = service.getAgenda(professionalId, null, null, false);
 
         assertNull(agenda.getFirst().getJobRequestId());
+    }
+
+    @Test
+    void getAgenda_calculatesRecurrenceForSchedulesPreviousToStartDateAndFiltersRange() {
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
+        OffsetDateTime baseStart = OffsetDateTime.parse("2035-02-01T10:00:00-03:00");
+        OffsetDateTime baseEnd = OffsetDateTime.parse("2035-02-01T11:00:00-03:00");
+        Schedule recurringBeforeFrom = Schedule.builder()
+                .id(11L)
+                .professional(professional)
+                .type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(baseStart)
+                .endTimestamp(baseEnd)
+                .rruleText("FREQ=DAILY;COUNT=5")
+                .build();
+        Schedule singleBeforeFrom = Schedule.builder()
+                .id(12L)
+                .professional(professional)
+                .type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(baseStart.minusDays(1))
+                .endTimestamp(baseEnd.minusDays(1))
+                .build();
+
+        OffsetDateTime from = OffsetDateTime.parse("2035-02-03T00:00:00-03:00");
+        OffsetDateTime to = OffsetDateTime.parse("2035-02-05T00:00:00-03:00");
+        when(scheduleRepository.findAgenda(professionalId, to))
+                .thenReturn(List.of(singleBeforeFrom, recurringBeforeFrom));
+
+        List<ScheduleResponse> agenda = service.getAgenda(professionalId, from, to, false);
+
+        assertEquals(2, agenda.size());
+        assertEquals(OffsetDateTime.parse("2035-02-03T10:00:00-03:00"), agenda.get(0).getStartTimestamp());
+        assertEquals(OffsetDateTime.parse("2035-02-03T11:00:00-03:00"), agenda.get(0).getEndTimestamp());
+        assertEquals(OffsetDateTime.parse("2035-02-04T10:00:00-03:00"), agenda.get(1).getStartTimestamp());
+        assertEquals(OffsetDateTime.parse("2035-02-04T11:00:00-03:00"), agenda.get(1).getEndTimestamp());
+        assertEquals("FREQ=DAILY;COUNT=5", agenda.get(0).getRruleText());
     }
 
     @Test

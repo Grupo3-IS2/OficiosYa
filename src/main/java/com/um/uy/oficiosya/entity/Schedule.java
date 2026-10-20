@@ -38,4 +38,7 @@ public class Schedule {
     @NotNull
     @Column(nullable = false)
     private OffsetDateTime endTimestamp;
+
+    @Column(name = "rrule_text")
+    private String rruleText;
 }

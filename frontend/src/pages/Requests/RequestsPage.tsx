@@ -370,8 +370,7 @@ export default function RequestsPage() {
                 // Stays open on the updated request: the new status, timeframe or reason is right there
                 setViewing(previous => previous && { ...previous, ...updated })
                 answeredToast[outcome](updated, updated.clientId === viewerId)
-                // Discard any list request started before this mutation and recover authoritative state.
-                setJobPushes(value => value + 1)
+                // The mutation response already updates the list and detail; no extra reload is needed.
             }}
         />}
         {ratingTarget && <ProfessionalRatingModal

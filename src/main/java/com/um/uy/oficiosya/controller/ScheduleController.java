@@ -10,9 +10,18 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -60,5 +69,20 @@ public class ScheduleController {
             Authentication authentication) {
         boolean ownerOrAdmin = ViewerAccess.isOwnerOrAdmin(authentication, professionalId);
         return ResponseEntity.ok(scheduleService.getAgenda(professionalId, from, to, ownerOrAdmin));
+    }
+
+    /** Exports a professional's agenda in RFC 5545 iCalendar (VCALENDAR) format. */
+    @SecurityRequirements
+    @GetMapping(value = "/ical", produces = "text/calendar;charset=UTF-8")
+    public ResponseEntity<String> exportAgendaICalendar(
+            @RequestParam UUID professionalId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
+            Authentication authentication) {
+        boolean ownerOrAdmin = ViewerAccess.isOwnerOrAdmin(authentication, professionalId);
+        String ics = scheduleService.exportAgendaICalendar(professionalId, from, to, ownerOrAdmin);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/calendar;charset=UTF-8"))
+                .body(ics);
     }
 }

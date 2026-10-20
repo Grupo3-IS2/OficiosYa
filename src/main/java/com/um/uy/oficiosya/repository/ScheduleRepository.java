@@ -14,7 +14,9 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     @Query("""
             SELECT s FROM Schedule s
             WHERE s.professional.publicId = :professionalPublicId
-            AND (CAST(:from AS OffsetDateTime) IS NULL OR s.endTimestamp > :from)
+            AND (CAST(:from AS OffsetDateTime) IS NULL
+                 OR COALESCE(s.recurrenceEnd, s.endTimestamp) > :from
+                 OR (s.rrule IS NOT NULL AND s.recurrenceEnd IS NULL))
             AND (CAST(:to AS OffsetDateTime) IS NULL OR s.startTimestamp < :to)
             ORDER BY s.startTimestamp ASC
             """)
@@ -34,4 +36,22 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
                                @Param("start") OffsetDateTime start,
                                @Param("end") OffsetDateTime end,
                                @Param("excludeId") Long excludeId);
+
+    /**
+     * Fetches candidate schedules (including recurring ones) that can overlap a window starting at {@code from}.
+     */
+    @Query("""
+            SELECT s FROM Schedule s
+            WHERE s.professional.publicId = :professionalPublicId
+            AND s.id <> :excludeId
+            AND (CAST(:from AS OffsetDateTime) IS NULL
+                 OR COALESCE(s.recurrenceEnd, s.endTimestamp) > :from
+                 OR (s.rrule IS NOT NULL AND s.recurrenceEnd IS NULL))
+            AND (CAST(:to AS OffsetDateTime) IS NULL OR s.startTimestamp < :to)
+            ORDER BY s.startTimestamp ASC
+            """)
+    List<Schedule> findActiveCandidates(@Param("professionalPublicId") UUID professionalPublicId,
+                                         @Param("from") OffsetDateTime from,
+                                         @Param("to") OffsetDateTime to,
+                                         @Param("excludeId") Long excludeId);
 }

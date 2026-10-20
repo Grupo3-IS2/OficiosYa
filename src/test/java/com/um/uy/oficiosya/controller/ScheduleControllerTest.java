@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,6 +58,7 @@ class ScheduleControllerTest {
         ScheduleResponse response = new ScheduleResponse();
         response.setId(5L);
         response.setType(ScheduleType.USER_RESERVED);
+        response.setRrule("FREQ=WEEKLY;COUNT=4");
         return response;
     }
 
@@ -66,9 +68,10 @@ class ScheduleControllerTest {
 
         mvc.perform(post(BASE).principal(authentication).contentType(MediaType.APPLICATION_JSON).content("""
                         {"type":"USER_RESERVED","startTimestamp":"2030-01-01T10:00:00-03:00",
-                         "endTimestamp":"2030-01-01T12:00:00-03:00"}"""))
+                         "endTimestamp":"2030-01-01T12:00:00-03:00","rrule":"FREQ=WEEKLY;COUNT=4"}"""))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(5));
+                .andExpect(jsonPath("$.id").value(5))
+                .andExpect(jsonPath("$.rrule").value("FREQ=WEEKLY;COUNT=4"));
     }
 
     @Test
@@ -106,5 +109,16 @@ class ScheduleControllerTest {
                         .param("from", "2030-01-01T00:00:00Z"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void exportAgendaICalendar_returnsCalendarContent() throws Exception {
+        String ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
+        when(scheduleService.exportAgendaICalendar(eq(userId), isNull(), isNull(), eq(true))).thenReturn(ics);
+
+        mvc.perform(get(BASE + "/ical").param("professionalId", userId.toString()).principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("text/calendar;charset=UTF-8"))
+                .andExpect(content().string(ics));
     }
 }

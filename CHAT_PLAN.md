@@ -28,7 +28,7 @@ es lo que hay que pasarle a quien haga la UI.
   mientras el par no tenga un trabajo aceptado (§5.8).
 - **Mails**: "Tenés mensajes sin leer", y avisos a las dos partes cuando un trabajo se acepta, cancela,
   reagenda o completa (§5.9).
-- Las propuestas sin respuesta **vencen solas** (`EXPIRED`) y los mensajes viejos se **borran** pasado
+- Las propuestas sin respuesta **vencen solas** (pasan a `CANCELLED`) y los mensajes viejos se **borran** pasado
   un plazo; los dos tiempos son configurables (§5.9).
 - **Fuera del MVP:** adjuntos o imágenes, editar o borrar mensajes, "escribiendo…", indicador de en
   línea, reportar usuarios y que el admin lea conversaciones (se hará después, ver §9).
@@ -216,7 +216,7 @@ Las dos tablas del chat van en un schema propio, `chat`, de la misma base. Los c
 |---|---|---|
 | `proposedBy` | `Role` (`CLIENT` / `PROFESSIONAL`), not null | Quién propuso el trabajo; define quién puede aceptarlo o rechazarlo. `@ColumnDefault("'CLIENT'")`, como `version`, para que las filas que ya existen queden como propuestas por el cliente, que es lo que eran. |
 | `proposedStart`, `proposedEnd` | `OffsetDateTime` (nullable) | El horario que ofrece el profesional cuando propone él. Null si propuso el cliente (el horario lo elige el profesional al aceptar, como hoy). Se limpian al aceptar, igual que `clearReschedule()`. |
-| `status` | `JobStatus` | Suma el valor **`EXPIRED`**: una propuesta que nadie respondió a tiempo (§5.9). La columna es `varchar(32)` con `EnumType.STRING`, así que no hace falta migrar. |
+| `status` | `JobStatus` | No suma valores: una propuesta que nadie respondió a tiempo pasa a `CANCELLED` (§5.9). |
 | `rescheduleRequestedBy` | `Role` (nullable) | Quién pidió el cambio de horario; sólo mientras `RESCHEDULE_REQUESTED`. Lo responde la otra parte (§5.6). Null en las filas existentes = lo pidió el cliente. |
 
 `confirmationPinHash` pasa a ser **nullable**: si propone el profesional, el PIN se genera recién
@@ -467,7 +467,7 @@ Siguiendo el estilo actual (Mockito para servicios, MockMvc para controllers):
   - la página de mensajes carga los trabajos de las tarjetas en una sola consulta.
 - `JobProposalExpirationTest`, `ChatMessageCleanupTest` y `ChatMailNotifierTest` (§5.9):
   - una propuesta `PROPOSED` vence después de `JOB_PROPOSAL_EXPIRATION_HOURS`, o antes si su
-    `proposedStart` ya pasó; con `-1` sólo vence por horario; una `EXPIRED` no se puede aceptar;
+    `proposedStart` ya pasó; con `-1` sólo vence por horario; al vencer queda `CANCELLED`;
   - con `CHAT_MESSAGE_RETENTION_DAYS=-1` no se borra nada; con N, se borran los mensajes más viejos y
     se limpia el preview si la conversación quedó vacía;
   - el mail de no leídos sale como mucho una vez por intervalo y no sale si ya los leyó; el de cambios
@@ -660,7 +660,7 @@ Cada `JobRequest` nuevo, lo proponga quien lo proponga, deja en la conversación
   cada vez que se pide la página de mensajes.
 - La etiqueta de estado la traduce el front: `PROPOSED` → "Pendiente", `ACCEPTED` → "Aceptado",
   `RESCHEDULE_REQUESTED` → "Cambio de horario pedido", `REJECTED` → "Rechazado", `CANCELLED` →
-  "Cancelado", `COMPLETED` → "Completado", `EXPIRED` → "Vencida".
+  "Cancelado", `COMPLETED` → "Completado".
 - El horario (`start`/`end` de `ChatJobSummary`):
 
   | Estado | Horario que muestra |
@@ -669,7 +669,7 @@ Cada `JobRequest` nuevo, lo proponga quien lo proponga, deja en la conversación
   | `PROPOSED`, propuso el cliente | `null` → "Horario a confirmar por el profesional" |
   | `ACCEPTED`, `COMPLETED` | El bloque agendado (`scheduledStart` – `scheduledEnd`) |
   | `RESCHEDULE_REQUESTED` | El agendado, y además `rescheduleStart` – `rescheduleEnd` como "propuesto" |
-  | `REJECTED`, `CANCELLED`, `EXPIRED` | `proposedStart` – `proposedEnd` si los hay (tachado por el front); si no, `null` |
+  | `REJECTED`, `CANCELLED` | `proposedStart` – `proposedEnd` si los hay (tachado por el front); si no, `null` |
 
   Para el último caso, al rechazar o cancelar un `PROPOSED` del profesional **no** se limpian
   `proposedStart`/`End` (sólo se limpian al aceptar). Un `ACCEPTED` cancelado muestra `null`:
@@ -740,12 +740,12 @@ Las tres tareas siguen el patrón de `VerificationCodeCleanup` (`@Scheduled` ya 
 
 **Vencimiento de propuestas (`JobProposalExpiration`):**
 
-- Cada hora pasa a `EXPIRED` los trabajos `PROPOSED` que cumplan cualquiera de:
+- Cada hora pasa a `CANCELLED` los trabajos `PROPOSED` que cumplan cualquiera de:
   - se crearon hace más de `JOB_PROPOSAL_EXPIRATION_HOURS` (con `-1` esta regla no aplica);
   - tienen `proposedStart` y ya pasó (siempre, porque esa propuesta ya no se puede aceptar).
-- Publica `JobStatusChanged` por cada uno: la tarjeta del chat pasa a "Vencida" y salen los mails.
-- `EXPIRED` es final, como `REJECTED`: no se acepta, rechaza ni cancela. Para retomarlo, se propone de
-  nuevo.
+- Publica `JobStatusChanged` con `CANCELLED` y sin autor por cada uno: la tarjeta del chat pasa a
+  "Cancelado" y salen los mails ("Venció sin respuesta la propuesta de trabajo").
+- `CANCELLED` es final: no se acepta, rechaza ni cancela. Para retomarlo, se propone de nuevo.
 - Usa `@Version` de `JobRequest`: si alguien acepta justo en ese momento, uno de los dos falla y gana
   el otro.
 
@@ -784,7 +784,8 @@ Lo bueno: casi toda la infraestructura ya está.
       quedan bien) y `proposed_start`/`proposed_end` nullable. Lo que **no** hace es sacar el
       `NOT NULL` de `confirmation_pin_hash`: lo hace solo `EnumCheckConstraintUpdater` en cada arranque
       (`ALTER TABLE job_request ALTER COLUMN confirmation_pin_hash DROP NOT NULL`, idempotente), igual
-      que agrega `EXPIRED` al check de `status`. No hay que correr nada a mano.
+      que pasa a `CANCELLED` las filas que quedaron en `EXPIRED` antes de rehacer el check de `status`.
+      No hay que correr nada a mano.
 - [ ] **Variables nuevas** (en `application.properties`, `docker-compose.yml` y `.env.example`, con
       default):
   - `CHAT_MESSAGE_MAX_LENGTH=2000`
@@ -867,8 +868,7 @@ Lo mínimo que necesita quien haga la UI:
       acepta con un clic, sin body. **La respuesta trae el PIN**: mostrarlo igual que hoy después de crear
       un trabajo, con el aviso de que no se vuelve a mostrar.
 14. Quien propuso ve su propuesta como "Esperando respuesta" y puede retirarla con "Cancelar".
-    Hay un estado nuevo, `EXPIRED` ("Vencida"), que hay que sumar al tipo `JobStatus` del front, a las
-    etiquetas y a los filtros de "Mis solicitudes" (junto con rechazadas y canceladas). No tiene acciones.
+    Las propuestas vencidas aparecen como canceladas; no hay un estado nuevo en el front.
 
 **Reagendar**
 
@@ -906,7 +906,7 @@ Lo mínimo que necesita quien haga la UI:
 | **2. API REST del chat** | `POST /conversations`, `POST /job-requests/{id}/conversation`, `ConversationController`, excepciones, Swagger, tests de controller | Chat funcional "a recargar", usable desde Swagger | 1 día |
 | **3. Propuestas y reagendar en los dos sentidos** | `proposedBy`, `proposedStart`/`End`, PIN al aceptar, crear con `clientId`, aceptar y rechazar por la contraparte, `rescheduleRequestedBy` (reagendar lo pide cualquiera, responde el otro), tests de servicio y controller, `ALTER` de `confirmation_pin_hash` | El profesional puede proponer y el cliente aceptar; cualquiera reagenda, desde Swagger | 2 días |
 | **4. Tarjeta en el chat** | `ChatMessageType`, `ChatJobSummary`, eventos `JobProposed` y `JobStatusChanged`, `ChatJobListener` (crear la tarjeta en la misma transacción), `job` en la página de mensajes, tests | Cada propuesta aparece en el chat con su estado y horario, desde Swagger | 1 día |
-| **5. Bloqueo, filtros, mails y tareas** | Bloquear/desbloquear, `canWrite`, `ChatContentFilter` (PIN y contacto), `EXPIRED` y `JobProposalExpiration`, `ChatMessageCleanup`, `ChatMailNotifier` y mails de cambios del trabajo, variables, tests | Reglas de seguridad y avisos completos, desde Swagger y Mailpit | 2,5 días |
+| **5. Bloqueo, filtros, mails y tareas** | Bloquear/desbloquear, `canWrite`, `ChatContentFilter` (PIN y contacto), `JobProposalExpiration`, `ChatMessageCleanup`, `ChatMailNotifier` y mails de cambios del trabajo, variables, tests | Reglas de seguridad y avisos completos, desde Swagger y Mailpit | 2,5 días |
 | **6. Tiempo real** | `WebSocketConfig`, `/ws` en `SecurityConfig`, endurecer `JwtChannelInterceptor`, eventos + push después del commit (mensajes y `job-updates`), cierre de sesiones al revocar, tests | Push en vivo, probado con un cliente STOMP de consola | 2 días |
 | **7. Deploy a dev** | Variables, `.env.example`, backup, `ALTER` en dev, deploy, verificar el `101` en `/ws/chat`, probar con dos navegadores | Funcionando en `dev.oficiosya.duckdns.org` | 0,5 día |
 | **8. Integración con el front** | Acompañar la integración, ajustar el contrato, E2E de Playwright con dos contextos | Feature completa en `dev` | 1,5 a 2,5 días (en paralelo con el front) |
@@ -933,7 +933,7 @@ las respuestas, como ya se hace en los tests de Playwright. La fase 3 depende de
 | 7 | Spam | Rate limits y **botón de bloquear** (en el MVP). El bloqueo también impide proponer trabajos. | §5.2, §5.8 |
 | 8 | Mails | En el MVP: "Tenés mensajes sin leer" (como mucho uno cada `CHAT_UNREAD_MAIL_INTERVAL_HOURS` por conversación) y mails a las dos partes en cada cambio del trabajo. | §5.9 |
 | 9 | Datos de contacto | Se rechazan teléfonos y mails mientras el par no tenga un trabajo `ACCEPTED`, `RESCHEDULE_REQUESTED` o `COMPLETED`. | §5.8 |
-| 10 | Propuestas viejas | Pasan a **`EXPIRED`** después de `JOB_PROPOSAL_EXPIRATION_HOURS` desde la creación (`-1` = no), o antes si el horario propuesto ya pasó. | §4, §5.9 |
+| 10 | Propuestas viejas | Pasan a **`CANCELLED`** después de `JOB_PROPOSAL_EXPIRATION_HOURS` desde la creación (`-1` = no), o antes si el horario propuesto ya pasó. | §4, §5.9 |
 
 ### Pendientes (no bloquean el MVP)
 

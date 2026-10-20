@@ -45,6 +45,6 @@ class EnumCheckConstraintUpdaterTest {
 
         new EnumCheckConstraintUpdater(jdbcTemplate).run();
 
-        verify(jdbcTemplate, times(7)).execute(anyString());
+        verify(jdbcTemplate, times(8)).execute(anyString());
     }
 }

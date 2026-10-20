@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.mapper;
 
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.dto.response.TaskResponse;
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
@@ -26,6 +27,13 @@ public interface JobRequestMapper {
     @Mapping(target = "scheduledStart", ignore = true)
     @Mapping(target = "scheduledEnd", ignore = true)
     JobRequestResponse toResponse(JobRequest jobRequest);
+
+    @Mapping(target = "jobRequestId", source = "id")
+    @Mapping(target = "clientName", source = "client.name")
+    @Mapping(target = "clientProfileImageUrl", source = "client.profileImageUrl")
+    @Mapping(target = "professionalId", source = "professional.publicId")
+    @Mapping(target = "professionalName", source = "professional.name")
+    ReviewResponse toReviewResponse(JobRequest jobRequest);
 
     @Mapping(target = "tradeId", source = "trade.id")
     @Mapping(target = "tradeName", source = "trade.name")

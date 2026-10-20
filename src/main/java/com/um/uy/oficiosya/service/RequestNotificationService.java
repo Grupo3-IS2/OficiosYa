@@ -116,7 +116,7 @@ public class RequestNotificationService {
             case RESCHEDULE_ACCEPTED -> "aceptó el cambio de horario del trabajo";
             case RESCHEDULE_REJECTED -> "rechazó el cambio de horario del trabajo";
             case COMPLETED -> "marcó como completado el trabajo";
-            case EXPIRED, RESCHEDULE_REQUESTED -> null;
+            case RESCHEDULE_REQUESTED -> null;
         };
         String event = actor == null
                 ? "Venció sin respuesta la propuesta de trabajo"

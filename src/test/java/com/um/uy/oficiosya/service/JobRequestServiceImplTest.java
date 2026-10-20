@@ -1,5 +1,8 @@
 package com.um.uy.oficiosya.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestAcceptRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCancelRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCompleteRequest;
@@ -9,6 +12,7 @@ import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.request.TaskCreateRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.Conversation;
 import com.um.uy.oficiosya.entity.JobRequest;
@@ -690,6 +694,43 @@ class JobRequestServiceImplTest {
     }
 
     @Test
+    void getProfessionalReviews_mapsEachReviewedJob() {
+        JobRequest job = job(JobStatus.COMPLETED);
+        job.setRating(9);
+        job.setReview("Excelente");
+        when(jobRequestRepository.findReviewsOfProfessional(professionalId, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(job)));
+
+        ReviewResponse review = service.getProfessionalReviews(professionalId, PageRequest.of(0, 20)).getContent().getFirst();
+
+        assertEquals(10L, review.getJobRequestId());
+        assertEquals("Ana", review.getClientName());
+        assertEquals(professionalId, review.getProfessionalId());
+        assertEquals(9, review.getRating());
+        assertEquals("Excelente", review.getReview());
+    }
+
+    @Test
+    void getMyReviews_areTheClientsReviewedJobs() {
+        JobRequest job = job(JobStatus.COMPLETED);
+        job.setRating(7);
+        when(jobRequestRepository.findReviewsByClient(clientId, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(job)));
+
+        assertEquals(7, service.getMyReviews(clientId, PageRequest.of(0, 20)).getContent().getFirst().getRating());
+    }
+
+    @Test
+    void getMyReviews_capsThePageSize() {
+        when(jobRequestRepository.findReviewsByClient(clientId, PageRequest.of(0, JobRequestServiceImpl.MAX_REVIEW_PAGE_SIZE)))
+                .thenReturn(Page.empty());
+
+        service.getMyReviews(clientId, PageRequest.of(0, 500));
+
+        verify(jobRequestRepository).findReviewsByClient(clientId, PageRequest.of(0, JobRequestServiceImpl.MAX_REVIEW_PAGE_SIZE));
+    }
+
+    @Test
     void reviewJobRequest_blankText_isStoredAsNoReview() {
         job(JobStatus.COMPLETED);
 
@@ -1007,28 +1048,16 @@ class JobRequestServiceImplTest {
         verify(events).publishEvent(new JobRequestEvents.JobStatusChanged(10L, JobRequestEvents.Change.REJECTED, clientId));
     }
 
-    @Test
-    void anExpiredProposal_cantBeAcceptedRejectedNorCancelled() {
-        job(JobStatus.EXPIRED);
-        JobRequestAcceptRequest request = new JobRequestAcceptRequest();
-        request.setStartTimestamp(proposedStart);
-        request.setEndTimestamp(proposedStart.plusHours(2));
-
-        assertThrows(ResponseStatusException.class, () -> service.acceptJobRequest(10L, request, professionalId));
-        assertThrows(ResponseStatusException.class, () -> service.rejectJobRequest(10L, null, professionalId));
-        assertThrows(ResponseStatusException.class, () -> service.cancelJobRequest(10L, null, clientId));
-    }
-
     // --- expiration ---
 
     @Test
-    void expireProposal_movesAnUnansweredProposalToExpired_andTellsBothSides() {
+    void expireProposal_movesAnUnansweredProposalToCancelled_andTellsBothSides() {
         JobRequest job = job(JobStatus.PROPOSED);
 
         assertTrue(service.expireProposal(10L));
 
-        assertEquals(JobStatus.EXPIRED, job.getStatus());
-        verify(events).publishEvent(new JobRequestEvents.JobStatusChanged(10L, JobRequestEvents.Change.EXPIRED, null));
+        assertEquals(JobStatus.CANCELLED, job.getStatus());
+        verify(events).publishEvent(new JobRequestEvents.JobStatusChanged(10L, JobRequestEvents.Change.CANCELLED, null));
     }
 
     @Test

@@ -6,8 +6,10 @@ import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.response.PriceRangeResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
+import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
@@ -32,9 +34,11 @@ import java.util.UUID;
 public class ProfessionalController {
 
     private final ProfessionalService professionalService;
+    private final JobRequestService jobRequestService;
 
-    public ProfessionalController(ProfessionalService professionalService) {
+    public ProfessionalController(ProfessionalService professionalService, JobRequestService jobRequestService) {
         this.professionalService = professionalService;
+        this.jobRequestService = jobRequestService;
     }
 
     /** The caller's full profile, contact data included and whether published or not. */
@@ -57,6 +61,13 @@ public class ProfessionalController {
     @GetMapping("/{id}")
     public ResponseEntity<ProfessionalPublicResponse> getProfessional(@PathVariable UUID id) {
         return ResponseEntity.ok(professionalService.getPublicProfessional(id));
+    }
+
+    @PreAuthorize("hasRole('CLIENT')")
+    @GetMapping("/{id}/reviews")
+    public ResponseEntity<Page<ReviewResponse>> getProfessionalReviews(@PathVariable UUID id,
+                                                                       @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(jobRequestService.getProfessionalReviews(id, pageable));
     }
 
     /**

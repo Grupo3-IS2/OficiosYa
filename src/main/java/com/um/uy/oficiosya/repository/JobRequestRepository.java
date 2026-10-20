@@ -2,6 +2,8 @@ package com.um.uy.oficiosya.repository;
 
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -42,6 +44,20 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
     /** Average of the reviewed jobs' ratings; null while the professional has none. */
     @Query("SELECT AVG(j.rating) FROM JobRequest j WHERE j.professional.publicId = :professionalPublicId AND j.rating IS NOT NULL")
     Double averageRatingOf(@Param("professionalPublicId") UUID professionalPublicId);
+
+    @Query("""
+            SELECT j FROM JobRequest j
+            WHERE j.professional.publicId = :professionalPublicId AND j.rating IS NOT NULL
+            ORDER BY j.updatedAt DESC
+            """)
+    Page<JobRequest> findReviewsOfProfessional(@Param("professionalPublicId") UUID professionalPublicId, Pageable pageable);
+
+    @Query("""
+            SELECT j FROM JobRequest j
+            WHERE j.client.publicId = :clientPublicId AND j.rating IS NOT NULL
+            ORDER BY j.updatedAt DESC
+            """)
+    Page<JobRequest> findReviewsByClient(@Param("clientPublicId") UUID clientPublicId, Pageable pageable);
 
     /** Proposals the other side made to the user that they haven't accepted or rejected yet. */
     @Query("""

@@ -9,6 +9,7 @@ import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.request.TaskCreateRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.entity.Conversation;
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
@@ -32,6 +33,9 @@ import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import com.um.uy.oficiosya.service.interfaces.ScheduleService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -51,6 +55,7 @@ import java.util.UUID;
 @Service
 public class JobRequestServiceImpl implements JobRequestService {
 
+    static final int MAX_REVIEW_PAGE_SIZE = 50;
     private static final String JOB_NOT_FOUND = "Trabajo no encontrado.";
 
     private static final SecureRandom PIN_RANDOM = new SecureRandom();
@@ -384,6 +389,24 @@ public class JobRequestServiceImpl implements JobRequestService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<ReviewResponse> getProfessionalReviews(UUID professionalId, Pageable pageable) {
+        return jobRequestRepository.findReviewsOfProfessional(professionalId, reviewPage(pageable))
+                .map(jobRequestMapper::toReviewResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ReviewResponse> getMyReviews(UUID clientId, Pageable pageable) {
+        return jobRequestRepository.findReviewsByClient(clientId, reviewPage(pageable))
+                .map(jobRequestMapper::toReviewResponse);
+    }
+
+    private static Pageable reviewPage(Pageable pageable) {
+        return PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), MAX_REVIEW_PAGE_SIZE));
+    }
+
+    @Override
     @Transactional
     public boolean expireProposal(Long id) {
         JobRequest jobRequest = jobRequestRepository.findById(id).orElse(null);
@@ -392,9 +415,9 @@ public class JobRequestServiceImpl implements JobRequestService {
             return false;
         }
 
-        jobRequest.setStatus(JobStatus.EXPIRED);
+        jobRequest.setStatus(JobStatus.CANCELLED);
         jobRequest = jobRequestRepository.save(jobRequest);
-        statusChanged(jobRequest, JobRequestEvents.Change.EXPIRED, null);
+        statusChanged(jobRequest, JobRequestEvents.Change.CANCELLED, null);
         return true;
     }
 

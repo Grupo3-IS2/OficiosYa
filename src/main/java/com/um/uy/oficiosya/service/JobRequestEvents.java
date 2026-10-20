@@ -18,7 +18,7 @@ public final class JobRequestEvents {
     }
 
     public enum Change {
-        ACCEPTED, REJECTED, CANCELLED, RESCHEDULE_REQUESTED, RESCHEDULE_ACCEPTED, RESCHEDULE_REJECTED, COMPLETED, EXPIRED
+        ACCEPTED, REJECTED, CANCELLED, RESCHEDULE_REQUESTED, RESCHEDULE_ACCEPTED, RESCHEDULE_REJECTED, COMPLETED
     }
 
     /** One side asked to move an accepted job: the other side is told. */

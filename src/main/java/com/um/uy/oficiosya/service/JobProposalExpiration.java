@@ -13,7 +13,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * Moves to EXPIRED the proposals nobody answered in {@code JOB_PROPOSAL_EXPIRATION_HOURS} (-1: no age
+ * Moves to CANCELLED the proposals nobody answered in {@code JOB_PROPOSAL_EXPIRATION_HOURS} (-1: no age
  * limit), and the ones whose proposed timeframe already started, which can't be accepted anymore.
  */
 @Component

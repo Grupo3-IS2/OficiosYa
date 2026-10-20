@@ -1,4 +1,5 @@
 import type { Professional } from '../../types/Professional'
+import { starsToRating } from '../../utils/ratingScale.ts'
 import { availabilityWindow, type DayRange } from './professionalAvailability.ts'
 import type { ProfessionalFilters } from './professionalFilters.ts'
 import type { ProfessionalOrder } from './professionalOrder.ts'
@@ -38,7 +39,7 @@ export function searchParams(search: ProfessionalSearch, page: number, size: num
     for (const tradeId of tradeIds) params.append('tradeIds', String(tradeId))
     if (filters.minimumPrice !== null) params.set('minPrice', String(filters.minimumPrice))
     if (filters.maximumPrice !== null) params.set('maxPrice', String(filters.maximumPrice))
-    if (filters.minimumRating !== null) params.set('minRating', String(filters.minimumRating))
+    if (filters.minimumRating !== null) params.set('minRating', String(starsToRating(filters.minimumRating)))
     if (filters.location.trim()) params.set('location', filters.location.trim())
     for (const [name, value] of availabilityParams(filters.availability, reference)) params.set(name, value)
     const backendOrder = order ? BACKEND_ORDER[order] : undefined

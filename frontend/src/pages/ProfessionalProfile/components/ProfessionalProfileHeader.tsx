@@ -1,9 +1,11 @@
 import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
+import { starLabel } from '../../../utils/ratingScale'
 import type { ExpertiseTrade, Professional } from '../../../types/Professional'
 import { openConversation } from '../../../services/chatService'
 import { toast } from 'sonner'
+import { getCurrentUser } from '../../../services/authService'
 
 interface ProfessionalProfileHeaderProps {
     professional: Professional
@@ -32,7 +34,7 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                     <Icon name="star" />
                     {professional.rating === null
                         ? <span>Sin calificaciones</span>
-                        : <><strong>{professional.rating.toFixed(1)}</strong><span>de 10</span></>}
+                        : <strong>{starLabel(professional.rating)}</strong>}
                 </div>
             </div>
 
@@ -48,7 +50,7 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                         type="button"
                         variant="ghost"
                         className="profile-summary__chat"
-                        onClick={() => openConversation(professional.id)
+                        onClick={() => openConversation(professional.id, getCurrentUser()?.id)
                             .then(conversation => window.location.assign(`/chat?c=${conversation.id}`))
                             .catch((error: Error) => toast.error(error.message))}
                     >

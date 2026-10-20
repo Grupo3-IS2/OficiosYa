@@ -24,7 +24,7 @@ test('every filter goes as the backend names it', () => {
     assert.deepEqual(params.getAll('tradeIds'), ['3', '5'])
     assert.equal(params.get('minPrice'), '300')
     assert.equal(params.get('maxPrice'), '900')
-    assert.equal(params.get('minRating'), '4.5')
+    assert.equal(params.get('minRating'), '9')
     assert.equal(params.get('location'), 'Cordón')
     // From now (the first day already started) to the end of the last day.
     assert.equal(params.get('availableFrom'), wednesday.toISOString())

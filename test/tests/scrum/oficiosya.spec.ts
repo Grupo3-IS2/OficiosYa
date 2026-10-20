@@ -1933,7 +1933,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
 
     await expect(page.getByRole('heading', { name: 'Profesional con reputación' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'Foto de Profesional con reputación' })).toHaveAttribute('src', '/uploads/profile-images/qa-profile.svg');
-    await expect(page.locator('.profile-summary__rating')).toContainText('8.7');
+    await expect(page.locator('.profile-summary__rating')).toContainText('4,4');
     await expect(page.getByRole('button', { name: 'Electricista' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Plomería' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.profile-summary__price')).toContainText('$500');

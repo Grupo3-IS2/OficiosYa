@@ -1,4 +1,5 @@
 import Icon from '../../../components/Icon/Icon'
+import { starLabel } from '../../../utils/ratingScale'
 
 interface ReviewsSectionProps {
     rating: number | null
@@ -13,8 +14,7 @@ function ReviewsSection({ rating }: ReviewsSectionProps) {
                 : <>
                     <div className="reviews-summary">
                         <Icon name="star" />
-                        <strong>{rating.toFixed(1)}</strong>
-                        <span>de 10</span>
+                        <strong>{starLabel(rating)}</strong>
                     </div>
                     <p className="profile-empty">Las opiniones individuales todavía no están disponibles.</p>
                 </>}

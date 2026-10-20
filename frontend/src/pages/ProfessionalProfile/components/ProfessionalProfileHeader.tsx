@@ -1,6 +1,7 @@
 import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
+import { starLabel } from '../../../utils/ratingScale'
 import type { ExpertiseTrade, Professional } from '../../../types/Professional'
 import { openConversation } from '../../../services/chatService'
 import { toast } from 'sonner'
@@ -33,7 +34,7 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                     <Icon name="star" />
                     {professional.rating === null
                         ? <span>Sin calificaciones</span>
-                        : <><strong>{professional.rating.toFixed(1)}</strong><span>de 10</span></>}
+                        : <strong>{starLabel(professional.rating)}</strong>}
                 </div>
             </div>
 

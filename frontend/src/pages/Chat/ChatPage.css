@@ -87,7 +87,7 @@
 .chat-job-card b { color: var(--chat-ink); }
 .chat-job-status { display: block; color: #e48300; font-weight: 600; margin-bottom: .2rem; }
 .chat-job-status--accepted, .chat-job-status--completed { color: #008b50; }
-.chat-job-status--cancelled, .chat-job-status--rejected, .chat-job-status--expired { color: #b54750; }
+.chat-job-status--cancelled, .chat-job-status--rejected { color: #b54750; }
 .chat-job-card a { display: inline-block; margin-top: .65rem; color: #008153; font-weight: 650; text-decoration: none; }
 .chat-job-card a:hover { text-decoration: underline; }
 .chat-job-card time { display: block; text-align: right; }

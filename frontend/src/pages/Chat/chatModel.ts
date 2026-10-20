@@ -40,5 +40,5 @@ export function activityLabel(value: string | null): string {
 
 export const jobStatusLabels: Record<string, string> = {
     PROPOSED: 'Pendiente', ACCEPTED: 'Aceptada', RESCHEDULE_REQUESTED: 'Cambio de horario pendiente',
-    COMPLETED: 'Completada', REJECTED: 'Rechazada', CANCELLED: 'Cancelada', EXPIRED: 'Vencida',
+    COMPLETED: 'Completada', REJECTED: 'Rechazada', CANCELLED: 'Cancelada',
 }

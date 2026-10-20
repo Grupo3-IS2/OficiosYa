@@ -89,7 +89,6 @@ const statusContent: Record<JobStatus, { label: string; tone: string; detail?: (
     COMPLETED: { label: 'Completada', tone: 'completed' },
     CANCELLED: { label: 'Cancelada', tone: 'cancelled' },
     REJECTED: { label: 'Rechazada', tone: 'cancelled' },
-    EXPIRED: { label: 'Vencida', tone: 'cancelled' },
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-UY', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Montevideo' })

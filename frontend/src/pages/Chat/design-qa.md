@@ -19,7 +19,6 @@ Fecha: 2026-10-19.
 - La existencia del perfil se consulta por UUID, sin usar el rol histórico del chat como tipo de cuenta.
 - La respuesta de apertura se conserva en sessionStorage, con clave por usuario y conversación, para chats aún ausentes del inbox.
 - «Ver solicitud» abre el detalle existente en `/mis-solicitudes?request=ID`.
-- El tipo JobStatus y las etiquetas del listado/detalle incluyen EXPIRED, presente en el backend, para que ese enlace también admita solicitudes vencidas.
 - La carga anterior se realiza con un botón y conserva un ancla de scroll. Los mensajes se ordenan y deduplican por ID.
 - Los mensajes nuevos y cambios de solicitudes conservan la conexión y eventos existentes de chatSocket.
 - La lectura exige final del historial visible, ventana enfocada, documento visible y ausencia del modal de solicitud.
@@ -50,8 +49,7 @@ Integraciones modificadas dentro de `frontend/src/`:
 - `pages/ProfessionalProfile/components/ProfessionalProfileHeader.tsx`: conserva la respuesta al abrir el chat.
 - `components/Header/useUnreadChats.ts`: actualiza el contador tras lectura y descarta respuestas antiguas.
 - `components/Icon/Icon.tsx`: amplía el sistema existente con enviar, opciones, volver y bloqueo.
-- `pages/Requests/RequestsPage.tsx`: abre el detalle enlazado y etiqueta EXPIRED.
-- `pages/Requests/RequestDetailModal.tsx`, `types/JobRequest.ts`: reconocen el estado EXPIRED.
+- `pages/Requests/RequestsPage.tsx`: abre el detalle enlazado.
 
 Pruebas creadas: `frontend/tests/chatModel.test.ts` y `frontend/tests/chatService.test.ts`.
 

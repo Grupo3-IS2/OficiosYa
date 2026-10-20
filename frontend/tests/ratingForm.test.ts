@@ -44,7 +44,7 @@ test('eligibility belongs to the job client, including a professional hiring som
     assert.equal(canRateRequest(job, 'working-professional-uuid'), false)
     assert.equal(canRateRequest(job, undefined), false)
     for (const rating of [1, 9, 10]) assert.equal(canRateRequest({ ...job, rating }, job.clientId), false)
-    for (const status of ['PROPOSED', 'ACCEPTED', 'RESCHEDULE_REQUESTED', 'CANCELLED', 'REJECTED', 'EXPIRED'] as JobStatus[]) {
+    for (const status of ['PROPOSED', 'ACCEPTED', 'RESCHEDULE_REQUESTED', 'CANCELLED', 'REJECTED'] as JobStatus[]) {
         assert.equal(canRateRequest({ ...job, status }, job.clientId), false)
     }
     // Another completed job for the same professional is independently eligible.

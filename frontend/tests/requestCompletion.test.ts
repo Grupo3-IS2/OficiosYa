@@ -14,7 +14,7 @@ test('only the professional assigned to an accepted job can enter its PIN', () =
 
 test('a pending reschedule still allows completion; closed and unaccepted requests do not', () => {
     assert.equal(canCompleteRequest({ professionalId: 'pro', status: 'RESCHEDULE_REQUESTED' }, 'pro'), true)
-    for (const status of ['PROPOSED', 'COMPLETED', 'CANCELLED', 'REJECTED', 'EXPIRED'] as JobStatus[]) {
+    for (const status of ['PROPOSED', 'COMPLETED', 'CANCELLED', 'REJECTED'] as JobStatus[]) {
         assert.equal(canCompleteRequest({ professionalId: 'pro', status }, 'pro'), false)
     }
 })

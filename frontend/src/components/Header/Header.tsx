@@ -7,6 +7,7 @@ import {
     isAuthenticated,
     logout,
 } from '../../services/authService'
+import { useUnreadChats } from './useUnreadChats'
 import { useAwaitingAnswers } from './useAwaitingAnswers'
 import './Header.css'
 
@@ -22,6 +23,7 @@ function Header() {
             : 'Convertirse en profesional'
     const requestsActive = window.location.pathname === '/mis-solicitudes'
     const awaiting = useAwaitingAnswers(authenticated)
+    const unreadChats = useUnreadChats(authenticated)
 
     const toggleMenu = () => {
         setIsMenuOpen((isOpen) => !isOpen)
@@ -78,6 +80,19 @@ function Header() {
                         <span>Mis solicitudes</span>
                         {awaiting > 0 && <span className="nav-alert-text">
                             {awaiting === 1 ? '(1 solicitud espera tu respuesta)' : `(${awaiting} solicitudes esperan tu respuesta)`}
+                        </span>}
+                    </a>
+                )}
+
+                {authenticated && (
+                    <a className="nav-item" href="/chat">
+                        <span className="nav-item__icon">
+                            <Icon name="message" />
+                            {unreadChats > 0 && <b className="nav-alert" aria-hidden="true">!</b>}
+                        </span>
+                        <span>Chat</span>
+                        {unreadChats > 0 && <span className="nav-alert-text">
+                            {unreadChats === 1 ? '(1 mensaje sin leer)' : `(${unreadChats} mensajes sin leer)`}
                         </span>}
                     </a>
                 )}

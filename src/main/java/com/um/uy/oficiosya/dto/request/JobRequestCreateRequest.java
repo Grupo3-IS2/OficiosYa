@@ -9,14 +9,24 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Exactly one of professionalId or clientId: the caller proposes the job as a client to that
+ * professional, or as a professional to that client, with the timeframe they offer.
+ */
 @Data
 @NoArgsConstructor
 public class JobRequestCreateRequest {
-    @NotNull(message = "El profesional es obligatorio")
     private UUID professionalId;
+
+    private UUID clientId;
+
+    /** Only when a professional proposes (with clientId); a client's proposal gets its timeframe when accepted. */
+    private OffsetDateTime startTimestamp;
+    private OffsetDateTime endTimestamp;
 
     @NotBlank(message = "La ubicación es obligatoria")
     private String location;

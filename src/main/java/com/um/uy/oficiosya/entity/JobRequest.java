@@ -49,9 +49,23 @@ public class JobRequest {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal paymentAmount;
 
-    /** Hash of the PIN the client shows on site; never store the PIN itself. */
-    @Column(nullable = false)
+    /**
+     * Hash of the PIN the client shows on site; never store the PIN itself. Null while a professional's
+     * proposal waits for the client: the PIN is generated when the client accepts it.
+     */
     private String confirmationPinHash;
+
+    /** Which side proposed the job: the other one accepts or rejects it. Rows from before either side could propose were the client's. */
+    @Builder.Default
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'CLIENT'")
+    @Column(nullable = false, length = 32)
+    private Role proposedBy = Role.CLIENT;
+
+    /** The timeframe a professional offers when they propose; null if the client proposed. Cleared on accept. */
+    private OffsetDateTime proposedStart;
+    private OffsetDateTime proposedEnd;
 
     @Builder.Default
     @NotNull

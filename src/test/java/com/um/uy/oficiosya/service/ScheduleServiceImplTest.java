@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -317,10 +318,13 @@ class ScheduleServiceImplTest {
     }
 
     @Test
-    void checkJobSlotAvailable_jobWithoutABlock_isNotFound() {
+    void checkJobSlotAvailable_proposalWithoutABlock_checksTheWholeAgenda() {
         JobRequest job = JobRequest.builder().professional(professional).build();
+        when(scheduleRepository.existsOverlapping(professional.getPublicId(), start, end, 0L)).thenReturn(true);
 
-        assertThrows(ScheduleNotFoundException.class, () -> service.checkJobSlotAvailable(job, start, end));
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.checkJobSlotAvailable(job, start, end));
+        assertEquals(HttpStatus.CONFLICT, e.getStatusCode());
     }
 
     @Test

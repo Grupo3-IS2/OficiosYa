@@ -8,6 +8,7 @@ import Icon from '../../components/Icon/Icon'
 import avatarPlaceholder from '../../assets/avatar-placeholder.svg'
 import { getCurrentUser } from '../../services/authService'
 import { getMyJobRequests } from '../../services/jobRequestService'
+import { onChatEvent } from '../../services/chatSocket'
 import { getJobRequestPin } from '../../services/jobRequestPinStore'
 import type { JobRequest, JobStatus, RequestParty } from '../../types/JobRequest'
 import { answersReschedule, awaitsAnswerFrom, filterAndOrderRequests, filterByDirection, groupRequestsByDate, localDateKey, requestDescription, serviceSummary, type RequestDirection, type RequestFilter, type RequestOrder } from './requestList'
@@ -191,6 +192,8 @@ export default function RequestsPage() {
     const [requests, setRequests] = useState<JobRequest[]>([])
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState(false)
+    // Bumped when a job changes (or pushes may have been missed), so the requests reload
+    const [jobPushes, setJobPushes] = useState(0)
     const [activeFilter, setActiveFilter] = useState<RequestFilter>('all')
     const [order, setOrder] = useState<RequestOrder>('newest')
     const [viewing, setViewing] = useState<JobRequest | null>(null)
@@ -224,6 +227,8 @@ export default function RequestsPage() {
         if (!loading && !loadError) publishAwaitingAnswers(awaiting.length)
     }, [loading, loadError, awaiting.length])
 
+    useEffect(() => onChatEvent(event => { if (event !== 'message') setJobPushes(n => n + 1) }), [])
+
     useEffect(() => {
         let active = true
         void getMyJobRequests()
@@ -237,7 +242,7 @@ export default function RequestsPage() {
                 if (active) setLoading(false)
             })
         return () => { active = false }
-    }, [])
+    }, [jobPushes])
 
     return <div id="top" className="requests-page">
         <Header />

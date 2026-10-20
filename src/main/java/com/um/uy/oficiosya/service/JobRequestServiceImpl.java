@@ -9,6 +9,7 @@ import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.request.TaskCreateRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.entity.Conversation;
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.PaymentState;
@@ -22,6 +23,7 @@ import com.um.uy.oficiosya.exception.JobRequestNotFoundException;
 import com.um.uy.oficiosya.exception.TradeNotFoundException;
 import com.um.uy.oficiosya.exception.ClientNotFoundException;
 import com.um.uy.oficiosya.mapper.JobRequestMapper;
+import com.um.uy.oficiosya.repository.ConversationRepository;
 import com.um.uy.oficiosya.repository.JobRequestRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.TradeRepository;
@@ -67,6 +69,7 @@ public class JobRequestServiceImpl implements JobRequestService {
     /** Notice needed to cancel or reschedule an accepted job. */
     private final Duration minNotice;
     private final ApplicationEventPublisher events;
+    private final ConversationRepository conversationRepository;
 
     public JobRequestServiceImpl(JobRequestRepository jobRequestRepository,
                                   ClientRepository clientRepository,
@@ -77,7 +80,8 @@ public class JobRequestServiceImpl implements JobRequestService {
                                   PasswordEncoder passwordEncoder,
                                   Clock clock,
                                   @Value("${app.job-request.min-notice-hours}") long minNoticeHours,
-                                  ApplicationEventPublisher events) {
+                                  ApplicationEventPublisher events,
+                                  ConversationRepository conversationRepository) {
         this.jobRequestRepository = jobRequestRepository;
         this.clientRepository = clientRepository;
         this.professionalRepository = professionalRepository;
@@ -88,31 +92,72 @@ public class JobRequestServiceImpl implements JobRequestService {
         this.clock = clock;
         this.minNotice = Duration.ofHours(minNoticeHours);
         this.events = events;
+        this.conversationRepository = conversationRepository;
     }
 
     @Override
     @Transactional
-    public JobRequestResponse createJobRequest(JobRequestCreateRequest request, UUID clientId) {
-        Client client = clientRepository.findByPublicId(clientId)
-                .orElseThrow(() -> new ClientNotFoundException("Cliente no encontrado."));
+    public JobRequestResponse createJobRequest(JobRequestCreateRequest request, UUID callerId) {
+        if ((request.getProfessionalId() == null) == (request.getClientId() == null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indicá el profesional o el cliente del trabajo, uno de los dos");
+        }
+        boolean byProfessional = request.getClientId() != null;
 
-        Professional professional = professionalRepository.findByPublicId(request.getProfessionalId())
-                .orElseThrow(() -> new ClientNotFoundException("Profesional no encontrado."));
+        Client client;
+        Professional professional;
+        if (byProfessional) {
+            professional = professionalRepository.findByPublicId(callerId)
+                    .orElseThrow(() -> new AccessDeniedException("Solo un profesional puede proponerle un trabajo a un cliente"));
+            client = clientRepository.findByPublicId(request.getClientId())
+                    .orElseThrow(() -> new ClientNotFoundException("Cliente no encontrado."));
+        } else {
+            client = clientRepository.findByPublicId(callerId)
+                    .orElseThrow(() -> new ClientNotFoundException("Cliente no encontrado."));
+            professional = professionalRepository.findByPublicId(request.getProfessionalId())
+                    .orElseThrow(() -> new ClientNotFoundException("Profesional no encontrado."));
+        }
 
         // A professional can request jobs like any client, just not to themselves
         if (professional.getPublicId().equals(client.getPublicId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No podés solicitarte un trabajo a vos mismo");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No puedes solicitarte un trabajo a vos mismo");
         }
 
-        String pin = generatePin();
+        // The proposal shows up in the pair's chat, so a block there would be skipped by proposing
+        Conversation conversation = conversationRepository.findBetween(client.getId(), professional.getId()).orElse(null);
+        if (conversation != null && conversation.isBlocked()) {
+            throw new AccessDeniedException("La conversación con esta persona está bloqueada");
+        }
 
         JobRequest jobRequest = JobRequest.builder()
                 .client(client)
                 .professional(professional)
                 .location(request.getLocation())
                 .paymentAmount(request.getPaymentAmount())
-                .confirmationPinHash(passwordEncoder.encode(pin))
+                .proposedBy(byProfessional ? Role.PROFESSIONAL : Role.CLIENT)
                 .build();
+
+        String pin = null;
+        if (byProfessional) {
+            // The only way a professional knows a client is that they talked first
+            if (conversation == null) {
+                throw new AccessDeniedException("Solo puedes proponerle un trabajo a un cliente con el que ya tengas una conversación");
+            }
+            if (request.getStartTimestamp() == null || request.getEndTimestamp() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El horario propuesto es obligatorio");
+            }
+            requireFuture(request.getStartTimestamp());
+            scheduleService.checkJobSlotAvailable(jobRequest, request.getStartTimestamp(), request.getEndTimestamp());
+            jobRequest.setProposedStart(request.getStartTimestamp());
+            jobRequest.setProposedEnd(request.getEndTimestamp());
+        } else {
+            if (request.getStartTimestamp() != null || request.getEndTimestamp() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El horario lo elige el profesional al aceptar el trabajo");
+            }
+            pin = generatePin();
+            jobRequest.setConfirmationPinHash(passwordEncoder.encode(pin));
+        }
 
         List<Task> tasks = new ArrayList<>();
         for (TaskCreateRequest taskRequest : request.getTasks()) {
@@ -128,6 +173,8 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setTasks(tasks);
 
         jobRequest = jobRequestRepository.save(jobRequest);
+        // Its card in the chat is saved in this same transaction (ChatJobListener)
+        events.publishEvent(new JobRequestEvents.JobProposed(jobRequest.getId()));
 
         JobRequestResponse response = jobRequestMapper.toResponse(jobRequest);
         response.setConfirmationPin(pin);
@@ -137,27 +184,47 @@ public class JobRequestServiceImpl implements JobRequestService {
 
     @Override
     @Transactional
-    public JobRequestResponse acceptJobRequest(Long id, JobRequestAcceptRequest request, UUID professionalId) {
-        JobRequest jobRequest = findOwnedByProfessional(id, professionalId, "aceptar");
+    public JobRequestResponse acceptJobRequest(Long id, JobRequestAcceptRequest request, UUID requesterId) {
+        JobRequest jobRequest = findProposalToAnswer(id, requesterId, "aceptar");
 
         if (jobRequest.getStatus() != JobStatus.PROPOSED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Solo se puede aceptar un trabajo en estado PROPOSED");
         }
 
-        requireFuture(request.getStartTimestamp());
-        scheduleService.createJobSchedule(jobRequest, request.getStartTimestamp(), request.getEndTimestamp());
+        String pin = null;
+        if (jobRequest.getProposedBy() == Role.PROFESSIONAL) {
+            // The client takes the timeframe the professional offered, as it is
+            if (request != null && (request.getStartTimestamp() != null || request.getEndTimestamp() != null)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El horario ya lo propuso el profesional, aceptalo sin cambiarlo");
+            }
+            requireFuture(jobRequest.getProposedStart());
+            scheduleService.createJobSchedule(jobRequest, jobRequest.getProposedStart(), jobRequest.getProposedEnd());
+            pin = generatePin();
+            jobRequest.setConfirmationPinHash(passwordEncoder.encode(pin));
+            jobRequest.setProposedStart(null);
+            jobRequest.setProposedEnd(null);
+        } else {
+            if (request == null || request.getStartTimestamp() == null || request.getEndTimestamp() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí el horario del trabajo para aceptarlo");
+            }
+            requireFuture(request.getStartTimestamp());
+            scheduleService.createJobSchedule(jobRequest, request.getStartTimestamp(), request.getEndTimestamp());
+        }
 
         jobRequest.setStatus(JobStatus.ACCEPTED);
         jobRequest = jobRequestRepository.save(jobRequest);
-        awaitingAnswersMayHaveChanged(jobRequest);
-        return jobRequestMapper.toResponse(jobRequest);
+        statusChanged(jobRequest, JobRequestEvents.Change.ACCEPTED, requesterId);
+        JobRequestResponse response = jobRequestMapper.toResponse(jobRequest);
+        response.setConfirmationPin(pin);
+        return response;
     }
 
     @Override
     @Transactional
-    public JobRequestResponse rejectJobRequest(Long id, JobRequestRejectRequest request, UUID professionalId) {
-        JobRequest jobRequest = findOwnedByProfessional(id, professionalId, "rechazar");
+    public JobRequestResponse rejectJobRequest(Long id, JobRequestRejectRequest request, UUID requesterId) {
+        JobRequest jobRequest = findProposalToAnswer(id, requesterId, "rechazar");
 
         if (jobRequest.getStatus() != JobStatus.PROPOSED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -167,7 +234,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setStatus(JobStatus.REJECTED);
         jobRequest.setRejectionReason(reason(request == null ? null : request.getReason()));
         jobRequest = jobRequestRepository.save(jobRequest);
-        awaitingAnswersMayHaveChanged(jobRequest);
+        statusChanged(jobRequest, JobRequestEvents.Change.REJECTED, requesterId);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -201,7 +268,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setCancellationReason(reason(request == null ? null : request.getReason()));
         jobRequest.clearReschedule();
         jobRequest = jobRequestRepository.save(jobRequest);
-        awaitingAnswersMayHaveChanged(jobRequest);
+        statusChanged(jobRequest, JobRequestEvents.Change.CANCELLED, requesterId);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -232,7 +299,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setStatus(JobStatus.RESCHEDULE_REQUESTED);
         jobRequest = jobRequestRepository.save(jobRequest);
         events.publishEvent(new JobRequestEvents.RescheduleRequested(jobRequest.getId()));
-        awaitingAnswersMayHaveChanged(jobRequest);
+        statusChanged(jobRequest, JobRequestEvents.Change.RESCHEDULE_REQUESTED, requesterId);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -247,7 +314,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setStatus(JobStatus.ACCEPTED);
         jobRequest.clearReschedule();
         jobRequest = jobRequestRepository.save(jobRequest);
-        awaitingAnswersMayHaveChanged(jobRequest);
+        statusChanged(jobRequest, JobRequestEvents.Change.RESCHEDULE_ACCEPTED, requesterId);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -259,7 +326,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setStatus(JobStatus.ACCEPTED);
         jobRequest.clearReschedule();
         jobRequest = jobRequestRepository.save(jobRequest);
-        awaitingAnswersMayHaveChanged(jobRequest);
+        statusChanged(jobRequest, JobRequestEvents.Change.RESCHEDULE_REJECTED, requesterId);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -281,7 +348,7 @@ public class JobRequestServiceImpl implements JobRequestService {
         jobRequest.setStatus(JobStatus.COMPLETED);
         jobRequest.clearReschedule();
         jobRequest = jobRequestRepository.save(jobRequest);
-        awaitingAnswersMayHaveChanged(jobRequest);
+        statusChanged(jobRequest, JobRequestEvents.Change.COMPLETED, professionalId);
         return jobRequestMapper.toResponse(jobRequest);
     }
 
@@ -314,6 +381,21 @@ public class JobRequestServiceImpl implements JobRequestService {
         professionalRepository.save(professional);
 
         return jobRequestMapper.toResponse(jobRequest);
+    }
+
+    @Override
+    @Transactional
+    public boolean expireProposal(Long id) {
+        JobRequest jobRequest = jobRequestRepository.findById(id).orElse(null);
+        // Answered in between: whoever got there first wins (and @Version settles an exact tie)
+        if (jobRequest == null || jobRequest.getStatus() != JobStatus.PROPOSED) {
+            return false;
+        }
+
+        jobRequest.setStatus(JobStatus.EXPIRED);
+        jobRequest = jobRequestRepository.save(jobRequest);
+        statusChanged(jobRequest, JobRequestEvents.Change.EXPIRED, null);
+        return true;
     }
 
     @Override
@@ -355,6 +437,27 @@ public class JobRequestServiceImpl implements JobRequestService {
     private void awaitingAnswersMayHaveChanged(JobRequest jobRequest) {
         events.publishEvent(new JobRequestEvents.AwaitingAnswersChanged(Set.of(
                 jobRequest.getClient().getPublicId(), jobRequest.getProfessional().getPublicId())));
+    }
+
+    /** Tells the chat card, the emails and the awaiting-answer alerts that the job changed. */
+    private void statusChanged(JobRequest jobRequest, JobRequestEvents.Change change, UUID actorId) {
+        events.publishEvent(new JobRequestEvents.JobStatusChanged(jobRequest.getId(), change, actorId));
+        awaitingAnswersMayHaveChanged(jobRequest);
+    }
+
+    /** A proposal is answered by the side that didn't make it; the one who did can only cancel it. */
+    private JobRequest findProposalToAnswer(Long id, UUID requesterId, String action) {
+        JobRequest jobRequest = jobRequestRepository.findById(id)
+                .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
+
+        if (!isParticipant(jobRequest, requesterId)) {
+            throw new AccessDeniedException("No tienes permiso para " + action + " este trabajo");
+        }
+        if (sideOf(jobRequest, requesterId) == jobRequest.getProposedBy()) {
+            throw new AccessDeniedException("La propuesta la hiciste vos: tiene que responderla la otra parte");
+        }
+
+        return jobRequest;
     }
 
     private JobRequest findOwnedByProfessional(Long id, UUID professionalId, String action) {

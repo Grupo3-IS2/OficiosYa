@@ -72,6 +72,12 @@ public class GlobalExceptionHandler {
     }
 
     @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ExceptionHandler(ConversationNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleConversationNotFound(ConversationNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    }
+
+    @ResponseStatus(HttpStatus.NOT_FOUND)
     @ExceptionHandler(TradeNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleTradeNotFound(TradeNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), null);

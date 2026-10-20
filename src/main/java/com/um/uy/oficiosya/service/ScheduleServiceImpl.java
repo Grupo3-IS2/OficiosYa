@@ -175,8 +175,15 @@ public class ScheduleServiceImpl implements ScheduleService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, BLOCK_STARTS_AFTER_END);
         }
 
-        requireNoOverlap(jobRequest.getProfessional().getPublicId(), start, end, null,
-                jobBlock(jobRequest).getId());
+        // A proposal has no block yet: then nothing of its own is left out of the overlap check
+        Long ownBlockId = jobRequest.getSchedules().stream()
+                .filter(schedule -> schedule.getType() == ScheduleType.SCHEDULED_JOB)
+                .findFirst()
+                .map(Schedule::getId)
+                .orElse(0L);
+        if (scheduleRepository.existsOverlapping(jobRequest.getProfessional().getPublicId(), start, end, ownBlockId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
+        }
     }
 
     @Override

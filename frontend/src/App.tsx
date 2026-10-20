@@ -6,6 +6,7 @@ import RequireAuth from './components/RequireAuth/RequireAuth'
 import ProfessionalProfilePage from './pages/ProfessionalProfile/ProfessionalProfilePage'
 import RequestsPage from './pages/Requests/RequestsPage'
 import TermsPage from './pages/Terms/TermsPage'
+import ChatPage from './pages/Chat/ChatPage'
 
 function App() {
     const currentPath = window.location.pathname
@@ -40,6 +41,14 @@ function App() {
         return (
             <RequireAuth>
                 <RequestsPage />
+            </RequireAuth>
+        )
+    }
+
+    if (currentPath === '/chat') {
+        return (
+            <RequireAuth>
+                <ChatPage />
             </RequireAuth>
         )
     }

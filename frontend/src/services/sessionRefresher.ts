@@ -1,4 +1,4 @@
-import type { LoginResponse } from '../types/Auth'
+import type { LoginResponse } from '../types/Auth.ts'
 
 /**
  * - `refreshed`: there is a fresh access token stored (this call got it, or another tab did).

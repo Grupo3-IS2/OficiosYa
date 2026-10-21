@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -90,12 +89,4 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
             """)
     List<JobRequest> findBetween(@Param("userId") Long userId, @Param("otherUserId") Long otherUserId);
 
-    /** Proposals still unanswered that were made before {@code createdBefore}, or whose proposed timeframe already started. */
-    @Query("""
-            SELECT j.id FROM JobRequest j
-            WHERE j.status = com.um.uy.oficiosya.entity.JobStatus.PROPOSED
-            AND (j.createdAt < :createdBefore OR j.proposedStart <= :now)
-            """)
-    List<Long> findProposalIdsToExpire(@Param("createdBefore") OffsetDateTime createdBefore,
-                                       @Param("now") OffsetDateTime now);
 }

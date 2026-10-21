@@ -274,15 +274,6 @@ class RequestNotificationServiceTest {
     }
 
     @Test
-    void anExpiredProposal_hasNoActor() {
-        job(Role.CLIENT);
-
-        service.notifyJobChanged(20L, JobRequestEvents.Change.CANCELLED, null);
-
-        assertTrue(mailTo("carla@example.com").contains("Venció sin respuesta la propuesta de trabajo"));
-    }
-
-    @Test
     void someoneWithTheEmailsOff_isLeftOut() {
         job(Role.CLIENT);
         professional.setEmailNotifications(false);

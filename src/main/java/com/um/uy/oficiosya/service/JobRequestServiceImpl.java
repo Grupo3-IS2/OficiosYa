@@ -407,21 +407,6 @@ public class JobRequestServiceImpl implements JobRequestService {
     }
 
     @Override
-    @Transactional
-    public boolean expireProposal(Long id) {
-        JobRequest jobRequest = jobRequestRepository.findById(id).orElse(null);
-        // Answered in between: whoever got there first wins (and @Version settles an exact tie)
-        if (jobRequest == null || jobRequest.getStatus() != JobStatus.PROPOSED) {
-            return false;
-        }
-
-        jobRequest.setStatus(JobStatus.CANCELLED);
-        jobRequest = jobRequestRepository.save(jobRequest);
-        statusChanged(jobRequest, JobRequestEvents.Change.CANCELLED, null);
-        return true;
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public JobRequestResponse getJobRequest(Long id, UUID requesterId) {
         JobRequest jobRequest = jobRequestRepository.findById(id)

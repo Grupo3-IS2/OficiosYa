@@ -53,7 +53,6 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1046,27 +1045,5 @@ class JobRequestServiceImplTest {
         assertEquals(JobStatus.REJECTED, job.getStatus());
         assertEquals(proposedStart, job.getProposedStart());
         verify(events).publishEvent(new JobRequestEvents.JobStatusChanged(10L, JobRequestEvents.Change.REJECTED, clientId));
-    }
-
-    // --- expiration ---
-
-    @Test
-    void expireProposal_movesAnUnansweredProposalToCancelled_andTellsBothSides() {
-        JobRequest job = job(JobStatus.PROPOSED);
-
-        assertTrue(service.expireProposal(10L));
-
-        assertEquals(JobStatus.CANCELLED, job.getStatus());
-        verify(events).publishEvent(new JobRequestEvents.JobStatusChanged(10L, JobRequestEvents.Change.CANCELLED, null));
-    }
-
-    @Test
-    void expireProposal_leavesAlone_aProposalAnsweredInBetween() {
-        JobRequest job = job(JobStatus.ACCEPTED);
-
-        assertFalse(service.expireProposal(10L));
-
-        assertEquals(JobStatus.ACCEPTED, job.getStatus());
-        verify(jobRequestRepository, never()).save(any());
     }
 }

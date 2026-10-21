@@ -13,7 +13,7 @@ public final class JobRequestEvents {
     public record JobProposed(Long jobRequestId) {
     }
 
-    /** The job's status or timeframe changed. {@code actorId} is who did it; null when it expired on its own. */
+    /** The job's status or timeframe changed. {@code actorId} is who did it. */
     public record JobStatusChanged(Long jobRequestId, Change change, UUID actorId) {
     }
 

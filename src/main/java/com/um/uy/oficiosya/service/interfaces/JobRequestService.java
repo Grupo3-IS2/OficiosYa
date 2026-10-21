@@ -32,9 +32,6 @@ public interface JobRequestService {
     /** The side that didn't propose turns it down; the request (and its reason) is optional. */
     JobRequestResponse rejectJobRequest(Long id, JobRequestRejectRequest request, UUID requesterId);
 
-    /** Moves a still unanswered proposal to CANCELLED; false if it was answered in between. */
-    boolean expireProposal(Long id);
-
     /**
      * Either side can cancel; the request (and its reason) is optional. Once accepted, it needs the
      * configured notice before the job starts, and it frees the agenda.

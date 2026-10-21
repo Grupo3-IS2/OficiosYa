@@ -20,6 +20,11 @@ public interface ScheduleService {
     void deleteSchedule(Long id, UUID professionalId);
 
     /**
+     * Exports a professional's agenda in RFC 5545 iCalendar (VCALENDAR) format.
+     */
+    String exportAgendaICalendar(UUID professionalId, OffsetDateTime from, OffsetDateTime to, boolean ownerOrAdmin);
+
+    /**
      * Blocks the professional's agenda for a job that was just accepted. Not exposed through a
      * controller: it's meant to be called by the job-acceptance flow, never directly by a client.
      */

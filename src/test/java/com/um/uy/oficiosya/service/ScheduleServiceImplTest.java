@@ -7,8 +7,8 @@ import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.entity.Schedule;
 import com.um.uy.oficiosya.entity.ScheduleType;
-import com.um.uy.oficiosya.exception.ScheduleNotFoundException;
 import com.um.uy.oficiosya.exception.ClientNotFoundException;
+import com.um.uy.oficiosya.exception.ScheduleNotFoundException;
 import com.um.uy.oficiosya.mapper.ScheduleMapperImpl;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.ScheduleRepository;
@@ -21,6 +21,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +29,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -35,7 +37,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** A professional's agenda: manual blocks, the SCHEDULED_JOB blocks that jobs create, and who sees what. */
+/** A professional's agenda: manual blocks, the SCHEDULED_JOB blocks that jobs create, RFC 5545 recurrence, and who sees what. */
 class ScheduleServiceImplTest {
 
     @Mock
@@ -54,7 +56,7 @@ class ScheduleServiceImplTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new ScheduleServiceImpl(scheduleRepository, professionalRepository, new ScheduleMapperImpl());
-        professional = Professional.builder().id(1L).publicId(professionalId).name("Beto").build();
+        professional = Professional.builder().id(1L).publicId(professionalId).name("John").build();
         when(scheduleRepository.save(any(Schedule.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -85,6 +87,55 @@ class ScheduleServiceImplTest {
         assertEquals(professionalId, response.getProfessionalId());
         assertEquals(ScheduleType.USER_RESERVED, response.getType());
         assertEquals(start, response.getStartTimestamp());
+        assertEquals(end, response.getRecurrenceEnd());
+    }
+
+    @Test
+    void createSchedule_withRecurringRule_computesRecurrenceEndAndSavesSingleRow() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        OffsetDateTime mondayStart = OffsetDateTime.of(2030, 5, 6, 9, 0, 0, 0, ZoneOffset.ofHours(-3));
+        OffsetDateTime mondayEnd = OffsetDateTime.of(2030, 5, 6, 11, 0, 0, 0, ZoneOffset.ofHours(-3));
+
+        ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, mondayStart, mondayEnd);
+        request.setRrule("RRULE:freq=weekly;count=3");
+        request.setTzid("America/Montevideo");
+
+        ScheduleResponse response = service.createSchedule(request, professionalId);
+
+        assertEquals("FREQ=WEEKLY;COUNT=3", response.getRrule());
+        assertEquals("America/Montevideo", response.getTzid());
+        assertEquals(mondayEnd.plusWeeks(2), response.getRecurrenceEnd());
+    }
+
+    @Test
+    void createSchedule_unboundedRecurrence_hasNullRecurrenceEnd() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
+        request.setRrule("FREQ=DAILY");
+
+        ScheduleResponse response = service.createSchedule(request, professionalId);
+        assertEquals("FREQ=DAILY", response.getRrule());
+        assertNull(response.getRecurrenceEnd());
+    }
+
+    @Test
+    void createSchedule_invalidTzid_isRejectedWith400() {
+        ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
+        request.setTzid("Invalid/Tz");
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.createSchedule(request, professionalId));
+        assertEquals(400, e.getStatusCode().value());
+    }
+
+    @Test
+    void createSchedule_invalidRRule_isRejectedWith400() {
+        ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
+        request.setRrule("FREQ=INVALID_FREQ;COUNT=3");
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.createSchedule(request, professionalId));
+        assertEquals(400, e.getStatusCode().value());
     }
 
     @Test
@@ -120,6 +171,32 @@ class ScheduleServiceImplTest {
         assertEquals(409, e.getStatusCode().value());
     }
 
+    @Test
+    void createSchedule_overlappingRecurringOccurrence_isAConflict() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        OffsetDateTime baseStart = OffsetDateTime.of(2030, 5, 6, 9, 0, 0, 0, ZoneOffset.ofHours(-3));
+        OffsetDateTime baseEnd = OffsetDateTime.of(2030, 5, 6, 11, 0, 0, 0, ZoneOffset.ofHours(-3));
+        Schedule existingRecurring = Schedule.builder()
+                .id(10L)
+                .professional(professional)
+                .type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(baseStart)
+                .endTimestamp(baseEnd)
+                .rrule("FREQ=WEEKLY;COUNT=4")
+                .build();
+        existingRecurring.validateAndNormalizeRecurrence();
+
+        OffsetDateTime thirdWeekStart = baseStart.plusWeeks(2).plusMinutes(30);
+        OffsetDateTime thirdWeekEnd = baseEnd.plusWeeks(2);
+        when(scheduleRepository.findActiveCandidates(eq(professionalId), eq(thirdWeekStart), any(), eq(0L)))
+                .thenReturn(List.of(existingRecurring));
+
+        ScheduleCreateRequest request = createRequest(ScheduleType.USER_RESERVED, thirdWeekStart, thirdWeekEnd);
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.createSchedule(request, professionalId));
+        assertEquals(409, e.getStatusCode().value());
+    }
+
     // --- update ---
 
     @Test
@@ -145,6 +222,45 @@ class ScheduleServiceImplTest {
 
         assertEquals(start.minusHours(1), response.getStartTimestamp());
         assertEquals(end.minusHours(1), response.getEndTimestamp());
+    }
+
+    @Test
+    void updateSchedule_updatesRRuleAndExdates() {
+        Schedule existing = block(ScheduleType.URGENT_AVAILABLE);
+        OffsetDateTime excludedOccurrence = existing.getStartTimestamp().plusDays(1);
+        ScheduleUpdateRequest request = new ScheduleUpdateRequest();
+        request.setRrule("FREQ=DAILY;COUNT=3");
+        request.setTzid("UTC");
+        request.setExdates(List.of(excludedOccurrence));
+
+        ScheduleResponse response = service.updateSchedule(request, 5L, professionalId);
+
+        assertEquals("FREQ=DAILY;COUNT=3", response.getRrule());
+        assertEquals("UTC", response.getTzid());
+        assertEquals(1, response.getExdates().size());
+        assertEquals(end.plusDays(2).withOffsetSameInstant(ZoneOffset.UTC), response.getRecurrenceEnd());
+    }
+
+    @Test
+    void updateSchedule_invalidRRule_isRejectedWith400() {
+        block(ScheduleType.URGENT_AVAILABLE);
+        ScheduleUpdateRequest request = new ScheduleUpdateRequest();
+        request.setRrule("FREQ=BAD_VALUE");
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.updateSchedule(request, 5L, professionalId));
+        assertEquals(400, e.getStatusCode().value());
+    }
+
+    @Test
+    void updateSchedule_invalidTzid_isRejectedWith400() {
+        block(ScheduleType.URGENT_AVAILABLE);
+        ScheduleUpdateRequest request = new ScheduleUpdateRequest();
+        request.setTzid("Bad/Zone");
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.updateSchedule(request, 5L, professionalId));
+        assertEquals(400, e.getStatusCode().value());
     }
 
     @Test
@@ -219,6 +335,23 @@ class ScheduleServiceImplTest {
     void createJobSchedule_overlapping_isAConflict() {
         JobRequest job = JobRequest.builder().professional(professional).build();
         when(scheduleRepository.existsOverlapping(eq(professionalId), any(), any(), anyLong())).thenReturn(true);
+
+        assertThrows(ResponseStatusException.class, () -> service.createJobSchedule(job, start, end));
+    }
+
+    @Test
+    void createJobSchedule_overlappingRecurringCandidate_isAConflict() {
+        JobRequest job = JobRequest.builder().professional(professional).build();
+        Schedule recurring = Schedule.builder()
+                .professional(professional)
+                .type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start)
+                .endTimestamp(end)
+                .rrule("FREQ=DAILY;COUNT=3")
+                .build();
+        recurring.validateAndNormalizeRecurrence();
+        when(scheduleRepository.findActiveCandidates(eq(professionalId), eq(start), eq(end), eq(0L)))
+                .thenReturn(List.of(recurring));
 
         assertThrows(ResponseStatusException.class, () -> service.createJobSchedule(job, start, end));
     }
@@ -321,6 +454,69 @@ class ScheduleServiceImplTest {
         List<ScheduleResponse> agenda = service.getAgenda(professionalId, null, null, false);
 
         assertNull(agenda.getFirst().getJobRequestId());
+    }
+
+    @Test
+    void getAgenda_expandsRecurringScheduleAndSkipsExdates() {
+        OffsetDateTime day1Start = OffsetDateTime.of(2030, 5, 6, 9, 0, 0, 0, ZoneOffset.ofHours(-3));
+        OffsetDateTime day1End = OffsetDateTime.of(2030, 5, 6, 12, 0, 0, 0, ZoneOffset.ofHours(-3));
+        Schedule recurring = Schedule.builder()
+                .id(15L)
+                .professional(professional)
+                .type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(day1Start)
+                .endTimestamp(day1End)
+                .rrule("FREQ=DAILY;COUNT=4")
+                .exdates(List.of(day1Start.plusDays(1)))
+                .build();
+        recurring.validateAndNormalizeRecurrence();
+
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
+        when(scheduleRepository.findAgenda(professionalId, day1Start, day1Start.plusDays(5)))
+                .thenReturn(List.of(recurring));
+
+        List<ScheduleResponse> agenda = service.getAgenda(professionalId, day1Start, day1Start.plusDays(5), false);
+
+        assertEquals(3, agenda.size());
+        assertEquals(day1Start, agenda.get(0).getStartTimestamp());
+        assertEquals(day1Start.plusDays(2), agenda.get(1).getStartTimestamp());
+        assertEquals(day1Start.plusDays(3), agenda.get(2).getStartTimestamp());
+    }
+
+    @Test
+    void exportAgendaICalendar_rendersValidRFC5545Document() {
+        OffsetDateTime blockStart = OffsetDateTime.of(2030, 5, 6, 9, 0, 0, 0, ZoneOffset.UTC);
+        OffsetDateTime blockEnd = OffsetDateTime.of(2030, 5, 6, 11, 0, 0, 0, ZoneOffset.UTC);
+        Schedule recurring = Schedule.builder()
+                .id(21L)
+                .professional(professional)
+                .type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(blockStart)
+                .endTimestamp(blockEnd)
+                .rrule("FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=6")
+                .build();
+
+        when(professionalRepository.existsByPublicId(professionalId)).thenReturn(true);
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(recurring));
+
+        String ics = service.exportAgendaICalendar(professionalId, null, null, true);
+
+        assertTrue(ics.startsWith("BEGIN:VCALENDAR\r\n"));
+        assertTrue(ics.contains("RRULE:FREQ=WEEKLY;COUNT=6;BYDAY=MO,WE,FR\r\n"));
+        assertTrue(ics.endsWith("END:VCALENDAR\r\n"));
+    }
+
+    @Test
+    void exportAgendaICalendar_publicView_requiresPublishedProfessional() {
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock()));
+
+        String ics = service.exportAgendaICalendar(professionalId, null, null, false);
+        assertTrue(ics.contains("BEGIN:VCALENDAR\r\n"));
+
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(false);
+        assertThrows(ClientNotFoundException.class,
+                () -> service.exportAgendaICalendar(professionalId, null, null, false));
     }
 
     @Test

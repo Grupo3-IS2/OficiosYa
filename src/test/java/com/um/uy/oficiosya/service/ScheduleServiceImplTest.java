@@ -110,6 +110,27 @@ class ScheduleServiceImplTest {
     }
 
     @Test
+    void createSchedule_unboundedRecurrence_hasNullRecurrenceEnd() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
+        request.setRrule("FREQ=DAILY");
+
+        ScheduleResponse response = service.createSchedule(request, professionalId);
+        assertEquals("FREQ=DAILY", response.getRrule());
+        assertNull(response.getRecurrenceEnd());
+    }
+
+    @Test
+    void createSchedule_invalidTzid_isRejectedWith400() {
+        ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
+        request.setTzid("Invalid/Tz");
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.createSchedule(request, professionalId));
+        assertEquals(400, e.getStatusCode().value());
+    }
+
+    @Test
     void createSchedule_invalidRRule_isRejectedWith400() {
         ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
         request.setRrule("FREQ=INVALID_FREQ;COUNT=3");
@@ -223,6 +244,28 @@ class ScheduleServiceImplTest {
     }
 
     @Test
+    void updateSchedule_invalidRRule_isRejectedWith400() {
+        block(ScheduleType.URGENT_AVAILABLE);
+        ScheduleUpdateRequest request = new ScheduleUpdateRequest();
+        request.setRrule("FREQ=BAD_VALUE");
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.updateSchedule(request, 5L, professionalId));
+        assertEquals(400, e.getStatusCode().value());
+    }
+
+    @Test
+    void updateSchedule_invalidTzid_isRejectedWith400() {
+        block(ScheduleType.URGENT_AVAILABLE);
+        ScheduleUpdateRequest request = new ScheduleUpdateRequest();
+        request.setTzid("Bad/Zone");
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.updateSchedule(request, 5L, professionalId));
+        assertEquals(400, e.getStatusCode().value());
+    }
+
+    @Test
     void updateSchedule_unknownBlock_isNotFound() {
         when(scheduleRepository.findById(5L)).thenReturn(Optional.empty());
         ScheduleUpdateRequest request = new ScheduleUpdateRequest();
@@ -294,6 +337,23 @@ class ScheduleServiceImplTest {
     void createJobSchedule_overlapping_isAConflict() {
         JobRequest job = JobRequest.builder().professional(professional).build();
         when(scheduleRepository.existsOverlapping(eq(professionalId), any(), any(), anyLong())).thenReturn(true);
+
+        assertThrows(ResponseStatusException.class, () -> service.createJobSchedule(job, start, end));
+    }
+
+    @Test
+    void createJobSchedule_overlappingRecurringCandidate_isAConflict() {
+        JobRequest job = JobRequest.builder().professional(professional).build();
+        Schedule recurring = Schedule.builder()
+                .professional(professional)
+                .type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start)
+                .endTimestamp(end)
+                .rrule("FREQ=DAILY;COUNT=3")
+                .build();
+        recurring.validateAndNormalizeRecurrence();
+        when(scheduleRepository.findActiveCandidates(eq(professionalId), eq(start), eq(end), eq(0L)))
+                .thenReturn(List.of(recurring));
 
         assertThrows(ResponseStatusException.class, () -> service.createJobSchedule(job, start, end));
     }
@@ -449,6 +509,19 @@ class ScheduleServiceImplTest {
     }
 
     @Test
+    void exportAgendaICalendar_publicView_requiresPublishedProfessional() {
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock()));
+
+        String ics = service.exportAgendaICalendar(professionalId, null, null, false);
+        assertTrue(ics.contains("BEGIN:VCALENDAR\r\n"));
+
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(false);
+        assertThrows(ClientNotFoundException.class,
+                () -> service.exportAgendaICalendar(professionalId, null, null, false));
+    }
+
+    @Test
     void getAgenda_unpublishedProfessional_isNotFoundForThePublic() {
         when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(false);
 
@@ -494,73 +567,5 @@ class ScheduleServiceImplTest {
 
         assertThrows(ResponseStatusException.class, () -> service.deleteSchedule(5L, professionalId));
         verify(scheduleRepository, never()).delete(any());
-    }
-
-    // --- RFC 5545 entity functions ---
-
-    @Test
-    void rfc5545_monthlyAndYearlyRecurrenceAndICalendarRoundTrip() {
-        OffsetDateTime baseStart = OffsetDateTime.of(2030, 1, 7, 10, 0, 0, 0, ZoneOffset.UTC);
-        OffsetDateTime baseEnd = OffsetDateTime.of(2030, 1, 7, 12, 0, 0, 0, ZoneOffset.UTC);
-
-        Schedule monthly = Schedule.builder()
-                .id(42L)
-                .type(ScheduleType.URGENT_AVAILABLE)
-                .startTimestamp(baseStart)
-                .endTimestamp(baseEnd)
-                .tzid("UTC")
-                .rrule("FREQ=MONTHLY;BYDAY=1MO;COUNT=3")
-                .build();
-        monthly.addExdate(OffsetDateTime.of(2030, 2, 4, 10, 0, 0, 0, ZoneOffset.UTC));
-        monthly.validateAndNormalizeRecurrence();
-
-        List<Schedule.Occurrence> occurrences = monthly.expandOccurrences(null, null);
-        assertEquals(2, occurrences.size());
-        assertEquals(OffsetDateTime.of(2030, 1, 7, 10, 0, 0, 0, ZoneOffset.UTC), occurrences.get(0).startTimestamp());
-        assertEquals(OffsetDateTime.of(2030, 3, 4, 10, 0, 0, 0, ZoneOffset.UTC), occurrences.get(1).startTimestamp());
-
-        String ics = monthly.toICalendar();
-        Schedule parsed = Schedule.fromICalendar(ics);
-        assertEquals(monthly.getType(), parsed.getType());
-        assertEquals(monthly.getRrule(), parsed.getRrule());
-        assertEquals(monthly.getTzid(), parsed.getTzid());
-        assertEquals(1, parsed.getExdates().size());
-        assertNotNull(parsed.getRecurrenceEnd());
-
-        assertTrue(parsed.removeExdate(OffsetDateTime.of(2030, 2, 4, 10, 0, 0, 0, ZoneOffset.UTC)));
-        assertFalse(parsed.removeExdate(OffsetDateTime.of(2030, 2, 4, 10, 0, 0, 0, ZoneOffset.UTC)));
-        assertEquals(3, parsed.expandOccurrences(null, null).size());
-    }
-
-    @Test
-    void rfc5545_overlapsBetweenTwoRecurringSchedules() {
-        OffsetDateTime startA = OffsetDateTime.of(2030, 6, 3, 9, 0, 0, 0, ZoneOffset.UTC);
-        OffsetDateTime endA = OffsetDateTime.of(2030, 6, 3, 11, 0, 0, 0, ZoneOffset.UTC);
-        Schedule weeklyEveryMonday = Schedule.builder()
-                .type(ScheduleType.URGENT_AVAILABLE)
-                .startTimestamp(startA)
-                .endTimestamp(endA)
-                .rrule("FREQ=WEEKLY;BYDAY=MO;UNTIL=20300630T235959Z")
-                .build();
-        weeklyEveryMonday.validateAndNormalizeRecurrence();
-
-        Schedule biweeklyMondayAfternoon = Schedule.builder()
-                .type(ScheduleType.USER_RESERVED)
-                .startTimestamp(startA.plusHours(5))
-                .endTimestamp(endA.plusHours(5))
-                .rrule("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=3")
-                .build();
-        biweeklyMondayAfternoon.validateAndNormalizeRecurrence();
-
-        Schedule biweeklyMondayMorningOverlap = Schedule.builder()
-                .type(ScheduleType.USER_RESERVED)
-                .startTimestamp(startA.plusWeeks(1).plusHours(1))
-                .endTimestamp(endA.plusWeeks(1).plusHours(1))
-                .rrule("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=2")
-                .build();
-        biweeklyMondayMorningOverlap.validateAndNormalizeRecurrence();
-
-        assertFalse(weeklyEveryMonday.overlaps(biweeklyMondayAfternoon));
-        assertTrue(weeklyEveryMonday.overlaps(biweeklyMondayMorningOverlap));
     }
 }

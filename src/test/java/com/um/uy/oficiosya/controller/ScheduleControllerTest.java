@@ -121,4 +121,19 @@ class ScheduleControllerTest {
                 .andExpect(content().contentType("text/calendar;charset=UTF-8"))
                 .andExpect(content().string(ics));
     }
+
+    @Test
+    void exportAgendaICalendar_anonymousWithRange() throws Exception {
+        UUID professionalId = UUID.randomUUID();
+        String ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
+        when(scheduleService.exportAgendaICalendar(eq(professionalId), any(), any(), eq(false))).thenReturn(ics);
+
+        mvc.perform(get(BASE + "/ical")
+                        .param("professionalId", professionalId.toString())
+                        .param("from", "2030-01-01T00:00:00Z")
+                        .param("to", "2030-01-31T23:59:59Z"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("text/calendar;charset=UTF-8"))
+                .andExpect(content().string(ics));
+    }
 }

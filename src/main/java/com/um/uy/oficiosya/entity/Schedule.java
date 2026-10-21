@@ -969,7 +969,7 @@ public class Schedule {
     private static OffsetDateTime parseICalDateTime(String rawValue, ZoneId defaultZone, boolean endOfDayIfDateOnly) {
         String value = rawValue.trim();
         try {
-            if (value.endsWith("Z")) {
+            if (value.endsWith("Z") && value.length() == 16 && value.charAt(8) == 'T') {
                 LocalDateTime ldt = LocalDateTime.parse(value.substring(0, value.length() - 1), ICAL_LOCAL_DT_FORMAT);
                 return ldt.atOffset(ZoneOffset.UTC);
             }

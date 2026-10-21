@@ -10,10 +10,15 @@ import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.response.ConversationResponse;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.service.interfaces.ChatService;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -26,7 +31,7 @@ import java.util.List;
 /**
  * Lifecycle: PROPOSED → accept → ACCEPTED → complete (PIN) → COMPLETED → review.
  * Either side proposes (proposedBy) and the other accepts or rejects it; a proposal nobody answers
- * in time becomes EXPIRED. From PROPOSED or ACCEPTED it can be cancelled by either side.
+ * in time becomes CANCELLED. From PROPOSED or ACCEPTED it can be cancelled by either side.
  * Once ACCEPTED either side can ask to reschedule (→ RESCHEDULE_REQUESTED); the other side's
  * answer takes it back to ACCEPTED, at the new time or the original one.
  */
@@ -132,6 +137,13 @@ public class JobRequestController {
                                                                  @PathVariable Long id,
                                                                  Authentication authentication) {
         return ResponseEntity.ok(jobRequestService.reviewJobRequest(id, request, AuthenticatedUser.id(authentication)));
+    }
+
+    @PreAuthorize("hasRole('CLIENT')")
+    @GetMapping("/reviews")
+    public ResponseEntity<Page<ReviewResponse>> getMyReviews(Authentication authentication,
+                                                             @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(jobRequestService.getMyReviews(AuthenticatedUser.id(authentication), pageable));
     }
 
     /**

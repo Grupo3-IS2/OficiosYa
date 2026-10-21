@@ -1,5 +1,11 @@
 package com.um.uy.oficiosya.controller;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import com.um.uy.oficiosya.dto.request.JobRequestAcceptRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCancelRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCompleteRequest;
@@ -9,6 +15,7 @@ import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.response.ConversationResponse;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
@@ -31,6 +38,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -221,6 +230,19 @@ class JobRequestControllerTest {
                         {"rating":9,"review":"Excelente"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rating").value(9));
+    }
+
+    @Test
+    void getMyReviews_passesThePage() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<ReviewResponse> page = new PageImpl<>(List.of(new ReviewResponse()));
+        when(jobRequestService.getMyReviews(userId, pageable)).thenReturn(page);
+
+        ResponseEntity<Page<ReviewResponse>> response = new JobRequestController(jobRequestService, chatService)
+                .getMyReviews(authentication, pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertSame(page, response.getBody());
     }
 
     @Test

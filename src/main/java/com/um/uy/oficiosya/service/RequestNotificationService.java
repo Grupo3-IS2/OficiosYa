@@ -116,11 +116,9 @@ public class RequestNotificationService {
             case RESCHEDULE_ACCEPTED -> "aceptó el cambio de horario del trabajo";
             case RESCHEDULE_REJECTED -> "rechazó el cambio de horario del trabajo";
             case COMPLETED -> "marcó como completado el trabajo";
-            case EXPIRED, RESCHEDULE_REQUESTED -> null;
+            case RESCHEDULE_REQUESTED -> null;
         };
-        String event = actor == null
-                ? "Venció sin respuesta la propuesta de trabajo"
-                : actor.getName() + " " + what;
+        String event = actor.getName() + " " + what;
 
         // The scheduled block once accepted, otherwise the timeframe the professional offered
         String when = job.getSchedules().stream()
@@ -146,13 +144,10 @@ public class RequestNotificationService {
         }
     }
 
-    /** Who made the change: whoever proposed it for a new job, none when it expired on its own. */
+    /** Who made the change: whoever proposed it for a new job. */
     private static Client actorOf(JobRequest job, JobRequestEvents.Change change, UUID actorId) {
         if (change == null) {
             return job.getProposedBy() == Role.PROFESSIONAL ? job.getProfessional() : job.getClient();
-        }
-        if (actorId == null) {
-            return null;
         }
         return job.getClient().getPublicId().equals(actorId) ? job.getClient() : job.getProfessional();
     }

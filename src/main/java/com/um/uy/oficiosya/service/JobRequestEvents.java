@@ -13,12 +13,12 @@ public final class JobRequestEvents {
     public record JobProposed(Long jobRequestId) {
     }
 
-    /** The job's status or timeframe changed. {@code actorId} is who did it; null when it expired on its own. */
+    /** The job's status or timeframe changed. {@code actorId} is who did it. */
     public record JobStatusChanged(Long jobRequestId, Change change, UUID actorId) {
     }
 
     public enum Change {
-        ACCEPTED, REJECTED, CANCELLED, RESCHEDULE_REQUESTED, RESCHEDULE_ACCEPTED, RESCHEDULE_REJECTED, COMPLETED, EXPIRED
+        ACCEPTED, REJECTED, CANCELLED, RESCHEDULE_REQUESTED, RESCHEDULE_ACCEPTED, RESCHEDULE_REJECTED, COMPLETED
     }
 
     /** One side asked to move an accepted job: the other side is told. */

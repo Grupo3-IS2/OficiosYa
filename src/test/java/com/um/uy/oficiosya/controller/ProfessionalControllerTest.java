@@ -4,9 +4,11 @@ import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
+import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,8 @@ class ProfessionalControllerTest {
 
     @Mock
     private ProfessionalService professionalService;
+    @Mock
+    private JobRequestService jobRequestService;
 
     private MockMvc mvc;
     private final UUID userId = UUID.randomUUID();
@@ -60,7 +64,7 @@ class ProfessionalControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         mvc = MockMvcBuilders
-                .standaloneSetup(new ProfessionalController(professionalService))
+                .standaloneSetup(new ProfessionalController(professionalService, jobRequestService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         profile.setName("Beto Gómez");
@@ -96,6 +100,20 @@ class ProfessionalControllerTest {
         mvc.perform(get(BASE + "/" + id)).andExpect(status().isOk());
     }
 
+    @Test
+    void getProfessionalReviews_passesThePage() {
+        UUID id = UUID.randomUUID();
+        Pageable pageable = PageRequest.of(1, 5);
+        Page<ReviewResponse> page = new PageImpl<>(List.of(new ReviewResponse()));
+        when(jobRequestService.getProfessionalReviews(id, pageable)).thenReturn(page);
+
+        ResponseEntity<Page<ReviewResponse>> response = new ProfessionalController(professionalService, jobRequestService)
+                .getProfessionalReviews(id, pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertSame(page, response.getBody());
+    }
+
     /** Called directly: rendering a Page to JSON needs Spring Data's web config, which a standalone MockMvc lacks. */
     @Test
     void searchProfessionals_passesTheFilters() {
@@ -106,7 +124,7 @@ class ProfessionalControllerTest {
         when(professionalService.searchProfessionals(new ProfessionalSearchFilters(List.of(1L, 2L), new BigDecimal("100"), null, 5.0,
                 "Montevideo", "beto", from, to, ProfessionalSearchFilters.Order.RATING_DESC), pageable)).thenReturn(page);
 
-        ResponseEntity<Page<ProfessionalPublicResponse>> response = new ProfessionalController(professionalService)
+        ResponseEntity<Page<ProfessionalPublicResponse>> response = new ProfessionalController(professionalService, jobRequestService)
                 .searchProfessionals(List.of(1L, 2L), new BigDecimal("100"), null, 5.0, "Montevideo", "beto",
                         from, to, ProfessionalSearchFilters.Order.RATING_DESC, pageable);
 

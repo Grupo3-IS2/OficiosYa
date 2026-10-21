@@ -2,11 +2,12 @@ package com.um.uy.oficiosya.repository;
 
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -43,6 +44,20 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
     @Query("SELECT AVG(j.rating) FROM JobRequest j WHERE j.professional.publicId = :professionalPublicId AND j.rating IS NOT NULL")
     Double averageRatingOf(@Param("professionalPublicId") UUID professionalPublicId);
 
+    @Query("""
+            SELECT j FROM JobRequest j
+            WHERE j.professional.publicId = :professionalPublicId AND j.rating IS NOT NULL
+            ORDER BY j.updatedAt DESC
+            """)
+    Page<JobRequest> findReviewsOfProfessional(@Param("professionalPublicId") UUID professionalPublicId, Pageable pageable);
+
+    @Query("""
+            SELECT j FROM JobRequest j
+            WHERE j.client.publicId = :clientPublicId AND j.rating IS NOT NULL
+            ORDER BY j.updatedAt DESC
+            """)
+    Page<JobRequest> findReviewsByClient(@Param("clientPublicId") UUID clientPublicId, Pageable pageable);
+
     /** Proposals the other side made to the user that they haven't accepted or rejected yet. */
     @Query("""
             SELECT COUNT(j) FROM JobRequest j
@@ -74,12 +89,4 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
             """)
     List<JobRequest> findBetween(@Param("userId") Long userId, @Param("otherUserId") Long otherUserId);
 
-    /** Proposals still unanswered that were made before {@code createdBefore}, or whose proposed timeframe already started. */
-    @Query("""
-            SELECT j.id FROM JobRequest j
-            WHERE j.status = com.um.uy.oficiosya.entity.JobStatus.PROPOSED
-            AND (j.createdAt < :createdBefore OR j.proposedStart <= :now)
-            """)
-    List<Long> findProposalIdsToExpire(@Param("createdBefore") OffsetDateTime createdBefore,
-                                       @Param("now") OffsetDateTime now);
 }

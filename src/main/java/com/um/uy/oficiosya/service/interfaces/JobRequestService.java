@@ -8,8 +8,11 @@ import com.um.uy.oficiosya.dto.request.JobRequestRejectRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.entity.JobStatus;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,9 +32,6 @@ public interface JobRequestService {
     /** The side that didn't propose turns it down; the request (and its reason) is optional. */
     JobRequestResponse rejectJobRequest(Long id, JobRequestRejectRequest request, UUID requesterId);
 
-    /** Moves a still unanswered proposal to EXPIRED; false if it was answered in between. */
-    boolean expireProposal(Long id);
-
     /**
      * Either side can cancel; the request (and its reason) is optional. Once accepted, it needs the
      * configured notice before the job starts, and it frees the agenda.
@@ -50,6 +50,8 @@ public interface JobRequestService {
 
     /** The client rates a COMPLETED job once; the professional's rating becomes the average of their reviews. */
     JobRequestResponse reviewJobRequest(Long id, JobRequestReviewRequest request, UUID clientId);
+    Page<ReviewResponse> getProfessionalReviews(UUID professionalId, Pageable pageable);
+    Page<ReviewResponse> getMyReviews(UUID clientId, Pageable pageable);
     JobRequestResponse getJobRequest(Long id, UUID requesterId);
     /** The jobs the user takes part in, as client or as professional; only those in the given status if not null. */
     List<JobRequestResponse> getMyJobRequests(UUID userId, JobStatus status);

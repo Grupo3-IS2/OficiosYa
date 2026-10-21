@@ -290,7 +290,7 @@ class ScheduleTest {
         Schedule sAllMondays = createSchedule("FREQ=MONTHLY;BYDAY=MO;COUNT=5", "UTC");
         List<Schedule.Occurrence> mondaysOccs = sAllMondays.expandOccurrences(null, null);
         assertEquals(5, mondaysOccs.size());
-        assertTrue(mondaysOccs.stream().allMatch(o -> o.startTimestamp().getDayOfWeek() == DayOfWeek.MONDAY));
+        assertTrue(mondaysOccs.stream().allMatch(o -> DayOfWeek.MONDAY.equals(o.startTimestamp().getDayOfWeek())));
 
         // Monthly with interval 2
         Schedule sBiMonthly = createSchedule("FREQ=MONTHLY;INTERVAL=2;COUNT=2", "UTC");
@@ -340,8 +340,8 @@ class ScheduleTest {
         Schedule s = createSchedule("FREQ=YEARLY;BYMONTH=6;BYDAY=MO;COUNT=3", "UTC");
         List<Schedule.Occurrence> occs = s.expandOccurrences(null, null);
         assertEquals(3, occs.size());
-        assertTrue(occs.stream().allMatch(o -> o.startTimestamp().getDayOfWeek() == DayOfWeek.MONDAY));
-        assertTrue(occs.stream().allMatch(o -> o.startTimestamp().getMonthValue() == 6));
+        assertTrue(occs.stream().allMatch(o -> DayOfWeek.MONDAY.equals(o.startTimestamp().getDayOfWeek())));
+        assertTrue(occs.stream().allMatch(o -> Integer.valueOf(6).equals(o.startTimestamp().getMonthValue())));
     }
 
     // --- Overlaps ---

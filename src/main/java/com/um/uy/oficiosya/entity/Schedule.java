@@ -63,6 +63,22 @@ public class Schedule {
     private static final int MAX_CANDIDATE_DAYS = 3650;
     private static final Duration UNBOUNDED_OVERLAP_HORIZON = Duration.ofDays(730);
 
+    private static final String RRULE_PREFIX = "RRULE:";
+    private static final String PROP_RRULE = "RRULE";
+    private static final String PROP_FREQ = "FREQ";
+    private static final String PROP_INTERVAL = "INTERVAL";
+    private static final String PROP_COUNT = "COUNT";
+    private static final String PROP_UNTIL = "UNTIL";
+    private static final String PROP_BYDAY = "BYDAY";
+    private static final String PROP_BYMONTHDAY = "BYMONTHDAY";
+    private static final String PROP_BYMONTH = "BYMONTH";
+    private static final String PROP_WKST = "WKST";
+    private static final String PROP_TZID = "TZID";
+    private static final String PROP_DTSTART = "DTSTART";
+    private static final String PROP_DTEND = "DTEND";
+    private static final String PROP_EXDATE = "EXDATE";
+    private static final String PROP_SUMMARY = "SUMMARY";
+
     private static final DateTimeFormatter ICAL_UTC_FORMAT =
             DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'", Locale.ROOT).withZone(ZoneOffset.UTC);
     private static final DateTimeFormatter ICAL_LOCAL_DT_FORMAT =
@@ -142,7 +158,7 @@ public class Schedule {
     public record ByDayEntry(Integer ordinal, DayOfWeek dayOfWeek) {
         public ByDayEntry {
             Objects.requireNonNull(dayOfWeek, "dayOfWeek must not be null");
-            if (ordinal != null && (ordinal == 0 || ordinal < -53 || ordinal > 53)) {
+            if (Objects.nonNull(ordinal) && (Integer.valueOf(0).equals(ordinal) || ordinal < -53 || ordinal > 53)) {
                 throw new IllegalArgumentException("Invalid BYDAY ordinal in RRULE: " + ordinal);
             }
         }
@@ -162,45 +178,57 @@ public class Schedule {
             if (interval <= 0) {
                 interval = 1;
             }
-            if (byDay == null) {
+            if (Objects.isNull(byDay)) {
                 byDay = List.of();
             }
-            if (byMonthDay == null) {
+            if (Objects.isNull(byMonthDay)) {
                 byMonthDay = List.of();
             }
-            if (byMonth == null) {
+            if (Objects.isNull(byMonth)) {
                 byMonth = List.of();
             }
-            if (wkst == null) {
+            if (Objects.isNull(wkst)) {
                 wkst = DayOfWeek.MONDAY;
             }
         }
 
+        public static String toIcalDay(DayOfWeek dayOfWeek) {
+            return switch (dayOfWeek) {
+                case MONDAY -> "MO";
+                case TUESDAY -> "TU";
+                case WEDNESDAY -> "WE";
+                case THURSDAY -> "TH";
+                case FRIDAY -> "FR";
+                case SATURDAY -> "SA";
+                case SUNDAY -> "SU";
+            };
+        }
+
         public String toNormalizedString() {
             List<String> parts = new ArrayList<>();
-            parts.add("FREQ=" + freq.name());
+            parts.add(PROP_FREQ + "=" + freq.name());
             if (interval > 1) {
-                parts.add("INTERVAL=" + interval);
+                parts.add(PROP_INTERVAL + "=" + interval);
             }
-            if (count != null) {
-                parts.add("COUNT=" + count);
+            if (Objects.nonNull(count)) {
+                parts.add(PROP_COUNT + "=" + count);
             }
-            if (until != null) {
-                parts.add("UNTIL=" + ICAL_UTC_FORMAT.format(until.toInstant()));
+            if (Objects.nonNull(until)) {
+                parts.add(PROP_UNTIL + "=" + ICAL_UTC_FORMAT.format(until.toInstant()));
             }
-            if (byMonth != null && !byMonth.isEmpty()) {
-                parts.add("BYMONTH=" + byMonth.stream().map(String::valueOf).collect(Collectors.joining(",")));
+            if (Objects.nonNull(byMonth) && !byMonth.isEmpty()) {
+                parts.add(PROP_BYMONTH + "=" + byMonth.stream().map(String::valueOf).collect(Collectors.joining(",")));
             }
-            if (byMonthDay != null && !byMonthDay.isEmpty()) {
-                parts.add("BYMONTHDAY=" + byMonthDay.stream().map(String::valueOf).collect(Collectors.joining(",")));
+            if (Objects.nonNull(byMonthDay) && !byMonthDay.isEmpty()) {
+                parts.add(PROP_BYMONTHDAY + "=" + byMonthDay.stream().map(String::valueOf).collect(Collectors.joining(",")));
             }
-            if (byDay != null && !byDay.isEmpty()) {
-                parts.add("BYDAY=" + byDay.stream()
-                        .map(entry -> (entry.ordinal() != null ? entry.ordinal().toString() : "") + toIcalDay(entry.dayOfWeek()))
+            if (Objects.nonNull(byDay) && !byDay.isEmpty()) {
+                parts.add(PROP_BYDAY + "=" + byDay.stream()
+                        .map(entry -> (Objects.nonNull(entry.ordinal()) ? entry.ordinal().toString() : "") + toIcalDay(entry.dayOfWeek()))
                         .collect(Collectors.joining(",")));
             }
-            if (wkst != null && wkst != DayOfWeek.MONDAY) {
-                parts.add("WKST=" + toIcalDay(wkst));
+            if (Objects.nonNull(wkst) && !DayOfWeek.MONDAY.equals(wkst)) {
+                parts.add(PROP_WKST + "=" + toIcalDay(wkst));
             }
             return String.join(";", parts);
         }
@@ -209,18 +237,18 @@ public class Schedule {
     public record Occurrence(OffsetDateTime startTimestamp, OffsetDateTime endTimestamp) {}
 
     public boolean isRecurring() {
-        return rrule != null && !rrule.isBlank();
+        return Objects.nonNull(rrule) && !rrule.isBlank();
     }
 
     public ZoneId resolveZoneId() {
-        if (tzid != null && !tzid.isBlank()) {
+        if (Objects.nonNull(tzid) && !tzid.isBlank()) {
             try {
                 return ZoneId.of(tzid.trim());
             } catch (DateTimeException ex) {
                 throw new IllegalArgumentException("Invalid time zone identifier (TZID): " + tzid, ex);
             }
         }
-        if (startTimestamp != null) {
+        if (Objects.nonNull(startTimestamp)) {
             return startTimestamp.getOffset();
         }
         return ZoneOffset.UTC;
@@ -232,13 +260,13 @@ public class Schedule {
     @PrePersist
     @PreUpdate
     public void validateAndNormalizeRecurrence() {
-        if (exdates == null) {
+        if (Objects.isNull(exdates)) {
             exdates = new ArrayList<>();
         } else {
             exdates = deduplicateByInstant(exdates);
         }
 
-        if (tzid != null) {
+        if (Objects.nonNull(tzid)) {
             String trimmedTz = tzid.trim();
             if (trimmedTz.isEmpty()) {
                 tzid = null;
@@ -252,7 +280,7 @@ public class Schedule {
             }
         }
 
-        if (rrule != null) {
+        if (Objects.nonNull(rrule)) {
             String trimmedRule = rrule.trim();
             if (trimmedRule.isEmpty()) {
                 rrule = null;
@@ -266,7 +294,7 @@ public class Schedule {
     }
 
     private void recalculateRecurrenceEnd() {
-        if (startTimestamp == null || endTimestamp == null || !startTimestamp.isBefore(endTimestamp)) {
+        if (Objects.isNull(startTimestamp) || Objects.isNull(endTimestamp) || !startTimestamp.isBefore(endTimestamp)) {
             recurrenceEnd = endTimestamp;
             return;
         }
@@ -275,7 +303,7 @@ public class Schedule {
             return;
         }
         RecurrenceRule parsed = parseRRule(rrule, resolveZoneId());
-        if (parsed.count() == null && parsed.until() == null) {
+        if (Objects.isNull(parsed.count()) && Objects.isNull(parsed.until())) {
             recurrenceEnd = null;
             return;
         }
@@ -291,106 +319,139 @@ public class Schedule {
      * Parses and validates an RFC 5545 {@code RRULE} string.
      */
     public static RecurrenceRule parseRRule(String rawRRule, ZoneId defaultZone) {
-        if (rawRRule == null || rawRRule.isBlank()) {
+        String cleaned = cleanRRuleString(rawRRule);
+        Map<String, String> properties = parseProperties(cleaned);
+        validateSupportedKeys(properties);
+
+        Frequency freq = parseFrequency(properties);
+        int interval = parseInterval(properties);
+        Integer count = parseCount(properties);
+        OffsetDateTime until = parseUntil(properties, defaultZone);
+        validateCountAndUntil(count, until);
+
+        List<ByDayEntry> byDay = parseByDayProperty(properties, freq);
+        List<Integer> byMonthDay = parseByMonthDayProperty(properties, freq);
+        List<Integer> byMonth = parseByMonthProperty(properties);
+        DayOfWeek wkst = parseWkst(properties);
+
+        return new RecurrenceRule(freq, interval, count, until, byDay, byMonthDay, byMonth, wkst);
+    }
+
+    private static String cleanRRuleString(String rawRRule) {
+        if (Objects.isNull(rawRRule) || rawRRule.isBlank()) {
             throw new IllegalArgumentException("Recurrence rule (RRULE) must not be blank");
         }
         String cleaned = rawRRule.trim();
-        if (cleaned.toUpperCase(Locale.ROOT).startsWith("RRULE:")) {
-            cleaned = cleaned.substring("RRULE:".length()).trim();
+        if (cleaned.toUpperCase(Locale.ROOT).startsWith(RRULE_PREFIX)) {
+            cleaned = cleaned.substring(RRULE_PREFIX.length()).trim();
         }
         if (cleaned.isEmpty()) {
             throw new IllegalArgumentException("Recurrence rule (RRULE) must not be blank");
         }
+        return cleaned;
+    }
 
+    private static Map<String, String> parseProperties(String cleaned) {
         Map<String, String> properties = new LinkedHashMap<>();
         String[] tokens = cleaned.split(";");
         for (String token : tokens) {
-            if (token.isBlank()) {
-                continue;
-            }
-            int eqIdx = token.indexOf('=');
-            if (eqIdx <= 0 || eqIdx == token.length() - 1) {
-                throw new IllegalArgumentException("Invalid property in RRULE: " + token);
-            }
-            String key = token.substring(0, eqIdx).trim().toUpperCase(Locale.ROOT);
-            String value = token.substring(eqIdx + 1).trim().toUpperCase(Locale.ROOT);
-            if (properties.put(key, value) != null) {
-                throw new IllegalArgumentException("Duplicate property in RRULE: " + key);
-            }
-        }
-
-        String freqStr = properties.get("FREQ");
-        if (freqStr == null) {
-            throw new IllegalArgumentException("RRULE must specify FREQ (DAILY, WEEKLY, MONTHLY, or YEARLY)");
-        }
-        Frequency freq;
-        try {
-            freq = Frequency.valueOf(freqStr);
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Unsupported frequency (FREQ) in RRULE: " + freqStr, ex);
-        }
-
-        int interval = 1;
-        if (properties.containsKey("INTERVAL")) {
-            try {
-                interval = Integer.parseInt(properties.get("INTERVAL"));
-            } catch (NumberFormatException ex) {
-                throw new IllegalArgumentException("INTERVAL must be a positive integer in RRULE", ex);
-            }
-            if (interval <= 0) {
-                throw new IllegalArgumentException("INTERVAL must be greater than 0 in RRULE");
+            if (!token.isBlank()) {
+                int eqIdx = token.indexOf('=');
+                if (eqIdx <= 0 || Integer.valueOf(token.length() - 1).equals(eqIdx)) {
+                    throw new IllegalArgumentException("Invalid property in RRULE: " + token);
+                }
+                String key = token.substring(0, eqIdx).trim().toUpperCase(Locale.ROOT);
+                String value = token.substring(eqIdx + 1).trim().toUpperCase(Locale.ROOT);
+                if (Objects.nonNull(properties.put(key, value))) {
+                    throw new IllegalArgumentException("Duplicate property in RRULE: " + key);
+                }
             }
         }
+        return properties;
+    }
 
-        Integer count = null;
-        if (properties.containsKey("COUNT")) {
-            try {
-                count = Integer.parseInt(properties.get("COUNT"));
-            } catch (NumberFormatException ex) {
-                throw new IllegalArgumentException("COUNT must be a positive integer in RRULE", ex);
-            }
-            if (count <= 0 || count > MAX_EXPANDED_OCCURRENCES) {
-                throw new IllegalArgumentException("COUNT must be between 1 and " + MAX_EXPANDED_OCCURRENCES + " in RRULE");
-            }
-        }
-
-        OffsetDateTime until = null;
-        if (properties.containsKey("UNTIL")) {
-            until = parseICalDateTime(properties.get("UNTIL"), defaultZone != null ? defaultZone : ZoneOffset.UTC, true);
-        }
-
-        if (count != null && until != null) {
-            throw new IllegalArgumentException("RRULE must not contain both COUNT and UNTIL (RFC 5545)");
-        }
-
-        List<ByDayEntry> byDay = List.of();
-        if (properties.containsKey("BYDAY")) {
-            byDay = parseByDay(properties.get("BYDAY"), freq);
-        }
-
-        List<Integer> byMonthDay = List.of();
-        if (properties.containsKey("BYMONTHDAY")) {
-            byMonthDay = parseByMonthDay(properties.get("BYMONTHDAY"), freq);
-        }
-
-        List<Integer> byMonth = List.of();
-        if (properties.containsKey("BYMONTH")) {
-            byMonth = parseByMonth(properties.get("BYMONTH"));
-        }
-
-        DayOfWeek wkst = DayOfWeek.MONDAY;
-        if (properties.containsKey("WKST")) {
-            wkst = parseIcalDay(properties.get("WKST"));
-        }
-
-        Set<String> supportedKeys = Set.of("FREQ", "INTERVAL", "COUNT", "UNTIL", "BYDAY", "BYMONTHDAY", "BYMONTH", "WKST");
+    private static void validateSupportedKeys(Map<String, String> properties) {
+        Set<String> supportedKeys = Set.of(
+                PROP_FREQ, PROP_INTERVAL, PROP_COUNT, PROP_UNTIL,
+                PROP_BYDAY, PROP_BYMONTHDAY, PROP_BYMONTH, PROP_WKST
+        );
         for (String key : properties.keySet()) {
             if (!supportedKeys.contains(key)) {
                 throw new IllegalArgumentException("Unsupported property in RRULE: " + key);
             }
         }
+    }
 
-        return new RecurrenceRule(freq, interval, count, until, byDay, byMonthDay, byMonth, wkst);
+    private static Frequency parseFrequency(Map<String, String> properties) {
+        String freqStr = properties.get(PROP_FREQ);
+        if (Objects.isNull(freqStr)) {
+            throw new IllegalArgumentException("RRULE must specify FREQ (DAILY, WEEKLY, MONTHLY, or YEARLY)");
+        }
+        try {
+            return Frequency.valueOf(freqStr);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Unsupported frequency (FREQ) in RRULE: " + freqStr, ex);
+        }
+    }
+
+    private static int parseInterval(Map<String, String> properties) {
+        if (!properties.containsKey(PROP_INTERVAL)) {
+            return 1;
+        }
+        try {
+            int interval = Integer.parseInt(properties.get(PROP_INTERVAL));
+            if (interval <= 0) {
+                throw new IllegalArgumentException("INTERVAL must be greater than 0 in RRULE");
+            }
+            return interval;
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("INTERVAL must be a positive integer in RRULE", ex);
+        }
+    }
+
+    private static Integer parseCount(Map<String, String> properties) {
+        if (!properties.containsKey(PROP_COUNT)) {
+            return null;
+        }
+        try {
+            int count = Integer.parseInt(properties.get(PROP_COUNT));
+            if (count <= 0 || count > MAX_EXPANDED_OCCURRENCES) {
+                throw new IllegalArgumentException("COUNT must be between 1 and " + MAX_EXPANDED_OCCURRENCES + " in RRULE");
+            }
+            return count;
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("COUNT must be a positive integer in RRULE", ex);
+        }
+    }
+
+    private static OffsetDateTime parseUntil(Map<String, String> properties, ZoneId defaultZone) {
+        if (!properties.containsKey(PROP_UNTIL)) {
+            return null;
+        }
+        ZoneId zone = Objects.nonNull(defaultZone) ? defaultZone : ZoneOffset.UTC;
+        return parseICalDateTime(properties.get(PROP_UNTIL), zone, true);
+    }
+
+    private static void validateCountAndUntil(Integer count, OffsetDateTime until) {
+        if (Objects.nonNull(count) && Objects.nonNull(until)) {
+            throw new IllegalArgumentException("RRULE must not contain both COUNT and UNTIL (RFC 5545)");
+        }
+    }
+
+    private static List<ByDayEntry> parseByDayProperty(Map<String, String> properties, Frequency freq) {
+        return properties.containsKey(PROP_BYDAY) ? parseByDay(properties.get(PROP_BYDAY), freq) : List.of();
+    }
+
+    private static List<Integer> parseByMonthDayProperty(Map<String, String> properties, Frequency freq) {
+        return properties.containsKey(PROP_BYMONTHDAY) ? parseByMonthDay(properties.get(PROP_BYMONTHDAY), freq) : List.of();
+    }
+
+    private static List<Integer> parseByMonthProperty(Map<String, String> properties) {
+        return properties.containsKey(PROP_BYMONTH) ? parseByMonth(properties.get(PROP_BYMONTH)) : List.of();
+    }
+
+    private static DayOfWeek parseWkst(Map<String, String> properties) {
+        return properties.containsKey(PROP_WKST) ? parseIcalDay(properties.get(PROP_WKST)) : DayOfWeek.MONDAY;
     }
 
     /**
@@ -398,10 +459,10 @@ public class Schedule {
      * When {@code rangeFrom} or {@code rangeTo} is null, that bound is left open.
      */
     public List<Occurrence> expandOccurrences(OffsetDateTime rangeFrom, OffsetDateTime rangeTo) {
-        if (startTimestamp == null || endTimestamp == null || !startTimestamp.isBefore(endTimestamp)) {
+        if (Objects.isNull(startTimestamp) || Objects.isNull(endTimestamp) || !startTimestamp.isBefore(endTimestamp)) {
             return List.of();
         }
-        if (rangeFrom != null && rangeTo != null && !rangeFrom.isBefore(rangeTo)) {
+        if (Objects.nonNull(rangeFrom) && Objects.nonNull(rangeTo) && !rangeFrom.isBefore(rangeTo)) {
             return List.of();
         }
 
@@ -416,7 +477,7 @@ public class Schedule {
         }
 
         RecurrenceRule parsed = parseRRule(rrule, resolveZoneId());
-        int limit = (rangeTo == null && parsed.count() == null && parsed.until() == null)
+        int limit = (Objects.isNull(rangeTo) && Objects.isNull(parsed.count()) && Objects.isNull(parsed.until()))
                 ? DEFAULT_UNBOUNDED_OCCURRENCES
                 : MAX_EXPANDED_OCCURRENCES;
         return generateOccurrencesInternal(parsed, rangeFrom, rangeTo, true, limit);
@@ -426,17 +487,17 @@ public class Schedule {
      * Checks whether any occurrence of this schedule overlaps the given {@code [otherStart, otherEnd)} timeframe.
      */
     public boolean overlaps(OffsetDateTime otherStart, OffsetDateTime otherEnd) {
-        if (otherStart == null || otherEnd == null || !otherStart.isBefore(otherEnd)) {
+        if (Objects.isNull(otherStart) || Objects.isNull(otherEnd) || !otherStart.isBefore(otherEnd)) {
             return false;
         }
-        if (startTimestamp == null || endTimestamp == null || !startTimestamp.isBefore(endTimestamp)) {
+        if (Objects.isNull(startTimestamp) || Objects.isNull(endTimestamp) || !startTimestamp.isBefore(endTimestamp)) {
             return false;
         }
         if (!startTimestamp.isBefore(otherEnd)) {
             return false;
         }
-        OffsetDateTime effectiveEnd = recurrenceEnd != null ? recurrenceEnd : (!isRecurring() ? endTimestamp : null);
-        if (effectiveEnd != null && !effectiveEnd.isAfter(otherStart)) {
+        OffsetDateTime effectiveEnd = Objects.nonNull(recurrenceEnd) ? recurrenceEnd : (!isRecurring() ? endTimestamp : null);
+        if (Objects.nonNull(effectiveEnd) && !effectiveEnd.isAfter(otherStart)) {
             return false;
         }
         return !expandOccurrences(otherStart, otherEnd).isEmpty();
@@ -446,10 +507,10 @@ public class Schedule {
      * Checks whether any occurrence of this schedule overlaps any occurrence of {@code other}.
      */
     public boolean overlaps(Schedule other) {
-        if (other == null || other.getStartTimestamp() == null || other.getEndTimestamp() == null) {
+        if (Objects.isNull(other) || Objects.isNull(other.getStartTimestamp()) || Objects.isNull(other.getEndTimestamp())) {
             return false;
         }
-        if (startTimestamp == null || endTimestamp == null) {
+        if (Objects.isNull(startTimestamp) || Objects.isNull(endTimestamp)) {
             return false;
         }
 
@@ -463,24 +524,14 @@ public class Schedule {
         OffsetDateTime windowStart = this.startTimestamp.isAfter(other.getStartTimestamp())
                 ? this.startTimestamp : other.getStartTimestamp();
 
-        OffsetDateTime thisEnd = this.recurrenceEnd != null
+        OffsetDateTime thisEnd = Objects.nonNull(this.recurrenceEnd)
                 ? this.recurrenceEnd
                 : (this.isRecurring() ? null : this.endTimestamp);
-        OffsetDateTime otherEnd = other.getRecurrenceEnd() != null
+        OffsetDateTime otherEnd = Objects.nonNull(other.getRecurrenceEnd())
                 ? other.getRecurrenceEnd()
                 : (other.isRecurring() ? null : other.getEndTimestamp());
 
-        OffsetDateTime windowEnd;
-        if (thisEnd != null && otherEnd != null) {
-            windowEnd = thisEnd.isBefore(otherEnd) ? thisEnd : otherEnd;
-        } else if (thisEnd != null) {
-            windowEnd = thisEnd;
-        } else if (otherEnd != null) {
-            windowEnd = otherEnd;
-        } else {
-            windowEnd = windowStart.plus(UNBOUNDED_OVERLAP_HORIZON);
-        }
-
+        OffsetDateTime windowEnd = resolveOverlapWindowEnd(windowStart, thisEnd, otherEnd);
         if (!windowStart.isBefore(windowEnd)) {
             return false;
         }
@@ -494,11 +545,28 @@ public class Schedule {
             return false;
         }
 
+        return occurrencesOverlap(thisOccurrences, otherOccurrences);
+    }
+
+    private static OffsetDateTime resolveOverlapWindowEnd(OffsetDateTime windowStart, OffsetDateTime thisEnd, OffsetDateTime otherEnd) {
+        if (Objects.nonNull(thisEnd) && Objects.nonNull(otherEnd)) {
+            return thisEnd.isBefore(otherEnd) ? thisEnd : otherEnd;
+        }
+        if (Objects.nonNull(thisEnd)) {
+            return thisEnd;
+        }
+        if (Objects.nonNull(otherEnd)) {
+            return otherEnd;
+        }
+        return windowStart.plus(UNBOUNDED_OVERLAP_HORIZON);
+    }
+
+    private static boolean occurrencesOverlap(List<Occurrence> listA, List<Occurrence> listB) {
         int i = 0;
         int j = 0;
-        while (i < thisOccurrences.size() && j < otherOccurrences.size()) {
-            Occurrence a = thisOccurrences.get(i);
-            Occurrence b = otherOccurrences.get(j);
+        while (i < listA.size() && j < listB.size()) {
+            Occurrence a = listA.get(i);
+            Occurrence b = listB.get(j);
             if (a.startTimestamp().isBefore(b.endTimestamp()) && a.endTimestamp().isAfter(b.startTimestamp())) {
                 return true;
             }
@@ -515,14 +583,14 @@ public class Schedule {
      * Adds an exception timestamp (RFC 5545 {@code EXDATE}) to skip a specific occurrence.
      */
     public void addExdate(OffsetDateTime exdate) {
-        if (exdate == null) {
+        if (Objects.isNull(exdate)) {
             throw new IllegalArgumentException("Exception date (EXDATE) must not be null");
         }
-        if (exdates == null) {
+        if (Objects.isNull(exdates)) {
             exdates = new ArrayList<>();
         }
         Instant target = exdate.toInstant();
-        boolean exists = exdates.stream().anyMatch(existing -> existing != null && existing.toInstant().equals(target));
+        boolean exists = exdates.stream().anyMatch(existing -> Objects.nonNull(existing) && existing.toInstant().equals(target));
         if (!exists) {
             exdates.add(exdate);
         }
@@ -532,50 +600,50 @@ public class Schedule {
      * Removes an exception timestamp (RFC 5545 {@code EXDATE}) matching the given instant.
      */
     public boolean removeExdate(OffsetDateTime exdate) {
-        if (exdate == null || exdates == null || exdates.isEmpty()) {
+        if (Objects.isNull(exdate) || Objects.isNull(exdates) || exdates.isEmpty()) {
             return false;
         }
         Instant target = exdate.toInstant();
-        return exdates.removeIf(existing -> existing != null && existing.toInstant().equals(target));
+        return exdates.removeIf(existing -> Objects.nonNull(existing) && existing.toInstant().equals(target));
     }
 
     /**
      * Formats this schedule as an RFC 5545 {@code VEVENT} block.
      */
     public String toICalendarVEvent() {
-        if (startTimestamp == null || endTimestamp == null) {
+        if (Objects.isNull(startTimestamp) || Objects.isNull(endTimestamp)) {
             throw new IllegalStateException("Schedule must have startTimestamp and endTimestamp to format as iCalendar");
         }
         validateAndNormalizeRecurrence();
         StringBuilder sb = new StringBuilder();
         sb.append("BEGIN:VEVENT\r\n");
-        String uid = (id != null ? "schedule-" + id : "schedule-temp") + "@oficiosya.uy";
+        String uid = (Objects.nonNull(id) ? "schedule-" + id : "schedule-temp") + "@oficiosya.uy";
         sb.append("UID:").append(uid).append("\r\n");
         sb.append("DTSTAMP:").append(ICAL_UTC_FORMAT.format(startTimestamp.toInstant())).append("\r\n");
-        if (tzid != null && !tzid.isBlank()) {
+        if (Objects.nonNull(tzid) && !tzid.isBlank()) {
             ZoneId zone = resolveZoneId();
-            sb.append("DTSTART;TZID=").append(tzid).append(":")
+            sb.append(PROP_DTSTART).append(";").append(PROP_TZID).append("=").append(tzid).append(":")
                     .append(ICAL_LOCAL_DT_FORMAT.format(startTimestamp.atZoneSameInstant(zone))).append("\r\n");
-            sb.append("DTEND;TZID=").append(tzid).append(":")
+            sb.append(PROP_DTEND).append(";").append(PROP_TZID).append("=").append(tzid).append(":")
                     .append(ICAL_LOCAL_DT_FORMAT.format(endTimestamp.atZoneSameInstant(zone))).append("\r\n");
         } else {
-            sb.append("DTSTART:").append(ICAL_UTC_FORMAT.format(startTimestamp.toInstant())).append("\r\n");
-            sb.append("DTEND:").append(ICAL_UTC_FORMAT.format(endTimestamp.toInstant())).append("\r\n");
+            sb.append(PROP_DTSTART).append(":").append(ICAL_UTC_FORMAT.format(startTimestamp.toInstant())).append("\r\n");
+            sb.append(PROP_DTEND).append(":").append(ICAL_UTC_FORMAT.format(endTimestamp.toInstant())).append("\r\n");
         }
-        if (type != null) {
-            sb.append("SUMMARY:").append(type.name()).append("\r\n");
+        if (Objects.nonNull(type)) {
+            sb.append(PROP_SUMMARY).append(":").append(type.name()).append("\r\n");
         }
         if (isRecurring()) {
-            sb.append("RRULE:").append(rrule).append("\r\n");
+            sb.append(RRULE_PREFIX).append(rrule).append("\r\n");
         }
-        if (exdates != null && !exdates.isEmpty()) {
+        if (Objects.nonNull(exdates) && !exdates.isEmpty()) {
             String formattedExdates = exdates.stream()
                     .filter(Objects::nonNull)
                     .sorted(Comparator.comparing(OffsetDateTime::toInstant))
                     .map(dt -> ICAL_UTC_FORMAT.format(dt.toInstant()))
                     .collect(Collectors.joining(","));
             if (!formattedExdates.isEmpty()) {
-                sb.append("EXDATE:").append(formattedExdates).append("\r\n");
+                sb.append(PROP_EXDATE).append(":").append(formattedExdates).append("\r\n");
             }
         }
         sb.append("END:VEVENT");
@@ -598,88 +666,107 @@ public class Schedule {
      * Parses an RFC 5545 {@code VCALENDAR} or {@code VEVENT} string and applies its metadata to this schedule.
      */
     public void applyICalendarVEvent(String icsContent) {
-        if (icsContent == null || icsContent.isBlank()) {
+        if (Objects.isNull(icsContent) || icsContent.isBlank()) {
             throw new IllegalArgumentException("iCalendar content must not be blank");
         }
         String unfolded = ICAL_UNFOLD_PATTERN.matcher(icsContent).replaceAll("");
         String[] lines = ICAL_LINE_BREAK_PATTERN.split(unfolded);
 
+        ParsedVEvent event = parseVEventLines(lines, this.type);
+        if (Objects.isNull(event.startTimestamp()) || Objects.isNull(event.endTimestamp())) {
+            throw new IllegalArgumentException("VEVENT component must include DTSTART and DTEND");
+        }
+        this.startTimestamp = event.startTimestamp();
+        this.endTimestamp = event.endTimestamp();
+        this.tzid = event.tzid();
+        this.rrule = event.rrule();
+        this.exdates = event.exdates();
+        this.type = Objects.nonNull(event.type()) ? event.type() : (Objects.nonNull(this.type) ? this.type : ScheduleType.URGENT_AVAILABLE);
+        validateAndNormalizeRecurrence();
+    }
+
+    private record ParsedVEvent(
+            OffsetDateTime startTimestamp,
+            OffsetDateTime endTimestamp,
+            String tzid,
+            String rrule,
+            ScheduleType type,
+            List<OffsetDateTime> exdates
+    ) {}
+
+    private static ParsedVEvent parseVEventLines(String[] lines, ScheduleType initialType) {
         OffsetDateTime parsedStart = null;
         OffsetDateTime parsedEnd = null;
         String parsedTzid = null;
         String parsedRRule = null;
-        ScheduleType parsedType = this.type;
+        ScheduleType parsedType = initialType;
         List<OffsetDateTime> parsedExdates = new ArrayList<>();
 
         for (String rawLine : lines) {
             String line = rawLine.trim();
-            if (line.isEmpty() || line.startsWith("BEGIN:") || line.startsWith("END:")
-                    || line.startsWith("VERSION:") || line.startsWith("PRODID:") || line.startsWith("CALSCALE:")
-                    || line.startsWith("UID:") || line.startsWith("DTSTAMP:")) {
-                continue;
-            }
-            int colonIdx = line.indexOf(':');
-            if (colonIdx <= 0) {
-                continue;
-            }
-            String propPart = line.substring(0, colonIdx).trim();
-            String valuePart = line.substring(colonIdx + 1).trim();
+            if (!isIgnorableIcalLine(line)) {
+                int colonIdx = line.indexOf(':');
+                if (colonIdx > 0) {
+                    String propPart = line.substring(0, colonIdx).trim();
+                    String valuePart = line.substring(colonIdx + 1).trim();
+                    String[] propTokens = propPart.split(";");
+                    String propName = propTokens[0].toUpperCase(Locale.ROOT);
+                    String lineTzid = extractTzidParam(propTokens);
 
-            String[] propTokens = propPart.split(";");
-            String propName = propTokens[0].toUpperCase(Locale.ROOT);
-            String lineTzid = null;
-            for (int i = 1; i < propTokens.length; i++) {
-                String param = propTokens[i].trim();
-                if (param.toUpperCase(Locale.ROOT).startsWith("TZID=")) {
-                    lineTzid = param.substring("TZID=".length()).trim();
-                }
-            }
-
-            switch (propName) {
-                case "TZID" -> parsedTzid = valuePart;
-                case "DTSTART" -> {
-                    if (lineTzid != null) {
-                        parsedTzid = lineTzid;
-                    }
-                    ZoneId zone = resolveZoneForParsing(lineTzid != null ? lineTzid : parsedTzid);
-                    parsedStart = parseICalDateTime(valuePart, zone, false);
-                }
-                case "DTEND" -> {
-                    ZoneId zone = resolveZoneForParsing(lineTzid != null ? lineTzid : parsedTzid);
-                    parsedEnd = parseICalDateTime(valuePart, zone, false);
-                }
-                case "RRULE" -> parsedRRule = valuePart;
-                case "EXDATE" -> {
-                    ZoneId zone = resolveZoneForParsing(lineTzid != null ? lineTzid : parsedTzid);
-                    for (String exToken : valuePart.split(",")) {
-                        if (!exToken.isBlank()) {
-                            parsedExdates.add(parseICalDateTime(exToken.trim(), zone, false));
+                    switch (propName) {
+                        case PROP_TZID -> parsedTzid = valuePart;
+                        case PROP_DTSTART -> {
+                            if (Objects.nonNull(lineTzid)) {
+                                parsedTzid = lineTzid;
+                            }
+                            ZoneId zone = resolveZoneForParsing(Objects.nonNull(lineTzid) ? lineTzid : parsedTzid);
+                            parsedStart = parseICalDateTime(valuePart, zone, false);
+                        }
+                        case PROP_DTEND -> {
+                            ZoneId zone = resolveZoneForParsing(Objects.nonNull(lineTzid) ? lineTzid : parsedTzid);
+                            parsedEnd = parseICalDateTime(valuePart, zone, false);
+                        }
+                        case PROP_RRULE -> parsedRRule = valuePart;
+                        case PROP_EXDATE -> {
+                            ZoneId zone = resolveZoneForParsing(Objects.nonNull(lineTzid) ? lineTzid : parsedTzid);
+                            for (String exToken : valuePart.split(",")) {
+                                if (!exToken.isBlank()) {
+                                    parsedExdates.add(parseICalDateTime(exToken.trim(), zone, false));
+                                }
+                            }
+                        }
+                        case PROP_SUMMARY -> {
+                            try {
+                                parsedType = ScheduleType.valueOf(valuePart.toUpperCase(Locale.ROOT));
+                            } catch (IllegalArgumentException _) {
+                                // Keep current schedule type when SUMMARY is a custom human-readable description
+                            }
+                        }
+                        default -> {
+                            // Ignored RFC 5545 properties
                         }
                     }
                 }
-                case "SUMMARY" -> {
-                    try {
-                        parsedType = ScheduleType.valueOf(valuePart.toUpperCase(Locale.ROOT));
-                    } catch (IllegalArgumentException ignored) {
-                        // Keep current schedule type when SUMMARY is a human-readable description
-                    }
-                }
-                default -> {
-                    // Other RFC 5545 properties are ignored
-                }
             }
         }
+        return new ParsedVEvent(parsedStart, parsedEnd, parsedTzid, parsedRRule, parsedType, parsedExdates);
+    }
 
-        if (parsedStart == null || parsedEnd == null) {
-            throw new IllegalArgumentException("VEVENT component must include DTSTART and DTEND");
+    private static boolean isIgnorableIcalLine(String line) {
+        return line.isEmpty() || line.startsWith("BEGIN:") || line.startsWith("END:")
+                || line.startsWith("VERSION:") || line.startsWith("PRODID:") || line.startsWith("CALSCALE:")
+                || line.startsWith("UID:") || line.startsWith("DTSTAMP:");
+    }
+
+    private static String extractTzidParam(String[] propTokens) {
+        String prefix = PROP_TZID + "=";
+        for (int i = 1; i < propTokens.length; i++) {
+            String param = propTokens[i].trim();
+            if (param.toUpperCase(Locale.ROOT).startsWith(prefix)) {
+                return param.substring(prefix.length()).trim();
+            }
         }
-        this.startTimestamp = parsedStart;
-        this.endTimestamp = parsedEnd;
-        this.tzid = parsedTzid;
-        this.rrule = parsedRRule;
-        this.exdates = parsedExdates;
-        this.type = (parsedType != null) ? parsedType : (this.type != null ? this.type : ScheduleType.URGENT_AVAILABLE);
-        validateAndNormalizeRecurrence();
+        return null;
     }
 
     /**
@@ -705,49 +792,43 @@ public class Schedule {
 
         List<Occurrence> results = new ArrayList<>();
         int generatedCount = 0;
+        boolean stop = false;
 
-        for (int dayOffset = 0; dayOffset <= MAX_CANDIDATE_DAYS; dayOffset++) {
+        for (int dayOffset = 0; dayOffset <= MAX_CANDIDATE_DAYS && !stop; dayOffset++) {
             LocalDate candidateDate = baseDate.plusDays(dayOffset);
-            if (!matchesRecurrenceDate(baseDate, candidateDate, rule)) {
-                continue;
-            }
+            if (matchesRecurrenceDate(baseDate, candidateDate, rule)) {
+                ZonedDateTime occStartZoned = ZonedDateTime.of(candidateDate, baseStartZoned.toLocalTime(), zone);
+                OffsetDateTime occStart = occStartZoned.toOffsetDateTime();
+                OffsetDateTime occEnd = occStart.plus(duration);
 
-            ZonedDateTime occStartZoned = ZonedDateTime.of(candidateDate, baseStartZoned.toLocalTime(), zone);
-            OffsetDateTime occStart = occStartZoned.toOffsetDateTime();
-            OffsetDateTime occEnd = occStart.plus(duration);
-
-            if (occStart.isBefore(startTimestamp)) {
-                continue;
-            }
-            if (rule.until() != null && occStart.toInstant().isAfter(rule.until().toInstant())) {
-                break;
-            }
-
-            generatedCount++;
-            if (rule.count() != null && generatedCount > rule.count()) {
-                break;
-            }
-
-            if (rangeTo != null && !occStart.isBefore(rangeTo)) {
-                if (rule.count() == null) {
-                    break;
+                if (!occStart.isBefore(startTimestamp)) {
+                    if (Objects.nonNull(rule.until()) && occStart.toInstant().isAfter(rule.until().toInstant())) {
+                        stop = true;
+                    } else {
+                        generatedCount++;
+                        if (Objects.nonNull(rule.count()) && generatedCount > rule.count()) {
+                            stop = true;
+                        } else {
+                            boolean inRange = Objects.isNull(rangeTo) || occStart.isBefore(rangeTo);
+                            if (inRange) {
+                                boolean excluded = applyExdates && isExcluded(occStart);
+                                if (!excluded && overlapsWindow(occStart, occEnd, rangeFrom, rangeTo)) {
+                                    results.add(new Occurrence(occStart, occEnd));
+                                    if (results.size() >= maxResults) {
+                                        stop = true;
+                                    }
+                                }
+                            } else if (Objects.isNull(rule.count())) {
+                                stop = true;
+                            }
+                            if (Objects.nonNull(rule.count()) && Integer.valueOf(generatedCount).equals(rule.count())) {
+                                stop = true;
+                            }
+                        }
+                    }
                 }
-                continue;
-            }
-
-            boolean excluded = applyExdates && isExcluded(occStart);
-            if (!excluded && overlapsWindow(occStart, occEnd, rangeFrom, rangeTo)) {
-                results.add(new Occurrence(occStart, occEnd));
-                if (results.size() >= maxResults) {
-                    break;
-                }
-            }
-
-            if (rule.count() != null && generatedCount >= rule.count()) {
-                break;
             }
         }
-
         return results;
     }
 
@@ -760,67 +841,76 @@ public class Schedule {
         }
 
         return switch (rule.freq()) {
-            case DAILY -> {
-                long daysBetween = ChronoUnit.DAYS.between(baseDate, candidate);
-                if (daysBetween % rule.interval() != 0) {
-                    yield false;
-                }
-                if (!rule.byMonthDay().isEmpty() && !matchesMonthDay(candidate, rule.byMonthDay())) {
-                    yield false;
-                }
-                yield rule.byDay().isEmpty() || matchesSimpleByDay(candidate, rule.byDay());
-            }
-            case WEEKLY -> {
-                LocalDate baseWeekStart = baseDate.with(TemporalAdjusters.previousOrSame(rule.wkst()));
-                LocalDate candidateWeekStart = candidate.with(TemporalAdjusters.previousOrSame(rule.wkst()));
-                long weeksBetween = ChronoUnit.WEEKS.between(baseWeekStart, candidateWeekStart);
-                if (weeksBetween < 0 || weeksBetween % rule.interval() != 0) {
-                    yield false;
-                }
-                if (rule.byDay().isEmpty()) {
-                    yield candidate.getDayOfWeek() == baseDate.getDayOfWeek();
-                }
-                yield matchesSimpleByDay(candidate, rule.byDay());
-            }
-            case MONTHLY -> {
-                YearMonth baseYm = YearMonth.from(baseDate);
-                YearMonth candidateYm = YearMonth.from(candidate);
-                long monthsBetween = ChronoUnit.MONTHS.between(baseYm, candidateYm);
-                if (monthsBetween < 0 || monthsBetween % rule.interval() != 0) {
-                    yield false;
-                }
-                if (!rule.byMonthDay().isEmpty()) {
-                    if (!matchesMonthDay(candidate, rule.byMonthDay())) {
-                        yield false;
-                    }
-                    yield rule.byDay().isEmpty() || matchesMonthlyByDay(candidate, rule.byDay());
-                }
-                if (!rule.byDay().isEmpty()) {
-                    yield matchesMonthlyByDay(candidate, rule.byDay());
-                }
-                yield candidate.getDayOfMonth() == baseDate.getDayOfMonth();
-            }
-            case YEARLY -> {
-                long yearsBetween = (long) candidate.getYear() - baseDate.getYear();
-                if (yearsBetween < 0 || yearsBetween % rule.interval() != 0) {
-                    yield false;
-                }
-                if (rule.byMonth().isEmpty() && rule.byDay().isEmpty() && rule.byMonthDay().isEmpty()) {
-                    yield candidate.getMonthValue() == baseDate.getMonthValue()
-                            && candidate.getDayOfMonth() == baseDate.getDayOfMonth();
-                }
-                if (!rule.byMonthDay().isEmpty() && !matchesMonthDay(candidate, rule.byMonthDay())) {
-                    yield false;
-                }
-                if (!rule.byDay().isEmpty()) {
-                    if (!rule.byMonth().isEmpty()) {
-                        yield matchesMonthlyByDay(candidate, rule.byDay());
-                    }
-                    yield matchesYearlyByDay(candidate, rule.byDay());
-                }
-                yield !rule.byMonthDay().isEmpty() || candidate.getDayOfMonth() == baseDate.getDayOfMonth();
-            }
+            case DAILY -> matchesDaily(baseDate, candidate, rule);
+            case WEEKLY -> matchesWeekly(baseDate, candidate, rule);
+            case MONTHLY -> matchesMonthly(baseDate, candidate, rule);
+            case YEARLY -> matchesYearly(baseDate, candidate, rule);
         };
+    }
+
+    private static boolean matchesDaily(LocalDate baseDate, LocalDate candidate, RecurrenceRule rule) {
+        long daysBetween = ChronoUnit.DAYS.between(baseDate, candidate);
+        if (daysBetween % rule.interval() != 0) {
+            return false;
+        }
+        if (!rule.byMonthDay().isEmpty() && !matchesMonthDay(candidate, rule.byMonthDay())) {
+            return false;
+        }
+        return rule.byDay().isEmpty() || matchesSimpleByDay(candidate, rule.byDay());
+    }
+
+    private static boolean matchesWeekly(LocalDate baseDate, LocalDate candidate, RecurrenceRule rule) {
+        LocalDate baseWeekStart = baseDate.with(TemporalAdjusters.previousOrSame(rule.wkst()));
+        LocalDate candidateWeekStart = candidate.with(TemporalAdjusters.previousOrSame(rule.wkst()));
+        long weeksBetween = ChronoUnit.WEEKS.between(baseWeekStart, candidateWeekStart);
+        if (weeksBetween < 0 || weeksBetween % rule.interval() != 0) {
+            return false;
+        }
+        if (rule.byDay().isEmpty()) {
+            return candidate.getDayOfWeek().equals(baseDate.getDayOfWeek());
+        }
+        return matchesSimpleByDay(candidate, rule.byDay());
+    }
+
+    private static boolean matchesMonthly(LocalDate baseDate, LocalDate candidate, RecurrenceRule rule) {
+        YearMonth baseYm = YearMonth.from(baseDate);
+        YearMonth candidateYm = YearMonth.from(candidate);
+        long monthsBetween = ChronoUnit.MONTHS.between(baseYm, candidateYm);
+        if (monthsBetween < 0 || monthsBetween % rule.interval() != 0) {
+            return false;
+        }
+        if (!rule.byMonthDay().isEmpty()) {
+            if (!matchesMonthDay(candidate, rule.byMonthDay())) {
+                return false;
+            }
+            return rule.byDay().isEmpty() || matchesMonthlyByDay(candidate, rule.byDay());
+        }
+        if (!rule.byDay().isEmpty()) {
+            return matchesMonthlyByDay(candidate, rule.byDay());
+        }
+        return Integer.valueOf(candidate.getDayOfMonth()).equals(baseDate.getDayOfMonth());
+    }
+
+    private static boolean matchesYearly(LocalDate baseDate, LocalDate candidate, RecurrenceRule rule) {
+        long yearsBetween = (long) candidate.getYear() - baseDate.getYear();
+        if (yearsBetween < 0 || yearsBetween % rule.interval() != 0) {
+            return false;
+        }
+        boolean sameMonth = Integer.valueOf(candidate.getMonthValue()).equals(baseDate.getMonthValue());
+        boolean sameDay = Integer.valueOf(candidate.getDayOfMonth()).equals(baseDate.getDayOfMonth());
+        if (rule.byMonth().isEmpty() && rule.byDay().isEmpty() && rule.byMonthDay().isEmpty()) {
+            return sameMonth && sameDay;
+        }
+        if (!rule.byMonthDay().isEmpty() && !matchesMonthDay(candidate, rule.byMonthDay())) {
+            return false;
+        }
+        if (!rule.byDay().isEmpty()) {
+            if (!rule.byMonth().isEmpty()) {
+                return matchesMonthlyByDay(candidate, rule.byDay());
+            }
+            return matchesYearlyByDay(candidate, rule.byDay());
+        }
+        return !rule.byMonthDay().isEmpty() || sameDay;
     }
 
     private static boolean matchesMonthDay(LocalDate candidate, List<Integer> byMonthDay) {
@@ -832,45 +922,37 @@ public class Schedule {
 
     private static boolean matchesSimpleByDay(LocalDate candidate, List<ByDayEntry> byDay) {
         DayOfWeek dow = candidate.getDayOfWeek();
-        return byDay.stream().anyMatch(entry -> entry.dayOfWeek() == dow);
+        return byDay.stream().anyMatch(entry -> entry.dayOfWeek().equals(dow));
     }
 
     private static boolean matchesMonthlyByDay(LocalDate candidate, List<ByDayEntry> byDay) {
         DayOfWeek dow = candidate.getDayOfWeek();
         int positiveOrdinal = (candidate.getDayOfMonth() - 1) / 7 + 1;
         int negativeOrdinal = -((candidate.lengthOfMonth() - candidate.getDayOfMonth()) / 7 + 1);
-        for (ByDayEntry entry : byDay) {
-            if (entry.dayOfWeek() != dow) {
-                continue;
-            }
-            if (entry.ordinal() == null || entry.ordinal() == positiveOrdinal || entry.ordinal() == negativeOrdinal) {
-                return true;
-            }
-        }
-        return false;
+        return byDay.stream()
+                .filter(entry -> entry.dayOfWeek().equals(dow))
+                .anyMatch(entry -> Objects.isNull(entry.ordinal())
+                        || Integer.valueOf(positiveOrdinal).equals(entry.ordinal())
+                        || Integer.valueOf(negativeOrdinal).equals(entry.ordinal()));
     }
 
     private static boolean matchesYearlyByDay(LocalDate candidate, List<ByDayEntry> byDay) {
         DayOfWeek dow = candidate.getDayOfWeek();
         int positiveOrdinal = (candidate.getDayOfYear() - 1) / 7 + 1;
         int negativeOrdinal = -((candidate.lengthOfYear() - candidate.getDayOfYear()) / 7 + 1);
-        for (ByDayEntry entry : byDay) {
-            if (entry.dayOfWeek() != dow) {
-                continue;
-            }
-            if (entry.ordinal() == null || entry.ordinal() == positiveOrdinal || entry.ordinal() == negativeOrdinal) {
-                return true;
-            }
-        }
-        return false;
+        return byDay.stream()
+                .filter(entry -> entry.dayOfWeek().equals(dow))
+                .anyMatch(entry -> Objects.isNull(entry.ordinal())
+                        || Integer.valueOf(positiveOrdinal).equals(entry.ordinal())
+                        || Integer.valueOf(negativeOrdinal).equals(entry.ordinal()));
     }
 
     private boolean isExcluded(OffsetDateTime occurrenceStart) {
-        if (exdates == null || exdates.isEmpty() || occurrenceStart == null) {
+        if (Objects.isNull(exdates) || exdates.isEmpty() || Objects.isNull(occurrenceStart)) {
             return false;
         }
         Instant target = occurrenceStart.toInstant();
-        return exdates.stream().anyMatch(ex -> ex != null && ex.toInstant().equals(target));
+        return exdates.stream().anyMatch(ex -> Objects.nonNull(ex) && ex.toInstant().equals(target));
     }
 
     private static boolean overlapsWindow(
@@ -879,10 +961,10 @@ public class Schedule {
             OffsetDateTime rangeFrom,
             OffsetDateTime rangeTo
     ) {
-        if (rangeFrom != null && !end.isAfter(rangeFrom)) {
+        if (Objects.nonNull(rangeFrom) && !end.isAfter(rangeFrom)) {
             return false;
         }
-        return rangeTo == null || start.isBefore(rangeTo);
+        return Objects.isNull(rangeTo) || start.isBefore(rangeTo);
     }
 
     private static List<ByDayEntry> parseByDay(String rawByDay, Frequency freq) {
@@ -895,8 +977,8 @@ public class Schedule {
                 throw new IllegalArgumentException("Invalid BYDAY value in RRULE: " + token);
             }
             Integer ordinal = null;
-            if (matcher.group(1) != null) {
-                if (freq != Frequency.MONTHLY && freq != Frequency.YEARLY) {
+            if (Objects.nonNull(matcher.group(1))) {
+                if (!Frequency.MONTHLY.equals(freq) && !Frequency.YEARLY.equals(freq)) {
                     throw new IllegalArgumentException("BYDAY with ordinal is only valid for MONTHLY or YEARLY frequencies");
                 }
                 ordinal = Integer.parseInt(matcher.group(1));
@@ -911,7 +993,7 @@ public class Schedule {
     }
 
     private static List<Integer> parseByMonthDay(String rawByMonthDay, Frequency freq) {
-        if (freq == Frequency.WEEKLY) {
+        if (Frequency.WEEKLY.equals(freq)) {
             throw new IllegalArgumentException("BYMONTHDAY is not valid when FREQ=WEEKLY (RFC 5545)");
         }
         String[] tokens = rawByMonthDay.split(",");
@@ -919,7 +1001,7 @@ public class Schedule {
         for (String token : tokens) {
             try {
                 int day = Integer.parseInt(token.trim());
-                if (day == 0 || day < -31 || day > 31) {
+                if (Integer.valueOf(0).equals(day) || day < -31 || day > 31) {
                     throw new IllegalArgumentException("BYMONTHDAY out of range (-31..31, excluding 0): " + day);
                 }
                 result.add(day);
@@ -966,20 +1048,8 @@ public class Schedule {
         };
     }
 
-    private static String toIcalDay(DayOfWeek dayOfWeek) {
-        return switch (dayOfWeek) {
-            case MONDAY -> "MO";
-            case TUESDAY -> "TU";
-            case WEDNESDAY -> "WE";
-            case THURSDAY -> "TH";
-            case FRIDAY -> "FR";
-            case SATURDAY -> "SA";
-            case SUNDAY -> "SU";
-        };
-    }
-
     private static ZoneId resolveZoneForParsing(String tzidCandidate) {
-        if (tzidCandidate != null && !tzidCandidate.isBlank()) {
+        if (Objects.nonNull(tzidCandidate) && !tzidCandidate.isBlank()) {
             try {
                 return ZoneId.of(tzidCandidate.trim());
             } catch (DateTimeException ex) {
@@ -991,18 +1061,18 @@ public class Schedule {
 
     private static OffsetDateTime parseICalDateTime(String rawValue, ZoneId defaultZone, boolean endOfDayIfDateOnly) {
         String value = rawValue.trim();
-        ZoneId zone = (defaultZone != null) ? defaultZone : ZoneOffset.UTC;
+        ZoneId zone = Objects.nonNull(defaultZone) ? defaultZone : ZoneOffset.UTC;
         try {
-            if (value.endsWith("Z") && value.length() == 16 && value.charAt(8) == 'T') {
+            if (value.endsWith("Z") && Integer.valueOf(16).equals(value.length()) && Character.valueOf('T').equals(value.charAt(8))) {
                 LocalDateTime ldt = LocalDateTime.parse(value.substring(0, value.length() - 1), ICAL_LOCAL_DT_FORMAT);
                 return ldt.atOffset(ZoneOffset.UTC);
             }
-            if (value.length() == 8 && value.chars().allMatch(Character::isDigit)) {
+            if (Integer.valueOf(8).equals(value.length()) && value.chars().allMatch(Character::isDigit)) {
                 LocalDate date = LocalDate.parse(value, ICAL_DATE_FORMAT);
                 LocalDateTime ldt = endOfDayIfDateOnly ? date.atTime(23, 59, 59) : date.atStartOfDay();
                 return ldt.atZone(zone).toOffsetDateTime();
             }
-            if (value.length() == 15 && value.charAt(8) == 'T') {
+            if (Integer.valueOf(15).equals(value.length()) && Character.valueOf('T').equals(value.charAt(8))) {
                 LocalDateTime ldt = LocalDateTime.parse(value, ICAL_LOCAL_DT_FORMAT);
                 return ldt.atZone(zone).toOffsetDateTime();
             }
@@ -1015,7 +1085,7 @@ public class Schedule {
     private static List<OffsetDateTime> deduplicateByInstant(List<OffsetDateTime> timestamps) {
         Map<Instant, OffsetDateTime> unique = new LinkedHashMap<>();
         for (OffsetDateTime ts : timestamps) {
-            if (ts != null) {
+            if (Objects.nonNull(ts)) {
                 unique.putIfAbsent(ts.toInstant(), ts);
             }
         }

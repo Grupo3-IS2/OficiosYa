@@ -70,7 +70,11 @@ public class Schedule {
     private static final DateTimeFormatter ICAL_DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyyMMdd", Locale.ROOT);
     private static final Pattern BYDAY_PATTERN =
-            Pattern.compile("^([+-]?\\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$");
+            Pattern.compile("([+-]?\\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)");
+    private static final Pattern ICAL_UNFOLD_PATTERN =
+            Pattern.compile("\\r?\\n[ \\t]");
+    private static final Pattern ICAL_LINE_BREAK_PATTERN =
+            Pattern.compile("\\r?\\n");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -154,6 +158,24 @@ public class Schedule {
             List<Integer> byMonth,
             DayOfWeek wkst
     ) {
+        public RecurrenceRule {
+            if (interval <= 0) {
+                interval = 1;
+            }
+            if (byDay == null) {
+                byDay = List.of();
+            }
+            if (byMonthDay == null) {
+                byMonthDay = List.of();
+            }
+            if (byMonth == null) {
+                byMonth = List.of();
+            }
+            if (wkst == null) {
+                wkst = DayOfWeek.MONDAY;
+            }
+        }
+
         public String toNormalizedString() {
             List<String> parts = new ArrayList<>();
             parts.add("FREQ=" + freq.name());
@@ -261,7 +283,7 @@ public class Schedule {
         if (occurrences.isEmpty()) {
             recurrenceEnd = endTimestamp;
         } else {
-            recurrenceEnd = occurrences.getLast().endTimestamp();
+            recurrenceEnd = occurrences.get(occurrences.size() - 1).endTimestamp();
         }
     }
 
@@ -433,20 +455,20 @@ public class Schedule {
 
         if (!this.isRecurring() && !other.isRecurring()) {
             return !this.isExcluded(this.startTimestamp)
-                    && !other.isExcluded(other.startTimestamp)
-                    && this.startTimestamp.isBefore(other.endTimestamp)
-                    && this.endTimestamp.isAfter(other.startTimestamp);
+                    && !other.isExcluded(other.getStartTimestamp())
+                    && this.startTimestamp.isBefore(other.getEndTimestamp())
+                    && this.endTimestamp.isAfter(other.getStartTimestamp());
         }
 
-        OffsetDateTime windowStart = this.startTimestamp.isAfter(other.startTimestamp)
-                ? this.startTimestamp : other.startTimestamp;
+        OffsetDateTime windowStart = this.startTimestamp.isAfter(other.getStartTimestamp())
+                ? this.startTimestamp : other.getStartTimestamp();
 
         OffsetDateTime thisEnd = this.recurrenceEnd != null
                 ? this.recurrenceEnd
                 : (this.isRecurring() ? null : this.endTimestamp);
-        OffsetDateTime otherEnd = other.recurrenceEnd != null
-                ? other.recurrenceEnd
-                : (other.isRecurring() ? null : other.endTimestamp);
+        OffsetDateTime otherEnd = other.getRecurrenceEnd() != null
+                ? other.getRecurrenceEnd()
+                : (other.isRecurring() ? null : other.getEndTimestamp());
 
         OffsetDateTime windowEnd;
         if (thisEnd != null && otherEnd != null) {
@@ -521,6 +543,9 @@ public class Schedule {
      * Formats this schedule as an RFC 5545 {@code VEVENT} block.
      */
     public String toICalendarVEvent() {
+        if (startTimestamp == null || endTimestamp == null) {
+            throw new IllegalStateException("Schedule must have startTimestamp and endTimestamp to format as iCalendar");
+        }
         validateAndNormalizeRecurrence();
         StringBuilder sb = new StringBuilder();
         sb.append("BEGIN:VEVENT\r\n");
@@ -576,8 +601,8 @@ public class Schedule {
         if (icsContent == null || icsContent.isBlank()) {
             throw new IllegalArgumentException("iCalendar content must not be blank");
         }
-        String unfolded = icsContent.replaceAll("\\r?\\n[ \\t]", "");
-        String[] lines = unfolded.split("\\r?\\n");
+        String unfolded = ICAL_UNFOLD_PATTERN.matcher(icsContent).replaceAll("");
+        String[] lines = ICAL_LINE_BREAK_PATTERN.split(unfolded);
 
         OffsetDateTime parsedStart = null;
         OffsetDateTime parsedEnd = null;
@@ -653,9 +678,7 @@ public class Schedule {
         this.tzid = parsedTzid;
         this.rrule = parsedRRule;
         this.exdates = parsedExdates;
-        if (parsedType != null) {
-            this.type = parsedType;
-        }
+        this.type = (parsedType != null) ? parsedType : (this.type != null ? this.type : ScheduleType.URGENT_AVAILABLE);
         validateAndNormalizeRecurrence();
     }
 
@@ -968,6 +991,7 @@ public class Schedule {
 
     private static OffsetDateTime parseICalDateTime(String rawValue, ZoneId defaultZone, boolean endOfDayIfDateOnly) {
         String value = rawValue.trim();
+        ZoneId zone = (defaultZone != null) ? defaultZone : ZoneOffset.UTC;
         try {
             if (value.endsWith("Z") && value.length() == 16 && value.charAt(8) == 'T') {
                 LocalDateTime ldt = LocalDateTime.parse(value.substring(0, value.length() - 1), ICAL_LOCAL_DT_FORMAT);
@@ -976,11 +1000,11 @@ public class Schedule {
             if (value.length() == 8 && value.chars().allMatch(Character::isDigit)) {
                 LocalDate date = LocalDate.parse(value, ICAL_DATE_FORMAT);
                 LocalDateTime ldt = endOfDayIfDateOnly ? date.atTime(23, 59, 59) : date.atStartOfDay();
-                return ldt.atZone(defaultZone).toOffsetDateTime();
+                return ldt.atZone(zone).toOffsetDateTime();
             }
             if (value.length() == 15 && value.charAt(8) == 'T') {
                 LocalDateTime ldt = LocalDateTime.parse(value, ICAL_LOCAL_DT_FORMAT);
-                return ldt.atZone(defaultZone).toOffsetDateTime();
+                return ldt.atZone(zone).toOffsetDateTime();
             }
             return OffsetDateTime.parse(value);
         } catch (DateTimeParseException ex) {

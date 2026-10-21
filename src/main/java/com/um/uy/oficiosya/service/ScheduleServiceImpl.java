@@ -23,6 +23,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -51,7 +52,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                     "A SCHEDULED_JOB block cannot be created manually");
         }
 
-        if (!scheduleRequest.getStartTimestamp().isBefore(scheduleRequest.getEndTimestamp())) {
+        if (scheduleRequest.getStartTimestamp() == null || scheduleRequest.getEndTimestamp() == null
+                || !scheduleRequest.getStartTimestamp().isBefore(scheduleRequest.getEndTimestamp())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     BLOCK_STARTS_AFTER_END);
         }
@@ -89,7 +91,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         OffsetDateTime end = scheduleRequest.getEndTimestamp() != null
                 ? scheduleRequest.getEndTimestamp() : schedule.getEndTimestamp();
 
-        if (!start.isBefore(end)) {
+        if (start == null || end == null || !start.isBefore(end)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     BLOCK_STARTS_AFTER_END);
         }
@@ -250,16 +252,18 @@ public class ScheduleServiceImpl implements ScheduleService {
         return scheduleRepository.findAgenda(professionalId, from, to).stream()
                 .flatMap(schedule -> {
                     if (!schedule.isRecurring() && (schedule.getExdates() == null || schedule.getExdates().isEmpty())) {
-                        return java.util.stream.Stream.of(scheduleMapper.toResponse(schedule));
+                        ScheduleResponse res = scheduleMapper.toResponse(schedule);
+                        return res != null ? java.util.stream.Stream.of(res) : java.util.stream.Stream.empty();
                     }
                     return schedule.expandOccurrences(from, to).stream()
-                            .map(occurrence -> scheduleMapper.toOccurrenceResponse(schedule, occurrence));
+                            .map(occurrence -> scheduleMapper.toOccurrenceResponse(schedule, occurrence))
+                            .filter(Objects::nonNull);
                 })
-                .peek(schedule -> {
-                    // Which job a block belongs to is not for the public to know
+                .map(schedule -> {
                     if (!ownerOrAdmin) {
                         schedule.setJobRequestId(null);
                     }
+                    return schedule;
                 })
                 .sorted(Comparator.comparing(ScheduleResponse::getStartTimestamp,
                         Comparator.nullsLast(Comparator.naturalOrder())))

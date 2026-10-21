@@ -21,7 +21,7 @@ public interface ScheduleMapper {
 
     default ScheduleResponse toOccurrenceResponse(Schedule schedule, Schedule.Occurrence occurrence) {
         ScheduleResponse response = toResponse(schedule);
-        if (occurrence != null) {
+        if (response != null && occurrence != null) {
             response.setStartTimestamp(occurrence.startTimestamp());
             response.setEndTimestamp(occurrence.endTimestamp());
         }

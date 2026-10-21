@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import java.time.DayOfWeek;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -333,6 +335,15 @@ class ScheduleTest {
         assertEquals(2032, occsInterval.get(1).startTimestamp().getYear());
     }
 
+    @Test
+    void expandOccurrences_yearlyByDayWithoutOrdinal() {
+        Schedule s = createSchedule("FREQ=YEARLY;BYMONTH=6;BYDAY=MO;COUNT=3", "UTC");
+        List<Schedule.Occurrence> occs = s.expandOccurrences(null, null);
+        assertEquals(3, occs.size());
+        assertTrue(occs.stream().allMatch(o -> o.startTimestamp().getDayOfWeek() == DayOfWeek.MONDAY));
+        assertTrue(occs.stream().allMatch(o -> o.startTimestamp().getMonthValue() == 6));
+    }
+
     // --- Overlaps ---
 
     @Test
@@ -376,6 +387,49 @@ class ScheduleTest {
                 .endTimestamp(BASE_END.plusYears(5))
                 .build();
         assertFalse(sBounded.overlaps(sDisjoint));
+    }
+
+    @Test
+    void overlaps_interleavedOccurrencesAndEmptyExpandedWindows() {
+        Schedule s1 = Schedule.builder()
+                .startTimestamp(BASE_START)
+                .endTimestamp(BASE_START.plusHours(1))
+                .rrule("FREQ=DAILY;COUNT=3")
+                .tzid("UTC")
+                .build();
+        s1.validateAndNormalizeRecurrence();
+        Schedule s2 = Schedule.builder()
+                .startTimestamp(BASE_START.plusHours(1))
+                .endTimestamp(BASE_START.plusHours(2))
+                .rrule("FREQ=DAILY;COUNT=3")
+                .tzid("UTC")
+                .build();
+        s2.validateAndNormalizeRecurrence();
+        assertFalse(s1.overlaps(s2));
+        assertFalse(s2.overlaps(s1));
+
+        Schedule s3 = Schedule.builder()
+                .startTimestamp(BASE_START)
+                .endTimestamp(BASE_START.plusMinutes(30))
+                .rrule("FREQ=DAILY;COUNT=2")
+                .tzid("UTC")
+                .build();
+        s3.validateAndNormalizeRecurrence();
+        Schedule s4 = Schedule.builder()
+                .startTimestamp(BASE_START.plusMinutes(45))
+                .endTimestamp(BASE_START.plusMinutes(60))
+                .rrule("FREQ=DAILY;COUNT=2")
+                .tzid("UTC")
+                .build();
+        s4.validateAndNormalizeRecurrence();
+        assertFalse(s3.overlaps(s4));
+        assertFalse(s4.overlaps(s3));
+
+        Schedule s5 = createSchedule("FREQ=DAILY;COUNT=1", "UTC");
+        s5.addExdate(BASE_START);
+        Schedule s6 = createSchedule("FREQ=DAILY;COUNT=1", "UTC");
+        assertFalse(s5.overlaps(s6));
+        assertFalse(s6.overlaps(s5));
     }
 
     // --- EXDATE & iCalendar Parsing / Serialization ---
@@ -436,6 +490,68 @@ class ScheduleTest {
         assertTrue(ics.contains("SUMMARY:USER_RESERVED"));
     }
 
+    @Test
+    void toICalendar_fullDocumentAndExdates() {
+        Schedule s = Schedule.builder()
+                .id(42L)
+                .type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(BASE_START)
+                .endTimestamp(BASE_END)
+                .tzid("America/Montevideo")
+                .rrule("FREQ=DAILY;COUNT=5")
+                .build();
+        s.addExdate(BASE_START.plusDays(1));
+        s.addExdate(BASE_START.plusDays(2));
+
+        String vcalendar = s.toICalendar();
+        assertTrue(vcalendar.startsWith("BEGIN:VCALENDAR\r\n"));
+        assertTrue(vcalendar.contains("PRODID:-//OficiosYa//Schedule//EN\r\n"));
+        assertTrue(vcalendar.contains("UID:schedule-42@oficiosya.uy\r\n"));
+        assertTrue(vcalendar.contains("DTSTART;TZID=America/Montevideo:"));
+        assertTrue(vcalendar.contains("DTEND;TZID=America/Montevideo:"));
+        assertTrue(vcalendar.contains("RRULE:FREQ=DAILY;COUNT=5\r\n"));
+        assertTrue(vcalendar.contains("EXDATE:"));
+        assertTrue(vcalendar.endsWith("END:VCALENDAR\r\n"));
+
+        Schedule parsed = Schedule.fromICalendar(vcalendar);
+        assertEquals(s.getRrule(), parsed.getRrule());
+        assertEquals("America/Montevideo", parsed.getTzid());
+        assertEquals(2, parsed.getExdates().size());
+        assertEquals(ScheduleType.URGENT_AVAILABLE, parsed.getType());
+    }
+
+    @Test
+    void toICalendarVEvent_throwsWhenNullTimestamps() {
+        Schedule s = new Schedule();
+        assertThrows(IllegalStateException.class, s::toICalendarVEvent);
+    }
+
+    @Test
+    void toICalendarVEvent_handlesEmptyExdatesList() {
+        Schedule s = createSchedule(null, null);
+        s.setExdates(new ArrayList<>(Collections.singletonList(null)));
+        assertFalse(s.toICalendarVEvent().contains("EXDATE:"));
+    }
+
+    @Test
+    void applyICalendarVEvent_summaryAndParsingEdges() {
+        Schedule s = new Schedule();
+        String ics = """
+                BEGIN:VEVENT
+                DTSTART:20300603T090000Z
+                DTEND:20300603T110000Z
+                SUMMARY:SCHEDULED_JOB
+                TZID:UTC
+                INVALID_LINE_WITHOUT_COLON
+                END:VEVENT
+                """;
+        s.applyICalendarVEvent(ics);
+        assertEquals(ScheduleType.SCHEDULED_JOB, s.getType());
+        assertEquals("UTC", s.getTzid());
+        assertEquals(BASE_START, s.getStartTimestamp());
+        assertEquals(BASE_END, s.getEndTimestamp());
+    }
+
     // --- DTOs and Mappers Coverage ---
 
     @Test
@@ -485,5 +601,48 @@ class ScheduleTest {
         };
         ScheduleResponse nullOccResponse = mapper.toOccurrenceResponse(new Schedule(), null);
         assertNotNull(nullOccResponse);
+    }
+
+    @Test
+    void scheduleMapperImpl_fullCoverage() {
+        com.um.uy.oficiosya.mapper.ScheduleMapper mapper = new com.um.uy.oficiosya.mapper.ScheduleMapperImpl();
+        assertNull(mapper.toEntity(null));
+        assertNull(mapper.toResponse(null));
+        assertNull(mapper.toOccurrenceResponse(null, null));
+
+        Schedule schedule = createSchedule("FREQ=WEEKLY", "UTC");
+        Professional prof = new Professional();
+        prof.setPublicId(UUID.randomUUID());
+        schedule.setProfessional(prof);
+        JobRequest jobReq = new JobRequest();
+        jobReq.setId(99L);
+        schedule.setJobRequest(jobReq);
+
+        Schedule.Occurrence occ = new Schedule.Occurrence(BASE_START.plusDays(7), BASE_END.plusDays(7));
+        ScheduleResponse occResponse = mapper.toOccurrenceResponse(schedule, occ);
+        assertNotNull(occResponse);
+        assertEquals(BASE_START.plusDays(7), occResponse.getStartTimestamp());
+        assertEquals(BASE_END.plusDays(7), occResponse.getEndTimestamp());
+        assertEquals("FREQ=WEEKLY", occResponse.getRrule());
+        assertEquals("UTC", occResponse.getTzid());
+        assertEquals(prof.getPublicId(), occResponse.getProfessionalId());
+        assertEquals(99L, occResponse.getJobRequestId());
+
+        ScheduleCreateRequest req = new ScheduleCreateRequest();
+        req.setType(ScheduleType.URGENT_AVAILABLE);
+        req.setStartTimestamp(BASE_START);
+        req.setEndTimestamp(BASE_END);
+        req.setRrule("FREQ=DAILY");
+        req.setTzid("UTC");
+        req.setExdates(List.of(BASE_START.plusDays(1)));
+        Schedule entity = mapper.toEntity(req);
+        assertNotNull(entity);
+        assertEquals(ScheduleType.URGENT_AVAILABLE, entity.getType());
+        assertEquals("FREQ=DAILY", entity.getRrule());
+        assertEquals(1, entity.getExdates().size());
+
+        ScheduleResponse resp = mapper.toResponse(entity);
+        assertNotNull(resp);
+        assertEquals(entity.getRrule(), resp.getRrule());
     }
 }

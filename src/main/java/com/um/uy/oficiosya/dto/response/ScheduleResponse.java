@@ -26,11 +26,6 @@ public class ScheduleResponse {
 
     public ScheduleResponse(Long id, UUID professionalId, Long jobRequestId, ScheduleType type,
                             OffsetDateTime startTimestamp, OffsetDateTime endTimestamp) {
-        this.id = id;
-        this.professionalId = professionalId;
-        this.jobRequestId = jobRequestId;
-        this.type = type;
-        this.startTimestamp = startTimestamp;
-        this.endTimestamp = endTimestamp;
+        this(id, professionalId, jobRequestId, type, startTimestamp, endTimestamp, null, null, null, null);
     }
 }

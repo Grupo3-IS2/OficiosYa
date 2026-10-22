@@ -7,6 +7,7 @@ import {
   getToken,
   isTokenUsable,
   storeLogin,
+  notifySessionChange,
 } from './session.ts'
 import { keepSessionFresh } from './sessionRenewal.ts'
 import type {
@@ -158,6 +159,7 @@ export async function logout(): Promise<void> {
 export function watchSessionFromOtherTabs(): void {
   window.addEventListener('storage', event => {
     if (event.storageArea !== localStorage) return
+    if (event.key === TOKEN_KEY || event.key === USER_KEY || event.key === null) notifySessionChange()
     if ((event.key === TOKEN_KEY || event.key === null) && event.oldValue !== null && !getToken()) {
       window.location.href = '/login'
     }
@@ -167,6 +169,7 @@ export function watchSessionFromOtherTabs(): void {
 export function updateStoredUser(user: StoredUser): void {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
   localStorage.removeItem(PROFILE_KEY)
+  notifySessionChange()
 }
 
 /**

@@ -1,4 +1,5 @@
-import { useState, type SubmitEvent } from 'react'
+import { useEffect, useState, type SubmitEvent } from 'react'
+import { useSession } from '../../components/SessionProvider/useSession'
 import Button from '../../components/Button/Button'
 import GoogleButton from '../../components/GoogleButton/GoogleButton'
 import Icon from '../../components/Icon/Icon'
@@ -22,6 +23,10 @@ function Brand() {
 }
 
 function Login() {
+    const { status } = useSession()
+    useEffect(() => {
+        if (status === 'authenticated') window.location.replace('/')
+    }, [status])
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
@@ -78,6 +83,7 @@ function Login() {
         }
     }
 
+    if (status === 'authenticated') return null
     return (
         <main className="login-page">
             <div className="login-decoration login-decoration--top" />

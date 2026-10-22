@@ -26,6 +26,36 @@ function setup(overrides: Partial<SessionRefresherDeps> = {}, initialToken: stri
 }
 
 describe('session refresher', () => {
+    it('does not restore a session when logout happened during the renewal request', async () => {
+        let finish!: (value: { status: number; body: LoginResponse }) => void
+        const { state, refresh } = setup({ requestRefresh: () => new Promise(resolve => { finish = resolve }) })
+        const renewal = refresh('old')
+        state.token = null
+        finish({ status: 200, body: { token: 'new' } as LoginResponse })
+        assert.equal(await renewal, 'expired')
+        assert.equal(state.token, null)
+    })
+
+    it('does not spend the refresh cookie after logout while waiting for the lock', async () => {
+        let enter!: () => void
+        const { state, refresh } = setup({ exclusive: task => new Promise(resolve => { enter = () => { void task().then(resolve) } }) })
+        const renewal = refresh('old')
+        state.token = null
+        enter()
+        assert.equal(await renewal, 'expired')
+        assert.equal(state.calls, 0)
+    })
+
+    it('does not overwrite a new login with a late response for the previous account', async () => {
+        let finish!: (value: { status: number; body: LoginResponse }) => void
+        const { state, refresh } = setup({ requestRefresh: () => new Promise(resolve => { finish = resolve }) })
+        const renewal = refresh('old')
+        state.token = 'other'
+        finish({ status: 200, body: { token: 'new' } as LoginResponse })
+        assert.equal(await renewal, 'refreshed')
+        assert.equal(state.token, 'other')
+    })
+
     it('stores the new access token the backend answers', async () => {
         const { state, refresh } = setup()
 

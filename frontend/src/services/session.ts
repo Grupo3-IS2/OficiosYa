@@ -4,6 +4,16 @@ export const TOKEN_KEY = 'oficiosya_token'
 export const USER_KEY = 'oficiosya_user'
 export const PROFILE_KEY = 'oficiosya_profile'
 
+const listeners = new Set<() => void>()
+export function subscribeSession(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+
+export function notifySessionChange(): void {
+  listeners.forEach(listener => listener())
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -20,12 +30,14 @@ export function storeLogin(response: LoginResponse): void {
     name: response.name,
     role: response.role,
   }))
+  notifySessionChange()
 }
 
 export function clearSession(): void {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
   localStorage.removeItem(PROFILE_KEY)
+  notifySessionChange()
 }
 
 /**

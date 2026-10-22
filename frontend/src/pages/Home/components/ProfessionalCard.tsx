@@ -3,7 +3,7 @@ import type { Professional } from '../../../types/Professional'
 import type { Schedule } from '../../../types/Schedule'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
-import { getCurrentUser, isAuthenticated } from '../../../services/authService'
+import { useSession } from '../../../components/SessionProvider/useSession'
 import { professionalAvailability } from '../professionalAvailability'
 import { tradesFor } from '../professionalFilters'
 import Rating from './Rating'
@@ -21,7 +21,7 @@ function ProfessionalCard({ professional, selectedTradeIds = [], schedules }: Pr
         : schedules === null ? 'No pudimos cargar la disponibilidad'
             : professionalAvailability(schedules)
 
-    const currentUser = getCurrentUser()
+    const { user: currentUser, status } = useSession()
     const isOwnProfile = currentUser?.id === professional.id
     const relevantTrades = tradesFor(professional, selectedTradeIds)
     // The profile opens on one trade: the first chosen one this professional does.
@@ -48,7 +48,7 @@ function ProfessionalCard({ professional, selectedTradeIds = [], schedules }: Pr
                     </div>
                 )}
                 <Rating value={professional.rating} />
-                {isAuthenticated() && professional.workingLocation && (
+                {status === 'authenticated' && professional.workingLocation && (
                     <p className="meta"><Icon name="location" /> {professional.workingLocation}</p>
                 )}
                 <p className="meta"><Icon name="calendar" /> {availability}</p>

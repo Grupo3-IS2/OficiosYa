@@ -34,6 +34,26 @@ test('publication requires a description and a trade with valid hourly rates', (
     assert.match(validateProfessional({ ...professional, trades: [{ ...professional.trades[0], maximumHourlyWage: '500' }] }, professional), /tarifas/)
 })
 
+test('new and existing trades reject zero, negative, empty and non-finite hourly rates', () => {
+    for (const id of [null, 1]) {
+        for (const field of ['minimumHourlyWage', 'maximumHourlyWage']) {
+            for (const value of ['0', '0.00', '-1', '-0.01', '', ' ', 'NaN', 'Infinity']) {
+                const trade = { ...professional.trades[0], id, [field]: value }
+                assert.match(validateProfessional({ ...professional, trades: [trade] }, professional), /mayores a \$0/, `${id}:${field}=${value}`)
+            }
+        }
+    }
+})
+
+test('positive decimal rates and equal bounds are valid, but an inverted range is not', () => {
+    for (const [minimumHourlyWage, maximumHourlyWage] of [['0.01', '0.01'], ['0.01', '100'], ['350', '350']]) {
+        const trade = { ...professional.trades[0], minimumHourlyWage, maximumHourlyWage }
+        assert.equal(validateProfessional({ ...professional, trades: [trade] }, professional), '')
+    }
+    const trade = { ...professional.trades[0], minimumHourlyWage: '100', maximumHourlyWage: '99.99' }
+    assert.match(validateProfessional({ ...professional, trades: [trade] }, professional), /máxima debe ser mayor o igual/)
+})
+
 test('a professional phone is required and follows the same rule as the backend', () => {
     assert.match(validatePhone(''), /Ingresa tu número/)
     assert.match(validatePhone('   '), /Ingresa tu número/)

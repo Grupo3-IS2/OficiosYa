@@ -3,18 +3,17 @@ import Button from '../Button/Button'
 import Icon from '../Icon/Icon'
 import ProfileMenu from './ProfileMenu/ProfileMenu'
 import {
-    getCurrentUser,
-    isAuthenticated,
     logout,
 } from '../../services/authService'
 import { useUnreadChats } from './useUnreadChats'
 import { useAwaitingAnswers } from './useAwaitingAnswers'
 import './Header.css'
+import { useSession } from '../SessionProvider/useSession'
 
 function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
-    const [authenticated, setAuthenticated] = useState(isAuthenticated)
-    const user = getCurrentUser()
+    const { status, user } = useSession()
+    const authenticated = status === 'authenticated'
     const isProfessional = user?.role === 'PROFESSIONAL'
     const professionalLabel = !authenticated
         ? 'Soy profesional'
@@ -31,7 +30,6 @@ function Header() {
 
     const handleLogout = async () => {
         await logout()
-        setAuthenticated(false)
         window.location.href = '/'
     }
 

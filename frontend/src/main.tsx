@@ -4,14 +4,13 @@ import './index.css'
 import App from './App.tsx'
 import AppToaster from './components/AppToaster/AppToaster'
 import { watchSessionFromOtherTabs } from './services/authService'
-import { resumeSession } from './services/sessionRenewal'
+import SessionProvider from './components/SessionProvider/SessionProvider'
 
-void resumeSession()
 watchSessionFromOtherTabs()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <SessionProvider><App /></SessionProvider>
     <AppToaster />
   </StrictMode>,
 )

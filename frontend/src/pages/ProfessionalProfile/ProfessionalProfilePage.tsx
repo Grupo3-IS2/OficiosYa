@@ -126,7 +126,7 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                         loading={scheduleState.professionalId !== professionalId || scheduleState.status === 'loading'}
                         error={scheduleState.professionalId === professionalId && scheduleState.status === 'error'}
                     />
-                    <ReviewsSection rating={professional.rating} />
+                    <ReviewsSection key={`${professionalId}:${ratingRevision}`} professionalId={professionalId} rating={professional.rating} />
                     {requestModalOpen && (
                         <ServiceRequestModal
                             professional={professional}

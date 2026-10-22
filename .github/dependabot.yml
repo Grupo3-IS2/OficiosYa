@@ -15,9 +15,9 @@ updates:
       interval: "weekly"
     target-branch: "dev"
 
-  # 3. Docker Compose (imágenes base de los servicios)
-  - package-ecosystem: "docker-compose"
-    directory: "/" # Carpeta donde se encuentra tu docker-compose.yml
+  # 3. Docker (imagen base del Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/" # El Dockerfile está en la raíz del repositorio.
     schedule:
       interval: "weekly"
     target-branch: "dev"

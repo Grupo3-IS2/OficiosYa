@@ -71,7 +71,7 @@ async function prepareProfile(page: Page) {
     return route.fulfill({ json: current });
   });
 
-  await page.addInitScript(token => {
+  await page.addInitScript(({ token, professionalId }) => {
     localStorage.setItem('oficiosya_token', token);
     localStorage.setItem('oficiosya_user', JSON.stringify({
       id: professionalId,
@@ -79,7 +79,7 @@ async function prepareProfile(page: Page) {
       email: 'professional.ui@qa.test',
       role: 'PROFESSIONAL',
     }));
-  }, TOKEN);
+  }, { token: TOKEN, professionalId });
   await page.goto(`${FRONTEND_BASE}/profile/edit`);
   await expect(page.getByRole('heading', { name: 'Perfil profesional' })).toBeVisible();
   return { calls, getCurrent: () => current };

@@ -1,4 +1,13 @@
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
+
+/** Valid session for isolated UI tests; register later routes to exercise rejection or outages. */
+export async function mockSessionVerification(surface: Page | BrowserContext) {
+  await surface.route('**/api/v1/auth/verify', route => route.fulfill({ json: {
+    verified: true,
+    emittedDate: new Date().toISOString(),
+    expirationDate: new Date(Date.now() + 3_600_000).toISOString(),
+  } }));
+}
 
 /**
  * Unsigned JWT for UI tests. The frontend only reads `exp` to decide if the session
@@ -15,6 +24,8 @@ export function fakeJwt(expiresInSeconds = 3600) {
  * 401 to those calls and the frontend expires the session, so UI tests with a session mock them.
  */
 export async function mockHomeApi(page: Page) {
+  // Home now checks an existing session before rendering its authenticated controls.
+  await mockSessionVerification(page);
   await mockChat(page);
   // The header asks for the user's requests, to warn on "Mis solicitudes" if one waits for them.
   // Registered first, so a test that mocks its own requests overrides it.
@@ -88,15 +99,6 @@ export interface MockedUser {
 
 export async function mockVerifiedSession(page: Page, user: MockedUser) {
   await mockHomeApi(page);
-  await page.route('**/api/v1/auth/verify', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      verified: true,
-      emittedDate: new Date().toISOString(),
-      expirationDate: new Date(Date.now() + 3_600_000).toISOString()
-    })
-  }));
   await page.route('**/api/v1/users/me', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -126,4 +128,8 @@ export async function mockProfileViewer(page: Page) {
     }));
   }, fakeJwt());
   await page.route('**/api/v1/schedules?**', route => route.fulfill({ json: [] }));
+  // Reviews are a separate authenticated request. Tests of unrelated profile features use an empty page.
+  await page.route('**/api/v1/professionals/*/reviews?**', route => route.fulfill({ json: {
+    content: [], number: 0, size: 5, totalElements: 0, totalPages: 0, last: true,
+  } }));
 }

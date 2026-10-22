@@ -152,7 +152,7 @@ export async function logout(): Promise<void> {
   try {
     await apiRequest<unknown>('/auth/logout', { method: 'POST' })
   } catch { /* already invalid or backend unreachable: clearing locally is all that is left */ }
-  clearSession()
+  clearSession('/')
 }
 
 /** Follows a logout done in another tab: localStorage changes there fire `storage` here. */

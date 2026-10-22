@@ -89,8 +89,13 @@ test('logout stays anonymous after reload even if a refresh cookie could still a
   await page.route('**/api/v1/auth/logout', route => route.fulfill({ status: 204 }));
   await page.goto('/');
   await page.getByRole('button', { name: 'Perfil', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Cerrar sesión', exact: true }).click();
+  await Promise.all([
+    page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() && new URL(frame.url()).pathname === '/' }),
+    page.getByRole('menuitem', { name: 'Cerrar sesión', exact: true }).click(),
+  ]);
+  await page.waitForLoadState('load');
   await expect(page.getByRole('link', { name: 'Iniciar sesión', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('oficiosya_token'))).toBeNull();
   await page.reload();
   await expect(page.getByRole('link', { name: 'Iniciar sesión', exact: true })).toBeVisible();
   expect(refreshes).toBe(0);

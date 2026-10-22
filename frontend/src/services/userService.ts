@@ -201,5 +201,5 @@ export async function deleteUser(confirmation: { currentPassword?: string; email
     method: 'DELETE',
     body: JSON.stringify(confirmation),
   })
-  clearSession()
+  clearSession('/')
 }

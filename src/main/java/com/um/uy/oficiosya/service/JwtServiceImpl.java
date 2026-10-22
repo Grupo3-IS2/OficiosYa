@@ -132,21 +132,21 @@ public class JwtServiceImpl implements JwtService {
     private String buildToken(Map<String, Object> extraClaims, String id, long expiration) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
-                .setClaims(extraClaims)
+                .claims(extraClaims)
                 .claim(ISSUED_AT_MILLIS, now)
-                .setSubject(id)
-                .setIssuedAt(new Date(now))
-                .setExpiration(new Date(now + expiration))
-                .signWith(this.privateKey, SignatureAlgorithm.RS256)
+                .subject(id)
+                .issuedAt(new Date(now))
+                .expiration(new Date(now + expiration))
+                .signWith(this.privateKey, Jwts.SIG.RS256)
                 .compact();
     }
 
     private Claims extractAllClaims(String token) {
         try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(this.publicKey).build()
-                    .parseClaimsJws(token)
-                    .getBody();
+            return Jwts.parser()
+                    .verifyWith(this.publicKey).build()
+                    .parseSignedClaims(token)
+                    .getPayload();
         } catch (ExpiredJwtException e) {
             logger.error("expired JWT token: {}", e.getMessage());
             throw e;

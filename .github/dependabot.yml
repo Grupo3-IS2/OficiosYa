@@ -14,6 +14,10 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    groups:
+      # jjwt-api/impl/jackson deben ir siempre en la misma versión.
+      jjwt:
+        patterns: ["io.jsonwebtoken:*"]
 
   # 3. Docker (imagen base del Dockerfile)
   - package-ecosystem: "docker"

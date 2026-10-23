@@ -24,6 +24,10 @@ function Header() {
     const awaiting = useAwaitingAnswers(authenticated)
     const unreadChats = useUnreadChats(authenticated)
 
+    const openProfessionalPanel = isProfessional && user
+        ? () => { window.location.href = `/profesionales/${encodeURIComponent(user.id)}` }
+        : undefined
+
     const toggleMenu = () => {
         setIsMenuOpen((isOpen) => !isOpen)
     }
@@ -44,7 +48,7 @@ function Header() {
 
             {authenticated && (
                 <div className="mobile-professional">
-                    <Button type="button">{professionalLabel}</Button>
+                    <Button type="button" onClick={openProfessionalPanel}>{professionalLabel}</Button>
                 </div>
             )}
 
@@ -109,7 +113,7 @@ function Header() {
                 )}
 
                 {authenticated && (
-                    <Button type="button">
+                    <Button type="button" onClick={openProfessionalPanel}>
                         <Icon name="user" />
                         <span>{professionalLabel}</span>
                     </Button>

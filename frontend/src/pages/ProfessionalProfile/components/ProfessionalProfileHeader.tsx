@@ -45,7 +45,7 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                         <strong>${startingPrice.toLocaleString('es-UY')}</strong>
                     </span>
                 )}
-                <div className="profile-summary__actions">
+                {professional.id !== getCurrentUser()?.id && <div className="profile-summary__actions">
                     <Button
                         type="button"
                         variant="ghost"
@@ -65,7 +65,7 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                     >
                         Solicitar servicio
                     </Button>
-                </div>
+                </div>}
             </div>
         </section>
     )

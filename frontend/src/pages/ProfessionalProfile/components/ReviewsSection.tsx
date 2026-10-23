@@ -13,8 +13,7 @@ interface ReviewsSectionProps {
 }
 
 export default function ReviewsSection({ professionalId, rating }: Readonly<ReviewsSectionProps>) {
-    const user = getCurrentUser()
-    const canRead = user?.role === 'CLIENT' || user?.id === professionalId
+    const canRead = Boolean(getCurrentUser()?.role)
     const [reviews, setReviews] = useState<ProfessionalReview[]>([])
     const [page, setPage] = useState(0)
     const [retry, setRetry] = useState(0)

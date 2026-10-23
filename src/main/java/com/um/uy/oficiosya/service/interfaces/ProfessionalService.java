@@ -26,8 +26,8 @@ public interface ProfessionalService {
     /** The full profile, contact data included: only for the owner and admins. */
     ProfessionalResponse getProfessional(UUID id);
 
-    /** The public view of a professional; not found unless the professional is published. */
-    ProfessionalPublicResponse getPublicProfessional(UUID id);
+    /** The public view of a professional; not found unless published or the viewer is the owner or an admin. */
+    ProfessionalPublicResponse getPublicProfessional(UUID id, boolean ownerOrAdmin);
     void deleteProfessional(UUID id);
 
     /** Admin-only. */

@@ -191,14 +191,23 @@ class ProfessionalServiceImplTest {
         ProfessionalPublicResponse publicResponse = new ProfessionalPublicResponse();
         when(professionalMapper.toPublicResponse(professional)).thenReturn(publicResponse);
 
-        assertSame(publicResponse, service.getPublicProfessional(id));
+        assertSame(publicResponse, service.getPublicProfessional(id, false));
     }
 
     @Test
     void getPublicProfessional_unpublished_isNotFound() {
         found();
 
-        assertThrows(ClientNotFoundException.class, () -> service.getPublicProfessional(id));
+        assertThrows(ClientNotFoundException.class, () -> service.getPublicProfessional(id, false));
+    }
+
+    @Test
+    void getPublicProfessional_unpublished_isVisibleToItsOwner() {
+        found();
+        ProfessionalPublicResponse publicResponse = new ProfessionalPublicResponse();
+        when(professionalMapper.toPublicResponse(professional)).thenReturn(publicResponse);
+
+        assertSame(publicResponse, service.getPublicProfessional(id, true));
     }
 
     @Test

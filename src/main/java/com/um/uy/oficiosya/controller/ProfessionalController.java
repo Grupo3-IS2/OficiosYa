@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.controller;
 
 import com.um.uy.oficiosya.config.AuthenticatedUser;
+import com.um.uy.oficiosya.config.ViewerAccess;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.response.PriceRangeResponse;
@@ -56,18 +57,14 @@ public class ProfessionalController {
         return ResponseEntity.ok(professional);
     }
 
-    /** Public view, without email or phone; not found unless the professional is published. */
+    /** Public view, without email or phone; not found unless published, except for the owner and admins. */
     @SecurityRequirements
     @GetMapping("/{id}")
-    public ResponseEntity<ProfessionalPublicResponse> getProfessional(@PathVariable UUID id) {
-        return ResponseEntity.ok(professionalService.getPublicProfessional(id));
+    public ResponseEntity<ProfessionalPublicResponse> getProfessional(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(professionalService.getPublicProfessional(id, ViewerAccess.isOwnerOrAdmin(authentication, id)));
     }
 
-    /**
-     * Clients, and the professional on their own profile. The role hierarchy lets professionals pass
-     * hasRole('CLIENT'), so other professionals are excluded explicitly.
-     */
-    @PreAuthorize("(hasRole('CLIENT') and !hasRole('PROFESSIONAL')) or #id.toString() == authentication.name")
+    @PreAuthorize("hasRole('CLIENT')")
     @GetMapping("/{id}/reviews")
     public ResponseEntity<Page<ReviewResponse>> getProfessionalReviews(@PathVariable UUID id,
                                                                        @ParameterObject @PageableDefault(size = 20) Pageable pageable) {

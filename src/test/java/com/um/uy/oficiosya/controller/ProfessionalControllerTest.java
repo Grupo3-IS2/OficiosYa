@@ -95,7 +95,7 @@ class ProfessionalControllerTest {
     @Test
     void getProfessional_isThePublicView() throws Exception {
         UUID id = UUID.randomUUID();
-        when(professionalService.getPublicProfessional(id)).thenReturn(new ProfessionalPublicResponse());
+        when(professionalService.getPublicProfessional(id, false)).thenReturn(new ProfessionalPublicResponse());
 
         mvc.perform(get(BASE + "/" + id)).andExpect(status().isOk());
     }

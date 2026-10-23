@@ -124,9 +124,9 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
     @Override
     @Transactional(readOnly = true)
-    public ProfessionalPublicResponse getPublicProfessional(UUID id) {
+    public ProfessionalPublicResponse getPublicProfessional(UUID id, boolean ownerOrAdmin) {
         Professional professional = professionalRepository.findByPublicId(id)
-                .filter(Professional::isPublished)
+                .filter(found -> ownerOrAdmin || found.isPublished())
                 .orElseThrow(() -> new ClientNotFoundException(PROFESSIONAL_NOT_FOUND));
         return professionalMapper.toPublicResponse(professional);
     }

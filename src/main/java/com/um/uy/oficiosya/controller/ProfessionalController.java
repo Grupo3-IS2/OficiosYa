@@ -63,7 +63,11 @@ public class ProfessionalController {
         return ResponseEntity.ok(professionalService.getPublicProfessional(id));
     }
 
-    @PreAuthorize("hasRole('CLIENT')")
+    /**
+     * Clients, and the professional on their own profile. The role hierarchy lets professionals pass
+     * hasRole('CLIENT'), so other professionals are excluded explicitly.
+     */
+    @PreAuthorize("(hasRole('CLIENT') and !hasRole('PROFESSIONAL')) or #id.toString() == authentication.name")
     @GetMapping("/{id}/reviews")
     public ResponseEntity<Page<ReviewResponse>> getProfessionalReviews(@PathVariable UUID id,
                                                                        @ParameterObject @PageableDefault(size = 20) Pageable pageable) {

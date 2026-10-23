@@ -4,6 +4,23 @@ export const TOKEN_KEY = 'oficiosya_token'
 export const USER_KEY = 'oficiosya_user'
 export const PROFILE_KEY = 'oficiosya_profile'
 
+const listeners = new Set<() => void>()
+type SessionDestination = '/' | '/login?expired=1'
+let sessionDestination: SessionDestination | null = null
+
+/** A deliberate session end owns its navigation; protected routes must not override it. */
+export function getSessionDestination(): SessionDestination | null {
+  return sessionDestination
+}
+export function subscribeSession(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+
+export function notifySessionChange(): void {
+  listeners.forEach(listener => listener())
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -13,6 +30,7 @@ export function getToken(): string | null {
  * HttpOnly cookie that only the browser and the backend see.
  */
 export function storeLogin(response: LoginResponse): void {
+  sessionDestination = null
   localStorage.setItem(TOKEN_KEY, response.token)
   localStorage.setItem(USER_KEY, JSON.stringify({
     id: response.id,
@@ -20,12 +38,15 @@ export function storeLogin(response: LoginResponse): void {
     name: response.name,
     role: response.role,
   }))
+  notifySessionChange()
 }
 
-export function clearSession(): void {
+export function clearSession(destination: SessionDestination | null = null): void {
+  sessionDestination = destination
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
   localStorage.removeItem(PROFILE_KEY)
+  notifySessionChange()
 }
 
 /**
@@ -54,6 +75,5 @@ export function isTokenUsable(token: string | null): boolean {
 
 /** Drops the dead session and sends the user to log in again, telling them why. */
 export function expireSession(): void {
-  clearSession()
-  window.location.href = '/login?expired=1'
+  clearSession('/login?expired=1')
 }

@@ -60,8 +60,8 @@ export function validateProfessional(current: ProfessionalData, saved: Professio
         const maximum = Number(trade.maximumHourlyWage)
         if (!trade.minimumHourlyWage.trim() || !trade.maximumHourlyWage.trim()
             || !Number.isFinite(minimum) || !Number.isFinite(maximum)
-            || minimum < 0 || maximum < minimum) {
-            return `Ingresá tarifas válidas para ${trade.tradeName}: la máxima debe ser mayor o igual a la mínima.`
+            || minimum <= 0 || maximum <= 0 || maximum < minimum) {
+            return `Ingresá tarifas válidas para ${trade.tradeName}: ambas deben ser mayores a $0 y la máxima debe ser mayor o igual a la mínima.`
         }
     }
     return ''

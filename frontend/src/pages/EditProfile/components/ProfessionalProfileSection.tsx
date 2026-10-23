@@ -60,8 +60,8 @@ export default function ProfessionalProfileSection({ value, onChange, onSave, me
                         <button type="button" onClick={() => onChange({ ...value, trades: value.trades.filter(item => item.tradeId !== trade.tradeId) })}>Quitar</button>
                     </div>
                     <div className="profile-trade-prices">
-                        <label>Tarifa mínima por hora<input type="number" min="0" step="0.01" value={trade.minimumHourlyWage} onChange={event => updateTrade(trade.tradeId, { minimumHourlyWage: event.target.value })} /></label>
-                        <label>Tarifa máxima por hora<input type="number" min="0" step="0.01" value={trade.maximumHourlyWage} onChange={event => updateTrade(trade.tradeId, { maximumHourlyWage: event.target.value })} /></label>
+                        <label>Tarifa mínima por hora<input type="number" min="0.01" step="0.01" value={trade.minimumHourlyWage} onChange={event => updateTrade(trade.tradeId, { minimumHourlyWage: event.target.value })} /></label>
+                        <label>Tarifa máxima por hora<input type="number" min="0.01" step="0.01" value={trade.maximumHourlyWage} onChange={event => updateTrade(trade.tradeId, { maximumHourlyWage: event.target.value })} /></label>
                     </div>
                 </div>)}
             </div>

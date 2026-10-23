@@ -7,6 +7,7 @@ import {
   getToken,
   isTokenUsable,
   storeLogin,
+  notifySessionChange,
 } from './session.ts'
 import { keepSessionFresh } from './sessionRenewal.ts'
 import type {
@@ -151,13 +152,14 @@ export async function logout(): Promise<void> {
   try {
     await apiRequest<unknown>('/auth/logout', { method: 'POST' })
   } catch { /* already invalid or backend unreachable: clearing locally is all that is left */ }
-  clearSession()
+  clearSession('/')
 }
 
 /** Follows a logout done in another tab: localStorage changes there fire `storage` here. */
 export function watchSessionFromOtherTabs(): void {
   window.addEventListener('storage', event => {
     if (event.storageArea !== localStorage) return
+    if (event.key === TOKEN_KEY || event.key === USER_KEY || event.key === null) notifySessionChange()
     if ((event.key === TOKEN_KEY || event.key === null) && event.oldValue !== null && !getToken()) {
       window.location.href = '/login'
     }
@@ -167,6 +169,7 @@ export function watchSessionFromOtherTabs(): void {
 export function updateStoredUser(user: StoredUser): void {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
   localStorage.removeItem(PROFILE_KEY)
+  notifySessionChange()
 }
 
 /**

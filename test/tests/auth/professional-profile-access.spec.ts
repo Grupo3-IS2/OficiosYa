@@ -81,7 +81,8 @@ test('a verification outage shows an error without exposing the profile or disca
   });
   await page.route('**/api/v1/auth/verify', route => route.fulfill({ status: 503, json: { message: 'Unavailable' } }));
   await page.goto(profilePath);
-  await expect(page.getByRole('alert')).toContainText('No pudimos verificar tu sesión');
+  await expect(page.getByRole('alert')).toContainText('No pudimos comprobar tu sesión');
+  await expect(page.getByRole('button', { name: 'Reintentar', exact: true })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${profilePath}$`));
   expect(profileReads).toBe(0);
   expect(await page.evaluate(() => localStorage.getItem('oficiosya_token'))).not.toBeNull();
@@ -104,7 +105,7 @@ test('the profile loads only after the backend verifies the session', async ({ p
     } });
   });
   await page.goto(profilePath);
-  await expect(page.getByText('Verificando sesión...')).toBeVisible();
+  await expect(page.getByText('Comprobando sesión...')).toBeVisible();
   expect(profileReads).toBe(0);
   releaseVerification();
   await expect(page.getByRole('heading', { name: 'Profesional protegido' })).toBeVisible();

@@ -1928,6 +1928,27 @@ test.describe('OficiosYa - QA suite expandida', () => {
       contentType: 'image/svg+xml',
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" />'
     }));
+    // Seven 9s and three 8s average 8.7 on the API scale. The paginated opinions
+    // must agree with the existing reputation instead of inheriting the empty default page.
+    const reviews = [9, 9, 9, 9, 9, 9, 9, 8, 8, 8].map((rating, index) => ({
+      jobRequestId: index + 1,
+      clientName: `Cliente ${index + 1}`,
+      clientProfileImageUrl: null,
+      professionalId,
+      professionalName: 'Profesional con reputación',
+      rating,
+      review: 'Trabajo realizado con profesionalismo.',
+    }));
+    await page.route(`**/api/v1/professionals/${professionalId}/reviews?**`, route => {
+      const params = new URL(route.request().url()).searchParams;
+      const number = Number(params.get('page') ?? 0);
+      const size = Number(params.get('size') ?? 5);
+      return route.fulfill({ json: {
+        content: reviews.slice(number * size, (number + 1) * size),
+        number, size, totalElements: reviews.length, totalPages: Math.ceil(reviews.length / size),
+        last: (number + 1) * size >= reviews.length,
+      } });
+    });
 
     await page.goto(`${FRONTEND_BASE}/profesionales/${professionalId}?tradeId=11`);
 
@@ -1938,6 +1959,9 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await expect(page.getByRole('button', { name: 'Plomería' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.profile-summary__price')).toContainText('$500');
     await expect(page.getByText('Este profesional todavía no tiene calificaciones.')).toHaveCount(0);
+    await expect(page.locator('.reviews-summary')).toContainText('10 opiniones');
+    await expect(page.locator('.profile-review')).toHaveCount(5);
+    await expect(page.locator('.profile-review').first().getByRole('img', { name: '4,5 de 5 estrellas' })).toBeVisible();
   });
 
   test('SCRUM-15: navegar a un perfil inexistente muestra el estado 404', async ({ page, request }) => {

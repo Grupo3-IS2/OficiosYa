@@ -10,6 +10,8 @@ for (const session of ['guest', 'authenticated', 'expired'] as const) {
       }, fakeJwt(session === 'expired' ? -60 : 3600));
     }
     await page.route('**/api/v1/auth/refresh', route => route.fulfill({ status: 401, json: { error: 'La sesión expiró' } }));
+    // Startup now verifies the session even on Home; this UI test uses an unsigned fixture token.
+    await page.route('**/api/v1/auth/verify', route => route.fulfill({ json: { verified: true } }));
     // The header asks for the user's requests (the "Mis solicitudes" alert): the fake token would be refused
     await mockChat(page);
     await page.route('**/api/v1/job-requests/mine', route => route.fulfill({ json: [] }));

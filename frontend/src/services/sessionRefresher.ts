@@ -45,6 +45,8 @@ export function createSessionRefresher(deps: SessionRefresherDeps): (staleToken:
   async function renew(staleToken: string | null): Promise<RefreshOutcome> {
     return deps.exclusive(async () => {
       if (renewedElsewhere(staleToken)) return 'refreshed'
+      // A logout while waiting for the lock must not restore the old account.
+      if (staleToken !== null && deps.readToken() === null) return 'expired'
 
       let response: { status: number; body?: LoginResponse }
       try {
@@ -53,6 +55,9 @@ export function createSessionRefresher(deps: SessionRefresherDeps): (staleToken:
         return 'unavailable'
       }
 
+      // Logout or another login may have happened while the request was pending.
+      if (renewedElsewhere(staleToken)) return 'refreshed'
+      if (staleToken !== null && deps.readToken() === null) return 'expired'
       if (response.status === 200 && response.body) {
         deps.storeLogin(response.body)
         return 'refreshed'

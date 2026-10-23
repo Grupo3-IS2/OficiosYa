@@ -1,5 +1,5 @@
 Términos y condiciones de OficiosYa
-Última actualización: 13 de octubre de 2026
+Última actualización: 23 de octubre de 2026
 
 1. Introducción
 Los presentes Términos y Condiciones regulan el acceso y la utilización de OficiosYa, una plataforma digital destinada a conectar a personas que necesitan servicios para el hogar con profesionales que ofrecen dichos servicios.
@@ -10,35 +10,55 @@ Al registrarse y marcar la casilla de aceptación, el usuario declara haber leí
 
 2. Objeto
 OficiosYa es una plataforma digital que conecta a clientes con profesionales que ofrecen servicios para el hogar en Uruguay, facilitando la búsqueda, el contacto y la gestión de solicitudes.
+OficiosYa actúa como intermediaria digital y no presta directamente los servicios ofrecidos por los profesionales.
 
 3. Registro y uso de la plataforma
 Los usuarios deberán proporcionar información veraz y mantener actualizados sus datos. Asimismo, se comprometen a utilizar la plataforma de forma responsable, respetuosa y conforme a la normativa vigente.
+No está permitido utilizar OficiosYa para realizar actividades ilícitas, proporcionar información engañosa, suplantar identidades o perjudicar a otros usuarios.
 
-4. Funcionamiento de los servicios
-Los clientes podrán buscar profesionales, consultar sus perfiles y solicitar servicios. Los profesionales podrán publicar sus servicios, indicar su disponibilidad y gestionar las solicitudes recibidas.
-La solicitud queda sujeta a la aceptación del profesional. Las condiciones del trabajo, incluyendo precio, alcance y horario, deberán acordarse entre ambas partes.
 
-5. Responsabilidades de los usuarios
-Los clientes deberán proporcionar información clara sobre el servicio solicitado y respetar las condiciones acordadas.
+3. Funcionamiento de los servicios
+Los clientes podrán buscar profesionales por nombre, explorar categorías, aplicar filtros y consultar perfiles, valoraciones y disponibilidad.
+Los profesionales podrán publicar información sobre sus servicios, indicar sus horarios disponibles y gestionar las solicitudes recibidas.
+El envío de una solicitud no garantiza la contratación del servicio. La solicitud quedará sujeta a la aceptación del profesional.
+Las condiciones del trabajo, incluyendo precio, alcance y horario, deberán ser acordadas entre ambas partes.
+
+4. Responsabilidades de los usuarios
+Los clientes deberán proporcionar información clara sobre el servicio solicitado, respetar las condiciones acordadas y comunicar oportunamente cualquier inconveniente.
 Los profesionales deberán mantener actualizada la información de sus perfiles, informar sus condiciones de trabajo y cumplir con los compromisos asumidos.
+Ambas partes deberán actuar de buena fe y mantener una comunicación respetuosa durante la coordinación y prestación del servicio.
 
-6. Cancelaciones y servicios urgentes
+5. Disponibilidad, cancelaciones y reagendamientos
+La disponibilidad publicada por los profesionales está sujeta a cambios y no implica que un horario quede reservado hasta que la solicitud sea aceptada y confirmada.
+Los clientes podrán solicitar la cancelación o el reagendamiento de una cita mediante las funcionalidades disponibles. Las solicitudes de cambio de horario podrán requerir la aceptación del profesional.
 Las cancelaciones y modificaciones deberán comunicarse oportunamente entre las partes.
-La opción de servicio urgente no garantiza disponibilidad inmediata ni un tiempo específico de respuesta. Las condiciones particulares de cancelación y atención urgente quedan pendientes de definición.
+Los plazos, las condiciones específicas y las posibles consecuencias de las cancelaciones quedan pendientes de definición y deberán informarse antes de implementar una política definitiva.
+
+6. Chat y comunicaciones
+OficiosYa permite que clientes y profesionales se comuniquen mediante el chat de la plataforma para consultar información y coordinar servicios.
+Los usuarios se comprometen a utilizar este medio de forma respetuosa y a no enviar contenido ilícito, ofensivo, fraudulento o que vulnere los derechos de otras personas.
+Las conversaciones deberán utilizarse para fines relacionados con la interacción entre los usuarios y los servicios ofrecidos en la plataforma.
+El acceso a cada conversación estará limitado a los usuarios que participen en ella, de acuerdo con las funcionalidades del sistema.
+Las condiciones de conservación de los mensajes, moderación de conversaciones y tratamiento de posibles reportes deberán definirse en las políticas correspondientes.
 
 7. Valoraciones y reclamos
-Los usuarios deberán realizar valoraciones honestas y respetuosas. Podrán reportar comportamientos inadecuados o problemas relacionados con los servicios.
-OficiosYa podrá revisar los reportes y adoptar medidas respecto del uso de la plataforma, pero no garantiza la resolución de los conflictos entre clientes y profesionales.
+Los clientes podrán valorar a los profesionales de acuerdo con las funcionalidades disponibles. Las valoraciones deberán ser honestas, respetuosas y estar relacionadas con experiencias reales.
+No está permitido manipular calificaciones ni publicar comentarios falsos, ofensivos o engañosos.
+Los usuarios podrán reportar comportamientos inadecuados o problemas relacionados con los servicios. OficiosYa podrá revisar los reportes y adoptar medidas respecto del uso de la plataforma.
+OficiosYa facilita el contacto entre las partes, pero no garantiza la resolución de todos los conflictos que puedan surgir durante la prestación de un servicio.
 
 8. Pagos
-La integración de pagos dentro de OficiosYa está prevista para una etapa futura. Sus condiciones se incorporarán a estos términos cuando dicha funcionalidad esté disponible.
+La integración de pagos dentro de OficiosYa está prevista para una etapa futura. Por el momento, estos términos no establecen un sistema de cobro o gestión de pagos integrado.
+Cuando esta funcionalidad esté disponible, se incorporarán las condiciones correspondientes, incluyendo los medios de pago, posibles comisiones, cancelaciones y reembolsos.
 
 9. Datos personales
-Los datos personales se utilizarán para gestionar las cuentas y permitir el funcionamiento de la plataforma, de acuerdo con la normativa uruguaya aplicable. La política de privacidad deberá establecer las condiciones específicas de su tratamiento.
+Los datos personales se utilizarán para gestionar las cuentas y permitir el funcionamiento de la plataforma, incluyendo la búsqueda de profesionales, las solicitudes y las comunicaciones entre usuarios.
+El tratamiento de los datos deberá ajustarse a la normativa uruguaya aplicable en materia de protección de datos personales.
+OficiosYa deberá contar con una política de privacidad que detalle los datos recopilados, sus finalidades, las condiciones de conservación y los mecanismos para ejercer los derechos correspondientes.
 
 10. Suspensión de cuentas
 OficiosYa podrá evaluar la suspensión de cuentas ante incumplimientos de estos términos, actividades fraudulentas o conductas que afecten a otros usuarios o al funcionamiento de la plataforma, respetando la normativa aplicable.
 
 11. Modificaciones y legislación aplicable
-OficiosYa podrá actualizar estos términos, comunicando los cambios de forma adecuada. El uso de la plataforma se regirá por la normativa vigente de la República Oriental del Uruguay.
-
+OficiosYa podrá evaluar la suspensión de cuentas ante incumplimientos de estos términos, actividades fraudulentas o conductas que afecten a otros usuarios o al funcionamiento de la plataforma.
+Las medidas deberán ser razonables y respetar la normativa aplicable. Cuando corresponda, se informará al usuario sobre los motivos de la medida adoptada.

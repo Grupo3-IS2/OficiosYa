@@ -141,6 +141,8 @@
 .request-detail-finished p { margin: 0; color: #667a96; line-height: 1.5; }
 .request-detail-finished > button { flex-shrink: 0; }
 .request-detail-finished--rated { justify-content: center; text-align: center; }
+.request-detail-review { margin-top: 14px; }
+.request-detail-review p { margin-top: 8px; color: var(--color-primary, #10255b); white-space: pre-line; overflow-wrap: anywhere; }
 @media (max-width: 480px) {
     .request-detail-finished { flex-direction: column; align-items: stretch; padding: 20px; }
 }

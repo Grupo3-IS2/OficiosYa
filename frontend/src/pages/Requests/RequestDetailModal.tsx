@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../components/Button/Button'
 import Icon from '../../components/Icon/Icon'
+import RatingStars from '../../components/RatingStars/RatingStars'
 import ZoneMap from '../../components/ZoneMap/ZoneMap'
 import { useZoneLookup } from '../../components/ZoneMap/useZoneLookup'
 import { getCurrentUser } from '../../services/authService'
@@ -253,6 +254,10 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                         <p>{request.rating != null
                             ? isClient ? 'El PIN fue confirmado y tu valoración fue enviada correctamente.' : 'El PIN fue confirmado y el cliente ya calificó el trabajo.'
                             : 'El PIN fue confirmado y el trabajo quedó completado.'}</p>
+                        {request.rating != null && <div className="request-detail-review">
+                            <RatingStars rating={request.rating} />
+                            {request.review && <p>{request.review}</p>}
+                        </div>}
                     </div>
                     {onRate && canRateRequest(request, getCurrentUser()?.id) && <Button type="button" onClick={() => onRate(bodyRef.current?.scrollTop ?? 0)}>Calificar</Button>}
                 </section> : !(canComplete && !cancelling) && <section className="request-detail-pin" aria-labelledby="request-pin-title">

@@ -20,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * The search by distance, against a real Postgres: it relies on SQL functions (ASIN, RADIANS, LEAST)
  * an in-memory database may not have or may compute differently. Skipped where Docker isn't available.
  */
-@DataJpaTest
+// ChatContentConverter is a JPA converter, so the context needs a key; dev-only, same as .env.example.
+@DataJpaTest(properties = "app.chat.encryption-key=ZGV2LW9ubHktY2hhdC1rZXktZG8tbm90LXVzZS0zMmI=")
 @Testcontainers(disabledWithoutDocker = true)
 class ProfessionalRepositoryDistanceTest {
 

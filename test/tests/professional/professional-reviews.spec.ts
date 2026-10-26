@@ -91,11 +91,11 @@ test('every half-star score colors only the left half of its outlined star', asy
   if (process.env.REVIEW_SCREENSHOTS) await page.locator('.reviews-section').screenshot({ path: process.env.REVIEW_SCREENSHOTS });
 });
 
-test('professional accounts do not call the client-only endpoint', async ({ page }) => {
+test('professional accounts also see the reviews', async ({ page }) => {
   await setup(page, 'PROFESSIONAL');
-  const calls: string[] = [];
-  await page.route('**/reviews?**', route => { calls.push(route.request().url()); return route.fulfill({ status: 403, json: {} }); });
+  await page.route('**/reviews?**', route => route.fulfill({ json: { content: [review], number: 0, totalElements: 1, last: true } }));
   await page.goto(`/profesionales/${id}`);
-  await expect(page.locator('.reviews-section')).toContainText('disponibles para cuentas de cliente');
-  expect(calls).toEqual([]);
+  const section = page.locator('.reviews-section');
+  await expect(section.getByRole('heading', { name: review.clientName })).toBeVisible();
+  await expect(section).not.toContainText('Iniciá sesión para ver las opiniones');
 });

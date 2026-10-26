@@ -23,6 +23,9 @@
 .chat-sidebar__brand-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: 1.1rem 1.5rem 1rem; min-height: 5rem; }
 .chat-brand { display: flex; align-items: center; gap: .4rem; min-width: 0; color: var(--chat-green); text-decoration: none; font-size: clamp(1.7rem, 2.4vw, 2.4rem); font-weight: 850; letter-spacing: -.07em; }
 .chat-brand .icon { width: 2.9rem; height: 2.9rem; flex: 0 0 auto; }
+.chat-exit { color: var(--chat-green); }
+.chat-exit .icon { width: 1.6rem; height: 1.6rem; }
+.chat-sidebar:not(.chat-sidebar--collapsed) .chat-brand { margin-right: auto; }
 .chat-collapse .icon { transform: rotate(90deg); }
 .chat-search { display: flex; align-items: center; gap: .8rem; margin: .2rem 1.25rem 1rem; padding: .9rem; border: 1px solid var(--chat-line); border-radius: .75rem; background: #fff; color: var(--chat-muted); }
 .chat-search input { min-width: 0; width: 100%; padding: 0; color: var(--chat-ink); border: 0; outline: none; background: transparent; }

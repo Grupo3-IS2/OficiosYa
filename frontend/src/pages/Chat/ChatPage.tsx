@@ -12,22 +12,29 @@ export default function ChatPage() {
     const inbox = useChatInbox(me)
     const [collapsed, setCollapsed] = useState(false)
     const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 700px)').matches)
-    const [viewportHeight, setViewportHeight] = useState<number | undefined>(undefined)
+    const [viewport, setViewport] = useState<{ height: number, top: number } | undefined>(undefined)
     useEffect(() => {
         const media = window.matchMedia('(max-width: 700px)')
         const resize = () => {
             setMobile(media.matches)
             // The visual viewport shrinks with the on-screen keyboard on browsers where dvh does not.
-            setViewportHeight(media.matches && window.visualViewport?.scale === 1 ? window.visualViewport.height : undefined)
+            // Fixed to it so the page cannot scroll past the composer, and following offsetTop because iOS pans the visual viewport.
+            const visual = window.visualViewport
+            setViewport(media.matches && visual?.scale === 1 ? { height: visual.height, top: visual.offsetTop } : undefined)
         }
         resize()
         media.addEventListener('change', resize)
         window.visualViewport?.addEventListener('resize', resize)
-        return () => { media.removeEventListener('change', resize); window.visualViewport?.removeEventListener('resize', resize) }
+        window.visualViewport?.addEventListener('scroll', resize)
+        return () => {
+            media.removeEventListener('change', resize)
+            window.visualViewport?.removeEventListener('resize', resize)
+            window.visualViewport?.removeEventListener('scroll', resize)
+        }
     }, [])
     const sidebarCollapsed = collapsed && !mobile
     const profiles = useChatProfiles(me, inbox.conversations.map(conversation => conversation.otherParticipant.id))
-    return <main style={viewportHeight ? { height: viewportHeight } : undefined} className={`chat-page${sidebarCollapsed ? ' chat-page--collapsed' : ''}${inbox.selectedId ? ' chat-page--selected' : ''}`}>
+    return <main style={viewport ? { position: 'fixed', top: viewport.top, left: 0, width: '100%', height: viewport.height } : undefined} className={`chat-page${sidebarCollapsed ? ' chat-page--collapsed' : ''}${inbox.selectedId ? ' chat-page--selected' : ''}`}>
         <ChatSidebar conversations={inbox.conversations} selectedId={inbox.selectedId} onSelect={inbox.select} collapsed={sidebarCollapsed}
             onToggle={() => setCollapsed(value => !value)} profiles={profiles} loading={inbox.loading} error={inbox.error} onRetry={() => void inbox.refresh()} />
         {inbox.selectedId ? <ConversationPanel key={inbox.selectedId} id={inbox.selectedId} conversation={inbox.selected}

@@ -46,6 +46,8 @@ async function setupChat(page: Page, conversations = [conversation()]) {
   }, { token: fakeJwt(), clientId });
   await mockSessionVerification(page);
   await mockChat(page);
+  // The header asks for the user's requests; unmocked, the real backend's 401 ends the session.
+  await page.route('**/api/v1/job-requests/mine', route => route.fulfill({ json: [] }));
   await page.route('**/api/v1/users/me', route => route.fulfill({ json: {
     id: clientId, name: 'Cliente Chat', email: 'cliente.chat@qa.test', role: 'CLIENT',
   } }));

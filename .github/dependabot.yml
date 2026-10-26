@@ -12,7 +12,7 @@ updates:
   - package-ecosystem: "maven"
     directory: "/" # El pom.xml del backend está en la raíz del repositorio.
     schedule:
-      interval: "weekly"
+      interval: "daily"
     target-branch: "dev"
     groups:
       # jjwt-api/impl/jackson deben ir siempre en la misma versión.

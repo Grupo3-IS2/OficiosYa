@@ -14,6 +14,7 @@ export default function ChatSidebar({ conversations, selectedId, onSelect, colla
     const visible = collapsed ? conversations : filterConversations(conversations, query)
     return <aside className={`chat-sidebar${collapsed ? ' chat-sidebar--collapsed' : ''}`} aria-label="Conversaciones">
         <div className="chat-sidebar__brand-row">
+            <a className="chat-icon-button chat-exit" href="/" aria-label="Volver al inicio"><Icon name="arrow-left" /></a>
             <a className="chat-brand" href="/" aria-label="OficiosYa, volver al inicio"><Icon name="wrench" /><span>OficiosYa</span></a>
             <button className="chat-icon-button chat-collapse" type="button" onClick={onToggle}
                 aria-label={collapsed ? 'Expandir conversaciones' : 'Contraer conversaciones'} aria-expanded={!collapsed}>

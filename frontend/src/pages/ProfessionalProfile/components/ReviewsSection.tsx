@@ -37,7 +37,7 @@ export default function ReviewsSection({ professionalId, rating }: Readonly<Revi
         }).catch(error => {
             if (!active) return
             setError(error instanceof ApiError && error.status === 403
-                ? 'Las opiniones están disponibles para cuentas de cliente.'
+                ? 'Iniciá sesión para ver las opiniones.'
                 : 'No pudimos cargar las opiniones. Intentá de nuevo.')
         }).finally(() => { if (active) setLoading(false) })
         return () => { active = false }
@@ -51,7 +51,7 @@ export default function ReviewsSection({ professionalId, rating }: Readonly<Revi
                 {total !== null && <p>{total} {total === 1 ? 'opinión' : 'opiniones'}</p>}
             </div>
         </div>}
-        {!canRead && <p className="profile-empty">Las opiniones están disponibles para cuentas de cliente.</p>}
+        {!canRead && <p className="profile-empty">Iniciá sesión para ver las opiniones.</p>}
         {canRead && <>
             {reviews.length > 0 && <ul className="profile-reviews">
                 {reviews.map(review => <li key={review.jobRequestId} className="profile-review">

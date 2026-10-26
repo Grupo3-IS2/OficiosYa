@@ -28,12 +28,28 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
+        cache: npm
+        cache-dependency-path: |
+          test/package-lock.json
+          frontend/package-lock.json
     - name: Install dependencies
       # No lifecycle scripts: Playwright doesn't need any, its browsers are installed in the next step.
       run: npm ci --ignore-scripts
+    - name: Playwright version
+      id: playwright
+      run: echo "version=$(./node_modules/.bin/playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+    - name: Cache Playwright browsers
+      id: browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}-chromium
     - name: Install Playwright Browsers
-      # The binary from the lockfile, never one npx would download.
-      run: ./node_modules/.bin/playwright install --with-deps
+      if: steps.browsers.outputs.cache-hit != 'true'
+      run: ./node_modules/.bin/playwright install --with-deps chromium
+    - name: Install Playwright system dependencies
+      if: steps.browsers.outputs.cache-hit == 'true'
+      run: ./node_modules/.bin/playwright install-deps chromium
     - name: Run Playwright tests
       run: ./node_modules/.bin/playwright test
     - name: Backend logs

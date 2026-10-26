@@ -17,6 +17,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ProfessionalRepository extends JpaRepository<Professional, Long> {
+    /** Haversine, from the centre of p's service area to (:lat, :lon); same as {@code ServiceArea.distanceKm}. */
+    // Padded: text blocks drop the trailing space of the text it's concatenated to.
+    String DISTANCE_KM = " " + """
+            6371 * 2 * ASIN(SQRT(POWER(SIN(RADIANS(p.serviceArea.latitude - :lat) / 2), 2)
+                + COS(RADIANS(:lat)) * COS(RADIANS(p.serviceArea.latitude))
+                * POWER(SIN(RADIANS(p.serviceArea.longitude - :lon) / 2), 2)))""" + " ";
+
     Optional<Professional> findByPublicId(UUID publicId);
     boolean existsByPublicId(UUID publicId);
     boolean existsByPublicIdAndPublishedTrue(UUID publicId);
@@ -38,6 +45,11 @@ public interface ProfessionalRepository extends JpaRepository<Professional, Long
      * them inside CONCAT when null and fails with "function lower(bytea) does not exist"
      * (:availableFrom likewise in its IS NULL).
      *
+     * <p>With a point (:lat, :lon), a professional matches if it falls inside their service area and
+     * within :maxDistanceKm. Those without a service area yet match by :location text instead, so they
+     * don't vanish from searches before picking one. There is no bounding-box pre-filter: an area can
+     * reach 800 km, the whole country, so a box would let everything through anyway.
+     *
      * <p>Filtered with EXISTS instead of a join, so there are no duplicates to DISTINCT away: with
      * DISTINCT, Postgres refuses to order by anything not selected, like the lowest price. :order
      * is a {@code ProfessionalSearchFilters.Order} name; the Pageable must come without a sort.
@@ -51,7 +63,11 @@ public interface ProfessionalRepository extends JpaRepository<Professional, Long
                 AND (:minPrice IS NULL OR et.maximumHourlyWage >= :minPrice)
                 AND (:maxPrice IS NULL OR et.minimumHourlyWage <= :maxPrice)))
             AND (:minRating IS NULL OR p.rating >= :minRating)
-            AND (:location IS NULL OR LOWER(p.workingLocation) LIKE LOWER(CONCAT('%', CAST(:location AS string), '%')))
+            AND (:location IS NULL OR (CAST(:lat AS Double) IS NOT NULL AND p.serviceArea.latitude IS NOT NULL)
+                OR LOWER(p.workingLocation) LIKE LOWER(CONCAT('%', CAST(:location AS string), '%')))
+            AND (CAST(:lat AS Double) IS NULL OR (p.serviceArea.latitude IS NULL AND :location IS NOT NULL) OR (
+                """ + DISTANCE_KM + """
+                <= LEAST(p.serviceArea.radiusKm, COALESCE(:maxDistanceKm, p.serviceArea.radiusKm))))
             AND (:query IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:query AS string), '%')))
             AND (CAST(:availableFrom AS OffsetDateTime) IS NULL OR EXISTS (
                 SELECT s.id FROM Schedule s WHERE s.professional = p
@@ -64,6 +80,8 @@ public interface ProfessionalRepository extends JpaRepository<Professional, Long
                 CASE WHEN :order = 'PRICE_DESC' THEN (SELECT MIN(e2.minimumHourlyWage) FROM ExpertiseTrade e2 WHERE e2.professional = p
                     AND (:tradeIds IS NULL OR e2.trade.id IN :tradeIds)) END DESC NULLS LAST,
                 CASE WHEN :order = 'RATING_DESC' THEN p.rating END DESC NULLS LAST,
+                CASE WHEN :order = 'DISTANCE' THEN """ + DISTANCE_KM + """
+                END ASC NULLS LAST,
                 LOWER(p.name), p.id
             """, countQuery = """
             SELECT COUNT(p) FROM Professional p
@@ -74,7 +92,11 @@ public interface ProfessionalRepository extends JpaRepository<Professional, Long
                 AND (:minPrice IS NULL OR et.maximumHourlyWage >= :minPrice)
                 AND (:maxPrice IS NULL OR et.minimumHourlyWage <= :maxPrice)))
             AND (:minRating IS NULL OR p.rating >= :minRating)
-            AND (:location IS NULL OR LOWER(p.workingLocation) LIKE LOWER(CONCAT('%', CAST(:location AS string), '%')))
+            AND (:location IS NULL OR (CAST(:lat AS Double) IS NOT NULL AND p.serviceArea.latitude IS NOT NULL)
+                OR LOWER(p.workingLocation) LIKE LOWER(CONCAT('%', CAST(:location AS string), '%')))
+            AND (CAST(:lat AS Double) IS NULL OR (p.serviceArea.latitude IS NULL AND :location IS NOT NULL) OR (
+                """ + DISTANCE_KM + """
+                <= LEAST(p.serviceArea.radiusKm, COALESCE(:maxDistanceKm, p.serviceArea.radiusKm))))
             AND (:query IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:query AS string), '%')))
             AND (CAST(:availableFrom AS OffsetDateTime) IS NULL OR EXISTS (
                 SELECT s.id FROM Schedule s WHERE s.professional = p
@@ -90,6 +112,9 @@ public interface ProfessionalRepository extends JpaRepository<Professional, Long
                                @Param("query") String query,
                                @Param("availableFrom") OffsetDateTime availableFrom,
                                @Param("availableTo") OffsetDateTime availableTo,
+                               @Param("lat") Double lat,
+                               @Param("lon") Double lon,
+                               @Param("maxDistanceKm") Integer maxDistanceKm,
                                @Param("order") String order,
                                Pageable pageable);
 

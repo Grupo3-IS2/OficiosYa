@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { JobRequest } from '../src/types/JobRequest.ts'
-import { answersReschedule, awaitsAnswerFrom, filterAndOrderRequests, filterByDirection, groupRequestsByDate, rescheduleRequester, requestDescription, serviceSummary, viewerParty } from '../src/pages/Requests/requestList.ts'
+import { answersReschedule, awaitsAnswerFrom, filterAndOrderRequests, filterByDirection, groupRequestsByDate, outsideServiceAreaNote, rescheduleRequester, requestDescription, serviceSummary, viewerParty } from '../src/pages/Requests/requestList.ts'
 
 function request(id: number, createdAt: string, status: JobRequest['status']): JobRequest {
     return {
@@ -105,4 +105,13 @@ test('what awaits the viewer: requests made to them and reschedules the other si
     assert.deepEqual(filterAndOrderRequests(requests, 'awaiting', 'newest', 'me').map(item => item.id), [1, 3])
     assert.equal(viewerParty(asClient, 'me'), 'CLIENT')
     assert.equal(awaitsAnswerFrom(asProfessional, undefined), false)
+})
+
+test('a job beyond the professional\'s area is pointed out to each side in its own words', () => {
+    const base = request(1, '2026-10-07T12:00:00-03:00', 'PROPOSED')
+    const outside = { ...base, outsideServiceArea: true }
+    assert.equal(outsideServiceAreaNote(outside, true), `Fuera de la zona que cubre ${base.professionalName}`)
+    assert.equal(outsideServiceAreaNote(outside, false), 'Fuera de tu zona de trabajo')
+    assert.equal(outsideServiceAreaNote({ ...base, outsideServiceArea: false }, true), null)
+    assert.equal(outsideServiceAreaNote({ ...base, outsideServiceArea: null }, false), null)
 })

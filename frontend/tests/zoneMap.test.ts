@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
     createZoneCache,
+    distanceKm,
     embedUrl,
     largerMapUrl,
     lookupZone,
@@ -390,4 +391,10 @@ test('a failed search is not turned into "try with less": it throws', async () =
     const refused = (async () => jsonResponse({}, 429)) as typeof fetch
 
     await assert.rejects(lookupBestZone('Calle 1, Cordón, Montevideo', { fetchFn: refused, pauseMs: 0 }), /429/)
+})
+
+test('the distance between two points is the great-circle one: Plaza Independencia to Carrasco is about 12.4 km', () => {
+    const km = distanceKm({ lat: -34.9058, lon: -56.1913 }, { lat: -34.8838, lon: -56.0581 })
+    assert.ok(Math.abs(km - 12.39) < 0.01, String(km))
+    assert.equal(distanceKm({ lat: -34.9, lon: -56.1 }, { lat: -34.9, lon: -56.1 }), 0)
 })

@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.service;
 
+import com.um.uy.oficiosya.dto.request.ServiceAreaRequest;
 import com.um.uy.oficiosya.entity.Role;
 
 /**
@@ -12,6 +13,8 @@ record PendingRegistration(
         String name,
         String passwordHash,
         String phoneNumber,
-        String workingLocation
+        String workingLocation,
+        // Null for clients, and in codes sent before it existed (their JSON has no such field).
+        ServiceAreaRequest serviceArea
 ) {
 }

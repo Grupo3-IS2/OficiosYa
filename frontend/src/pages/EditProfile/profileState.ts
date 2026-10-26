@@ -1,3 +1,5 @@
+import type { ServiceArea } from '../../types/Professional'
+
 export interface PersonalData {
     name: string
     email: string
@@ -15,6 +17,8 @@ export interface SecurityData {
 export interface ProfessionalData {
     description: string
     workingLocation: string
+    /** Null while the zone is only typed: it is chosen on the map. */
+    serviceArea: ServiceArea | null
     trades: ProfessionalTradeData[]
     published: boolean
 }
@@ -35,8 +39,13 @@ export function personalChanged(current: PersonalData, saved: PersonalData) {
         || current.emailNotifications !== saved.emailNotifications
 }
 
+export function sameServiceArea(current: ServiceArea | null, saved: ServiceArea | null) {
+    return current?.latitude === saved?.latitude && current?.longitude === saved?.longitude && current?.radiusKm === saved?.radiusKm
+}
+
 export function professionalChanged(current: ProfessionalData, saved: ProfessionalData) {
     return current.description !== saved.description || current.workingLocation !== saved.workingLocation
+        || !sameServiceArea(current.serviceArea, saved.serviceArea)
         || current.published !== saved.published
         || current.trades.length !== saved.trades.length
         || current.trades.some(trade => {
@@ -52,6 +61,8 @@ export function validateProfessional(current: ProfessionalData, saved: Professio
         return 'La descripción debe tener entre 20 y 500 caracteres.'
     }
     if (!current.workingLocation.trim()) return 'Ingresá una ubicación de trabajo.'
+    // Once saved it can be moved but not taken away: a zone typed by hand alone has no point to keep.
+    if (saved.serviceArea && !current.serviceArea) return 'Marcá en el mapa desde dónde trabajás.'
     if (current.published && (description.length < 20 || current.trades.length === 0)) {
         return 'Para ofrecer tus servicios, completá la descripción y elegí al menos un oficio.'
     }

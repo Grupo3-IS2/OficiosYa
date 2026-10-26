@@ -1,7 +1,7 @@
 import { apiRequest } from './api'
 import { clearSession } from './session'
 import type { PendingVerification } from '../types/Auth'
-import type { ExpertiseTrade, Trade } from '../types/Professional'
+import type { ExpertiseTrade, ServiceArea, Trade } from '../types/Professional'
 
 export interface UserResponse {
   id: string
@@ -22,6 +22,7 @@ export interface ProfessionalResponse extends UserResponse {
   role: 'PROFESSIONAL'
   phoneNumber: string
   workingLocation: string
+  serviceArea: ServiceArea | null
   description: string | null
   published: boolean
   expertiseTrades: ExpertiseTrade[]
@@ -42,6 +43,7 @@ export interface UserUpdateRequest {
 export interface ProfessionalUpdateRequest extends UserUpdateRequest {
   phoneNumber?: string
   workingLocation?: string
+  serviceArea?: ServiceArea
   description?: string
 }
 

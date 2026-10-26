@@ -20,7 +20,11 @@ public class ProfessionalPublicResponse {
     private String name;
     private String profileImageUrl;
     private String workingLocation;
+    /** With the centre rounded to about a kilometre: it can be the professional's home. */
+    private ServiceAreaResponse serviceArea;
     private String description;
     private Double rating;
     private List<ExpertiseTradeResponse> expertiseTrades;
+    /** From the point searched for, to the nearest half kilometre; null when the search has no point. */
+    private Double distanceKm;
 }

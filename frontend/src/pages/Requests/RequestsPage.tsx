@@ -12,7 +12,7 @@ import { onRatingChange } from '../../services/ratingEvents'
 import { onChatEvent } from '../../services/chatSocket'
 import { getJobRequestPin } from '../../services/jobRequestPinStore'
 import type { JobRequest, JobStatus, RequestParty } from '../../types/JobRequest'
-import { answersReschedule, awaitsAnswerFrom, filterAndOrderRequests, filterByDirection, groupRequestsByDate, localDateKey, requestDescription, serviceSummary, type RequestDirection, type RequestFilter, type RequestOrder } from './requestList'
+import { answersReschedule, awaitsAnswerFrom, filterAndOrderRequests, filterByDirection, groupRequestsByDate, localDateKey, outsideServiceAreaNote, requestDescription, serviceSummary, type RequestDirection, type RequestFilter, type RequestOrder } from './requestList'
 import RequestOrderControl from './RequestOrderControl'
 import RequestDetailModal from './RequestDetailModal'
 import RescheduleModal from './RescheduleModal'
@@ -155,6 +155,7 @@ function RequestCard({ request, side, viewerId, onView, onRespond, onReschedule,
     // The other side of the job: who the viewer is dealing with.
     const otherName = side === 'professional' ? request.clientName : request.professionalName
     const otherImage = side === 'professional' ? request.clientProfileImageUrl : request.professionalProfileImageUrl
+    const outsideNote = outsideServiceAreaNote(request, side !== 'professional')
 
     return <article className={`request-card${urgent ? ' request-card--needs-answer' : ''}`}>
         <div className="request-card__professional">
@@ -165,6 +166,7 @@ function RequestCard({ request, side, viewerId, onView, onRespond, onReschedule,
             />
             <div className="request-card__copy">
                 {urgent && <span className="request-card__badge">Requiere tu respuesta</span>}
+                {outsideNote && <span className="request-card__badge">{outsideNote}</span>}
                 <h3>{serviceSummary(request)}</h3>
                 <strong>{otherName}</strong>
                 <p>{requestDescription(request)}</p>

@@ -1,0 +1,19 @@
+/* Same look as the hourly price filter in Home's FilterPanel, with one thumb. */
+.radius-field { margin: 12px 0 0; }
+.radius-field__selection { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
+.radius-field__selection label { color: #1f2d40; font-size: 14px; font-weight: 600; }
+.radius-field__selection strong { color: #172235; font-size: 16px; white-space: nowrap; }
+.radius-field__input { display: flex; align-items: center; width: 120px; min-height: 40px; border: 1px solid #dfe5e8; border-radius: 11px; background: #fff; }
+.radius-field__input:focus-within { outline: 3px solid rgba(7, 152, 76, .12); border-color: #07984c; }
+/* .radius-field in front: page styles like EditProfile's `.profile-field input` would otherwise win. */
+.radius-field .radius-field__input input { min-width: 0; width: 100%; height: auto; border: 0; border-radius: 0; padding: 9px 5px 9px 11px; outline: 0; background: transparent; color: #263346; font: inherit; font-size: 13px; font-weight: 650; }
+.radius-field__input input::-webkit-inner-spin-button { opacity: .45; }
+.radius-field__entry { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.radius-field__entry > span { color: #07984c; font-size: 14px; font-weight: 800; }
+.radius-field__slider { position: relative; height: 25px; }
+.radius-field__slider::before { content: ''; position: absolute; top: 10px; right: 0; left: 0; height: 5px; border-radius: 999px; background: linear-gradient(to right, #07984c 0 var(--range-end), #e1e7e5 var(--range-end)); }
+.radius-field .radius-field__slider input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; border-radius: 0; padding: 0; appearance: none; background: transparent; }
+.radius-field__slider input::-webkit-slider-thumb { width: 21px; height: 21px; border: 3px solid #fff; border-radius: 50%; appearance: none; background: #07984c; box-shadow: 0 1px 7px rgba(17, 30, 49, .28); }
+.radius-field__slider input::-moz-range-thumb { width: 15px; height: 15px; border: 3px solid #fff; border-radius: 50%; background: #07984c; box-shadow: 0 1px 7px rgba(17, 30, 49, .28); }
+.radius-field__slider input::-moz-range-track { background: transparent; }
+.radius-field__bounds { display: flex; justify-content: space-between; margin-top: 6px; color: #6e7a8b; font-size: 11px; }

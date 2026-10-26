@@ -10,6 +10,7 @@ import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.entity.ExpertiseTrade;
 import com.um.uy.oficiosya.entity.Professional;
+import com.um.uy.oficiosya.entity.ServiceArea;
 import com.um.uy.oficiosya.entity.Trade;
 import com.um.uy.oficiosya.exception.ExpertiseTradeNotFoundException;
 import com.um.uy.oficiosya.exception.TradeNotFoundException;
@@ -108,6 +109,10 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
         if (professionalRequest.getDescription() != null && !professionalRequest.getDescription().isBlank()) {
             professional.setDescription(professionalRequest.getDescription());
+        }
+
+        if (professionalRequest.getServiceArea() != null) {
+            professional.setServiceArea(professionalMapper.toServiceArea(professionalRequest.getServiceArea()));
         }
 
         professional = professionalRepository.save(professional);
@@ -261,6 +266,16 @@ public class ProfessionalServiceImpl implements ProfessionalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "La disponibilidad necesita un desde anterior al hasta");
         }
+        boolean hasPoint = filters.lat() != null;
+        if (hasPoint != (filters.lon() != null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La ubicación necesita latitud y longitud");
+        }
+        if (filters.maxDistanceKm() != null && (!hasPoint || filters.maxDistanceKm() < 1)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La distancia máxima necesita una ubicación y al menos 1 km");
+        }
+        if (filters.order() == ProfessionalSearchFilters.Order.DISTANCE && !hasPoint) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ordenar por cercanía necesita una ubicación");
+        }
 
         ProfessionalSearchFilters.Order order = filters.order() == null ? ProfessionalSearchFilters.Order.RELEVANCE : filters.order();
         // The order is the query's own; a page is never bigger than MAX_PAGE_SIZE.
@@ -269,8 +284,17 @@ public class ProfessionalServiceImpl implements ProfessionalService {
         return professionalRepository
                 .search(orNull(filters.tradeIds()), filters.minPrice(), filters.maxPrice(), filters.minRating(),
                         orNull(filters.location()), orNull(filters.query()),
-                        filters.availableFrom(), filters.availableTo(), order.name(), page)
-                .map(professionalMapper::toPublicResponse);
+                        filters.availableFrom(), filters.availableTo(),
+                        filters.lat(), filters.lon(), filters.maxDistanceKm(), order.name(), page)
+                .map(professional -> {
+                    ProfessionalPublicResponse response = professionalMapper.toPublicResponse(professional);
+                    ServiceArea area = professional.getServiceArea();
+                    // Rounded: exact distances from points of the client's choosing would locate the centre.
+                    if (hasPoint && area != null) {
+                        response.setDistanceKm(Math.round(area.distanceKm(filters.lat(), filters.lon()) * 2) / 2.0);
+                    }
+                    return response;
+                });
     }
 
     @Override

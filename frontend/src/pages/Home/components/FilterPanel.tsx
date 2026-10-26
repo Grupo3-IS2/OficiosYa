@@ -25,6 +25,7 @@ interface Props {
 const formatPrice = (price: number) => `$${price.toLocaleString('es-UY')}`
 /** How far ahead the calendar goes: agendas are not filled in much further. */
 const CALENDAR_DAYS = 90
+const MAX_DISTANCES_KM = [2, 5, 10, 25]
 
 export default function FilterPanel({ filters, trades, tradeIds, query, onApply, onClose }: Props) {
     const dialog = useRef<HTMLDialogElement>(null)
@@ -134,15 +135,19 @@ export default function FilterPanel({ filters, trades, tradeIds, query, onApply,
                         <div className="location-controls">
                             <label className="filter-field">
                                 <span>Ciudad o barrio</span>
-                                <input value={draft.location} onChange={event => setDraft(current => ({ ...current, location: event.target.value }))} placeholder="Ej. Montevideo" />
+                                {/* Typed by hand, the point chosen before no longer matches the text */}
+                                <input value={draft.location} onChange={event => setDraft(current => ({ ...current, location: event.target.value, point: null, maxDistanceKm: null }))} placeholder="Ej. Montevideo" />
                             </label>
-                            <label className="filter-field filter-field--disabled">
+                            <label className={`filter-field${draft.point ? '' : ' filter-field--disabled'}`}>
                                 <span>Radio</span>
-                                <select disabled><option>Cualquier distancia</option></select>
+                                <select disabled={!draft.point} value={draft.maxDistanceKm ?? ''} onChange={event => setDraft(current => ({ ...current, maxDistanceKm: event.target.value ? Number(event.target.value) : null }))}>
+                                    <option value="">Cualquier distancia</option>
+                                    {MAX_DISTANCES_KM.map(km => <option key={km} value={km}>A menos de {km} km</option>)}
+                                </select>
                             </label>
                         </div>
-                        <ZonePicker query={draft.location} onChoose={location => setDraft(current => ({ ...current, location }))} locateSaved mapLabel="Mapa para elegir la zona donde necesitás el servicio" />
-                        <small className="filter-note">La búsqueda por kilómetros estará disponible próximamente.</small>
+                        <ZonePicker query={draft.location} onChoose={(location, point) => setDraft(current => ({ ...current, location, point }))} locateSaved savedPoint={draft.point} radiusKm={draft.maxDistanceKm ?? undefined} mapLabel="Mapa para elegir la zona donde necesitás el servicio" />
+                        {!draft.point && <small className="filter-note">Elegí el lugar en el mapa o en la lista para ver quién llega hasta ahí.</small>}
                     </section>
 
                     <section className="filter-group">

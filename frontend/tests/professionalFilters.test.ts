@@ -41,6 +41,8 @@ test('tradesFor filters professional trades by selected tradeIds, or returns all
 test('activeFilterCount tallies active filters accurately', () => {
     assert.equal(activeFilterCount({
         location: '',
+        point: null,
+        maxDistanceKm: null,
         minimumPrice: null,
         maximumPrice: null,
         minimumRating: null,
@@ -49,6 +51,8 @@ test('activeFilterCount tallies active filters accurately', () => {
 
     assert.equal(activeFilterCount({
         location: ' Pocitos ',
+        point: null,
+        maxDistanceKm: null,
         minimumPrice: 200,
         maximumPrice: null,
         minimumRating: null,
@@ -57,6 +61,8 @@ test('activeFilterCount tallies active filters accurately', () => {
 
     assert.equal(activeFilterCount({
         location: 'Cordón',
+        point: { lat: -34.9, lon: -56.18 },
+        maxDistanceKm: 5,
         minimumPrice: null,
         maximumPrice: 500,
         minimumRating: 4.0,

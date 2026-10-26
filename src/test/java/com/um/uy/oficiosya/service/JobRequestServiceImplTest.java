@@ -12,6 +12,7 @@ import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.request.TaskCreateRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.dto.response.ServiceAreaResponse;
 import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.Conversation;
@@ -19,6 +20,7 @@ import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.PaymentState;
 import com.um.uy.oficiosya.entity.Professional;
+import com.um.uy.oficiosya.entity.ServiceArea;
 import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.entity.Schedule;
 import com.um.uy.oficiosya.entity.ScheduleType;
@@ -153,6 +155,40 @@ class JobRequestServiceImplTest {
         assertTrue(response.getConfirmationPin().matches("\\d{6}"));
         // A new request waits for the professional: it may be the one that reaches the reminder
         verify(events).publishEvent(new JobRequestEvents.AwaitingAnswersChanged(Set.of(clientId, professionalId)));
+    }
+
+    @Test
+    void createJobRequest_withAPoint_tellsWhetherTheProfessionalsAreaReachesIt() {
+        professional.setServiceArea(new ServiceArea(-34.9058, -56.1913, 10)); // Plaza Independencia, 10 km
+        when(clientRepository.findByPublicId(clientId)).thenReturn(Optional.of(client));
+        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        when(tradeRepository.findById(3L)).thenReturn(Optional.of(Trade.builder().id(3L).name("Plomería").build()));
+        when(passwordEncoder.encode(anyString())).thenReturn("pin-hash");
+        JobRequestCreateRequest carrasco = createRequest(3L); // ~12.4 km away
+        carrasco.setLatitude(-34.8838);
+        carrasco.setLongitude(-56.0581);
+        JobRequestCreateRequest cordon = createRequest(3L); // ~2 km away
+        cordon.setLatitude(-34.9011);
+        cordon.setLongitude(-56.1700);
+
+        JobRequestResponse outside = service.createJobRequest(carrasco, clientId);
+        assertEquals(true, outside.getOutsideServiceArea());
+        assertEquals(-34.8838, outside.getLatitude());
+        // The professional's centre goes rounded, as on their public profile.
+        assertEquals(new ServiceAreaResponse(-34.91, -56.19, 10), outside.getProfessionalServiceArea());
+        assertEquals(false, service.createJobRequest(cordon, clientId).getOutsideServiceArea());
+        assertNull(service.createJobRequest(createRequest(3L), clientId).getOutsideServiceArea());
+    }
+
+    @Test
+    void createJobRequest_withHalfAPoint_isRejected() {
+        when(clientRepository.findByPublicId(clientId)).thenReturn(Optional.of(client));
+        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        JobRequestCreateRequest request = createRequest(3L);
+        request.setLatitude(-34.9);
+
+        assertThrows(ResponseStatusException.class, () -> service.createJobRequest(request, clientId));
+        verify(jobRequestRepository, never()).save(any());
     }
 
     @Test

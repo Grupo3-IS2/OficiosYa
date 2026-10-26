@@ -401,6 +401,8 @@ public class ClientServiceImpl implements ClientService {
             // Both are required of a professional: a dash keeps nothing of theirs.
             professional.setPhoneNumber(DELETED_FIELD);
             professional.setWorkingLocation(DELETED_FIELD);
+            // It can be their home.
+            professional.setServiceArea(null);
             professional.setDescription(null);
             professional.getExpertiseTrades().clear();
             // Its free time goes; the slots of jobs stay with those jobs.

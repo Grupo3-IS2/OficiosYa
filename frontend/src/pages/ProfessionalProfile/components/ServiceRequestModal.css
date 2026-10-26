@@ -143,6 +143,7 @@
 .service-request-remove-task:hover { color: #ad2a21; }
 
 .service-request-error { display: block; margin-top: 6px; color: #ba3329; font-size: 12px; line-height: 1.35; }
+.service-request-outside { margin: 10px 0 0; padding: 10px 12px; border-radius: 8px; color: #8a4f00; background: #fff7e5; font-size: 14px; line-height: 1.4; }
 .service-request-submit-error { margin: 18px 0 0; padding: 12px 14px; border-radius: 8px; color: #9f2f27; background: #fff1ef; font-size: 14px; line-height: 1.4; }
 
 .service-request-modal__footer {

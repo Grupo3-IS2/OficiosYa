@@ -12,7 +12,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", imports = ProfessionalMapper.class)
 public interface JobRequestMapper {
 
     @Mapping(target = "clientId", source = "client.publicId")
@@ -26,6 +26,8 @@ public interface JobRequestMapper {
     @Mapping(target = "confirmationPin", ignore = true)
     @Mapping(target = "scheduledStart", ignore = true)
     @Mapping(target = "scheduledEnd", ignore = true)
+    @Mapping(target = "outsideServiceArea", expression = "java(jobRequest.isOutsideServiceArea())")
+    @Mapping(target = "professionalServiceArea", expression = "java(ProfessionalMapper.approximate(jobRequest.getProfessional().getServiceArea()))")
     JobRequestResponse toResponse(JobRequest jobRequest);
 
     @Mapping(target = "jobRequestId", source = "id")

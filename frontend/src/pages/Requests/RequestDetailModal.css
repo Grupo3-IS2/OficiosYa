@@ -58,6 +58,7 @@
 .request-detail-section > p .icon { width: 19px; height: 19px; flex: 0 0 auto; color: #07984c; }
 .request-detail-location { color: #147a78 !important; }
 .request-detail-muted { color: #7b8699 !important; }
+.request-detail-outside,
 .request-detail-proposed { padding: 10px 12px; border-radius: 9px; color: #9b6200 !important; background: #fff7e5; }
 
 .request-detail-map { margin: 12px 0 16px; }

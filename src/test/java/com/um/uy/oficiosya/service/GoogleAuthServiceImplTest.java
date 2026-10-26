@@ -5,6 +5,7 @@ import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
 import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.request.ServiceAreaRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.response.ClientResponse;
@@ -298,12 +299,14 @@ class GoogleAuthServiceImplTest {
         when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(stored));
 
         service.registerProfessional(GoogleProfessionalRegisterRequest.builder()
-                .credential(CREDENTIAL).phoneNumber("099123456").workingLocation("Montevideo").build());
+                .credential(CREDENTIAL).phoneNumber("099123456").workingLocation("Montevideo")
+                .serviceArea(new ServiceAreaRequest(-34.9, -56.16, 10)).build());
 
         ArgumentCaptor<ProfessionalCreateRequest> request = ArgumentCaptor.forClass(ProfessionalCreateRequest.class);
         verify(professionalService).createProfessional(request.capture(), anyString());
         assertEquals("099123456", request.getValue().getPhoneNumber());
         assertEquals("Montevideo", request.getValue().getWorkingLocation());
+        assertEquals(new ServiceAreaRequest(-34.9, -56.16, 10), request.getValue().getServiceArea());
         assertEquals(EMAIL, request.getValue().getEmail());
         assertEquals(AuthProvider.GOOGLE, stored.getAuthProvider());
     }

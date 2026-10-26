@@ -1,6 +1,8 @@
 package com.um.uy.oficiosya.dto.request;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -30,6 +32,18 @@ public class JobRequestCreateRequest {
 
     @NotBlank(message = "La ubicación es obligatoria")
     private String location;
+
+    /**
+     * Where the job is, when chosen on the map (both or neither): it tells whether the professional's
+     * service area reaches it. Uruguay's bounds, like {@link ServiceAreaRequest}.
+     */
+    @DecimalMin(value = "-35.2", message = "La ubicación tiene que estar en Uruguay")
+    @DecimalMax(value = "-29.9", message = "La ubicación tiene que estar en Uruguay")
+    private Double latitude;
+
+    @DecimalMin(value = "-58.7", message = "La ubicación tiene que estar en Uruguay")
+    @DecimalMax(value = "-52.9", message = "La ubicación tiene que estar en Uruguay")
+    private Double longitude;
 
     @NotNull(message = "El monto a pagar es obligatorio")
     @PositiveOrZero(message = "El monto a pagar no puede ser negativo")

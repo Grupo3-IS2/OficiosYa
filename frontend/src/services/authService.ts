@@ -20,6 +20,7 @@ import type {
   StoredUser,
   TokenResponse,
 } from '../types/Auth.ts'
+import type { ServiceArea } from '../types/Professional.ts'
 
 /** A new login: the cached profile belonged to whoever was logged in before. */
 function storeSession(response: LoginResponse): void {
@@ -57,6 +58,7 @@ export async function register(
         ...request,
         phoneNumber: profile.phoneNumber,
         workingLocation: profile.location,
+        serviceArea: profile.serviceArea ?? undefined,
       }
     : request
 
@@ -114,7 +116,7 @@ export async function googleLink(credential: string, password: string): Promise<
 export async function googleRegister(
   credential: string,
   accountType: AccountType,
-  professional?: { phoneNumber: string; workingLocation: string },
+  professional?: { phoneNumber: string; workingLocation: string; serviceArea?: ServiceArea },
   name?: string,
 ): Promise<LoginResponse> {
   const isProfessional = accountType === 'professional'

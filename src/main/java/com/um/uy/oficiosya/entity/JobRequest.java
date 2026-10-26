@@ -44,6 +44,17 @@ public class JobRequest {
     @Column(nullable = false)
     private String location;
 
+    /** The location's point, if it was chosen on the map; null on requests from before, or typed by hand. */
+    private Double latitude;
+    private Double longitude;
+
+    /** Null when it can't be told: the job or the professional's service area has no point. */
+    public Boolean isOutsideServiceArea() {
+        ServiceArea area = professional.getServiceArea();
+        if (latitude == null || longitude == null || area == null) return null;
+        return area.distanceKm(latitude, longitude) > area.getRadiusKm();
+    }
+
     @NotNull
     @PositiveOrZero
     @Column(nullable = false, precision = 12, scale = 2)

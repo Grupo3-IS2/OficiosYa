@@ -3,16 +3,29 @@ import { lookupBestZone, reverseZone, reverseZoomFor, sharedZoneCache, suggestZo
 import ZoneMap, { type MapFocus } from '../ZoneMap/ZoneMap'
 import './ZonePicker.css'
 
+/** A point on the map, in degrees. */
+export interface ZonePoint {
+  lat: number
+  lon: number
+}
+
 interface ZonePickerProps {
   /** What is written in the location field: it is the search, and what ends up saved. */
   query: string
-  /** The zone chosen, as the short name to keep in the field. */
-  onChoose: (label: string) => void
+  /**
+   * The zone chosen, as the short name to keep in the field, and the point it was chosen at: where the map
+   * was tapped (or the person is), or the centre of the place suggested.
+   */
+  onChoose: (label: string, point: ZonePoint) => void
   /**
    * For a form that opens with a zone already saved: puts the map on it. Once, the first time the field has
    * a value (it may arrive after the form is drawn); what is typed afterwards is suggested as usual.
    */
   locateSaved?: boolean
+  /** With `locateSaved`: the point saved with the zone. The map goes there instead of searching the name. */
+  savedPoint?: ZonePoint | null
+  /** Draws the area covered around the point, in kilometres. */
+  radiusKm?: number
   /** What a screen reader says the map is for. */
   mapLabel?: string
 }
@@ -36,7 +49,7 @@ const CURRENT_ZONE_ZOOM = 14
  * Photon, which is made for it); picking one, or tapping the map, puts its name in the field. It doesn't
  * replace typing the zone by hand, it helps to find it.
  */
-function ZonePicker({ query, onChoose, locateSaved = false, mapLabel = 'Mapa para elegir tu zona de trabajo' }: Readonly<ZonePickerProps>) {
+function ZonePicker({ query, onChoose, locateSaved = false, savedPoint, radiusKm, mapLabel = 'Mapa para elegir tu zona de trabajo' }: Readonly<ZonePickerProps>) {
   const [choices, setChoices] = useState<ZoneChoice[]>([])
   const [focus, setFocus] = useState<MapFocus | null>(null)
   const [status, setStatus] = useState<Status>('idle')
@@ -67,7 +80,7 @@ function ZonePicker({ query, onChoose, locateSaved = false, mapLabel = 'Mapa par
         if (!active || !zone || latestQuery.current.trim()) return
         setFocus({ lat: coords.latitude, lon: coords.longitude })
         settled.current = zone.label
-        latestOnChoose.current(zone.label)
+        latestOnChoose.current(zone.label, { lat: coords.latitude, lon: coords.longitude })
       } catch {
         // Without a name for the point the map just stays on the country.
       } finally {
@@ -86,10 +99,15 @@ function ZonePicker({ query, onChoose, locateSaved = false, mapLabel = 'Mapa par
     located.current = true
     settled.current = query.trim()
 
+    if (savedPoint) {
+      setFocus({ lat: savedPoint.lat, lon: savedPoint.lon })
+      return
+    }
+
     lookupBestZone(query, { cache: sharedZoneCache() })
       .then(place => { if (place) setFocus(place) })
       .catch(() => { /* the map just stays on the country: the zone is still written in the field */ })
-  }, [locateSaved, query])
+  }, [locateSaved, query, savedPoint])
 
   useEffect(() => {
     const text = query.trim()
@@ -124,7 +142,7 @@ function ZonePicker({ query, onChoose, locateSaved = false, mapLabel = 'Mapa par
 
   function choose(choice: ZoneChoice) {
     settled.current = choice.label
-    onChoose(choice.label)
+    onChoose(choice.label, { lat: choice.lat, lon: choice.lon })
     setFocus({ lat: choice.lat, lon: choice.lon, bbox: choice.bbox })
     setChoices([])
     setSuggesting('idle')
@@ -140,7 +158,7 @@ function ZonePicker({ query, onChoose, locateSaved = false, mapLabel = 'Mapa par
       const zone = await reverseZone(lat, lon, { zoom: reverseZoomFor(mapZoom) })
       if (zone) {
         settled.current = zone.label
-        onChoose(zone.label)
+        onChoose(zone.label, { lat, lon })
         setChoices([])
         setSuggesting('idle')
         setStatus('idle')
@@ -167,7 +185,7 @@ function ZonePicker({ query, onChoose, locateSaved = false, mapLabel = 'Mapa par
         </ul>
       )}
 
-      <ZoneMap focus={focus} onPick={(lat, lon, zoom) => void pick(lat, lon, zoom)} label={mapLabel} />
+      <ZoneMap focus={focus} onPick={(lat, lon, zoom) => void pick(lat, lon, zoom)} radiusKm={radiusKm} label={mapLabel} />
 
       {/* Only while nothing is written: the browser may still be asking the person, and typing answers it too */}
       {status === 'locating' && !query.trim() && <output className="zone-picker__note zone-picker__note--busy">Buscando tu ubicación…</output>}

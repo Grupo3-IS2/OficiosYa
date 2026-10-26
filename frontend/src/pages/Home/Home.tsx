@@ -18,6 +18,7 @@ import { popularSearches } from './homeData'
 import type { ProfessionalOrder } from './professionalOrder'
 import { activeFilterCount, emptyProfessionalFilters, tradeSelectionName } from './professionalFilters'
 import { useProfessionalSearch } from './useProfessionalSearch'
+import { useServiceAreaReminder } from './useServiceAreaReminder'
 import type { ProfessionalFilters } from './professionalFilters'
 import './Home.css'
 
@@ -30,6 +31,7 @@ function Home() {
     const [filters, setFilters] = useState<ProfessionalFilters>(emptyProfessionalFilters)
     const [filtersOpen, setFiltersOpen] = useState(false)
     const [order, setOrder] = useState<ProfessionalOrder>('relevance')
+    useServiceAreaReminder()
     // The search filters and orders them, a page at a time: the next one loads when the list's end comes into view.
     const found = useProfessionalSearch({ query: searchQuery, tradeIds: selectedTradeIds, filters, order })
     const { professionals } = found
@@ -133,11 +135,11 @@ function Home() {
                                 <Icon name="filter" /> Filtros
                                 {appliedFilterCount > 0 && <span aria-label={`${appliedFilterCount} filtros activos`}>{appliedFilterCount}</span>}
                             </button>
-                            <SortControl value={order} onChange={setOrder} />
+                            <SortControl value={order} onChange={setOrder} nearest={filters.point !== null} />
                         </div>
 
                         {appliedFilterCount > 0 && <div className="active-filters" aria-label="Filtros activos">
-                            {filters.location && <button type="button" onClick={() => setFilters(current => ({ ...current, location: '' }))}>{filters.location} <span aria-hidden="true">×</span></button>}
+                            {filters.location && <button type="button" onClick={() => setFilters(current => ({ ...current, location: '', point: null, maxDistanceKm: null }))}>{filters.location}{filters.maxDistanceKm !== null && ` · a menos de ${filters.maxDistanceKm} km`} <span aria-hidden="true">×</span></button>}
                             {(filters.minimumPrice !== null || filters.maximumPrice !== null) && <button type="button" onClick={() => setFilters(current => ({ ...current, minimumPrice: null, maximumPrice: null }))}>
                                 {filters.minimumPrice !== null ? `$${filters.minimumPrice.toLocaleString('es-UY')}` : 'Desde el mínimo'} – {filters.maximumPrice !== null ? `$${filters.maximumPrice.toLocaleString('es-UY')}` : 'sin máximo'} <span aria-hidden="true">×</span>
                             </button>}

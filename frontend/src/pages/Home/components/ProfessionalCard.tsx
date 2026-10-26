@@ -49,7 +49,7 @@ function ProfessionalCard({ professional, selectedTradeIds = [], schedules }: Pr
                 )}
                 <Rating value={professional.rating} />
                 {status === 'authenticated' && professional.workingLocation && (
-                    <p className="meta"><Icon name="location" /> {professional.workingLocation}</p>
+                    <p className="meta"><Icon name="location" /> {professional.workingLocation}{professional.distanceKm != null && ` · a ${professional.distanceKm.toLocaleString('es-UY')} km`}</p>
                 )}
                 <p className="meta"><Icon name="calendar" /> {availability}</p>
             </div>

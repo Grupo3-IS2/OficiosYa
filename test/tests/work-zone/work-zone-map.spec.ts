@@ -16,12 +16,15 @@ const montevideo = [{
   boundingbox: ['-34.9400', '-34.7000', '-56.4300', '-56.0200']
 }];
 
-function professional(workingLocation: string) {
+type ServiceArea = { latitude: number; longitude: number; radiusKm: number };
+
+function professional(workingLocation: string, serviceArea: ServiceArea | null = null) {
   return {
     id: PROFESSIONAL_ID,
     name: 'Juan Gomez',
     profileImageUrl: null,
     workingLocation,
+    serviceArea,
     description: 'Electricista con diez años de experiencia.',
     rating: 4.5,
     expertiseTrades: []
@@ -36,13 +39,13 @@ interface Mocks {
 // A 1x1 transparent PNG: what the map's tiles are answered with.
 const BLANK_TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 
-async function mockProfile(page: Page, workingLocation: string, nominatim: { status: number; body: unknown | ((query: string) => unknown) }): Promise<Mocks> {
+async function mockProfile(page: Page, workingLocation: string, nominatim: { status: number; body: unknown | ((query: string) => unknown) }, serviceArea: ServiceArea | null = null): Promise<Mocks> {
   const mocks: Mocks = { searches: [], tiles: [] };
 
   await page.route(`**/api/v1/professionals/${PROFESSIONAL_ID}`, (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify(professional(workingLocation))
+    body: JSON.stringify(professional(workingLocation, serviceArea))
   }));
   await page.route('https://nominatim.openstreetmap.org/**', (route) => {
     mocks.searches.push(new URL(route.request().url()));
@@ -204,6 +207,20 @@ test.describe('Mapa de la zona de trabajo (OpenStreetMap)', () => {
     await expect(mapOf(page)).toBeVisible();
 
     expect(mocks.searches).toHaveLength(1);
+  });
+
+  test('UI: con un área de atención se dibuja su círculo entero sin buscar la zona en Nominatim', async ({ page }) => {
+    const mocks = await mockProfile(page, 'Cordón, Montevideo', { status: 200, body: montevideo },
+      { latitude: -34.9, longitude: -56.18, radiusKm: 5 });
+
+    await page.goto(`${FRONTEND_BASE}/profesionales/${PROFESSIONAL_ID}`);
+
+    await expect(zoneSection(page)).toContainText('Cordón, Montevideo · hasta 5 km');
+    await expect(mapOf(page).locator('.zone-pin')).toBeVisible();
+    await expect(mapOf(page).locator('path')).toHaveCount(1);
+    // The whole 10 km across fits a map a few hundred pixels wide: about city level, not street level.
+    expect(await settledZoom(mapOf(page))).toBeLessThanOrEqual(12);
+    expect(mocks.searches).toHaveLength(0);
   });
 
   test('UI: sin zona informada no se busca nada', async ({ page }) => {

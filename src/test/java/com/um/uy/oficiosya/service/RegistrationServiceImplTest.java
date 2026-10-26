@@ -2,6 +2,7 @@ package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
+import com.um.uy.oficiosya.dto.request.ServiceAreaRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
@@ -54,6 +55,7 @@ class RegistrationServiceImplTest {
     private static final String HASH = "{argon2}hashed";
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final ServiceAreaRequest AREA = new ServiceAreaRequest(-34.9, -56.16, 10);
 
     @Mock
     private ClientRepository clientRepository;
@@ -87,11 +89,11 @@ class RegistrationServiceImplTest {
 
     private ProfessionalCreateRequest professionalRequest() {
         return ProfessionalCreateRequest.builder().name(NAME).email(EMAIL).password(PASSWORD)
-                .phoneNumber("+59899123456").workingLocation("Montevideo").build();
+                .phoneNumber("+59899123456").workingLocation("Montevideo").serviceArea(AREA).build();
     }
 
     private String payloadOf(Role type, String phone, String location) {
-        return JSON.writeValueAsString(new PendingRegistration(type, NAME, HASH, phone, location));
+        return JSON.writeValueAsString(new PendingRegistration(type, NAME, HASH, phone, location, null));
     }
 
     // --- startRegistration ---
@@ -141,6 +143,18 @@ class RegistrationServiceImplTest {
         assertEquals(Role.PROFESSIONAL, stored.accountType());
         assertEquals("+59899123456", stored.phoneNumber());
         assertEquals("Montevideo", stored.workingLocation());
+        assertEquals(AREA, stored.serviceArea());
+    }
+
+    @Test
+    void aCodeSentBeforeTheServiceAreaExisted_stillReads() {
+        String old = "{\"accountType\":\"PROFESSIONAL\",\"name\":\"" + NAME + "\",\"passwordHash\":\"" + HASH
+                + "\",\"phoneNumber\":\"+59899123456\",\"workingLocation\":\"Montevideo\"}";
+
+        PendingRegistration stored = JSON.readValue(old, PendingRegistration.class);
+
+        assertEquals("Montevideo", stored.workingLocation());
+        assertNull(stored.serviceArea());
     }
 
     @Test
@@ -227,7 +241,8 @@ class RegistrationServiceImplTest {
                 .password(HASH).build();
 
         when(emailVerificationService.verifyCode(EMAIL, VerificationPurpose.REGISTER, "123456"))
-                .thenReturn(new VerificationResult(null, payloadOf(Role.PROFESSIONAL, "+59899123456", "Montevideo")));
+                .thenReturn(new VerificationResult(null, JSON.writeValueAsString(
+                        new PendingRegistration(Role.PROFESSIONAL, NAME, HASH, "+59899123456", "Montevideo", AREA))));
         when(professionalService.createProfessional(any(), eq(HASH)))
                 .thenReturn(professionalResponse(publicId));
         when(clientRepository.findByPublicId(publicId)).thenReturn(Optional.of(professional));
@@ -240,6 +255,7 @@ class RegistrationServiceImplTest {
         verify(professionalService).createProfessional(created.capture(), eq(HASH));
         assertEquals("+59899123456", created.getValue().getPhoneNumber());
         assertEquals("Montevideo", created.getValue().getWorkingLocation());
+        assertEquals(AREA, created.getValue().getServiceArea());
         assertEquals(Role.PROFESSIONAL, response.getRole());
     }
 

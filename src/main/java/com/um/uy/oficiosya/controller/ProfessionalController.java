@@ -87,10 +87,13 @@ public class ProfessionalController {
             @RequestParam(required = false) String query,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime availableFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime availableTo,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lon,
+            @RequestParam(required = false) Integer maxDistanceKm,
             @RequestParam(required = false) ProfessionalSearchFilters.Order order,
             @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
         ProfessionalSearchFilters filters = new ProfessionalSearchFilters(tradeIds, minPrice, maxPrice, minRating,
-                location, query, availableFrom, availableTo, order);
+                location, query, availableFrom, availableTo, lat, lon, maxDistanceKm, order);
         return ResponseEntity.ok(professionalService.searchProfessionals(filters, pageable));
     }
 

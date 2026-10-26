@@ -18,6 +18,10 @@ interface ZoneMapProps {
    * was looking, which is how precise the choice should be). Without: it only shows the zone.
    */
   onPick?: (lat: number, lon: number, zoom: number) => void
+  /** Draws the area covered: a circle of this many kilometres around the pin, and fits the map to it. */
+  radiusKm?: number
+  /** Centres the circle here instead of on the pin (someone's area around a place): the map shows both. */
+  areaCentre?: { lat: number; lon: number }
   /** What a screen reader says the map is. */
   label: string
 }
@@ -37,10 +41,16 @@ const pin = L.divIcon({ className: 'zone-pin-wrap', html: '<span class="zone-pin
  * A plain map of a zone. It is the same one for the profile (only shown) and for the forms (where the
  * zone is picked). Both can be zoomed in and out; only the second one picks a point when it is touched.
  */
-function ZoneMap({ focus, onPick, label }: Readonly<ZoneMapProps>) {
+function ZoneMap({ focus, onPick, radiusKm, areaCentre, label }: Readonly<ZoneMapProps>) {
+  // As numbers: a new object with the same point must not redraw the circle and refit the map.
+  const areaLat = areaCentre?.lat
+  const areaLon = areaCentre?.lon
   const container = useRef<HTMLElement>(null)
   const map = useRef<L.Map | null>(null)
   const marker = useRef<L.Marker | null>(null)
+  const circle = useRef<L.Circle | null>(null)
+  /** The radius the circle was last drawn with, to tell a moved slider from a moved point. */
+  const drawnRadius = useRef<number | undefined>(undefined)
   // The map is built once; this always points at the latest callback.
   const pick = useRef(onPick)
   const interactive = onPick !== undefined
@@ -91,6 +101,8 @@ function ZoneMap({ focus, onPick, label }: Readonly<ZoneMapProps>) {
       created.remove()
       map.current = null
       marker.current = null
+      circle.current = null
+      drawnRadius.current = undefined
     }
   }, [interactive])
 
@@ -126,6 +138,33 @@ function ZoneMap({ focus, onPick, label }: Readonly<ZoneMapProps>) {
       current.setView(point, Math.max(current.getZoom(), 12))
     }
   }, [focus, interactive])
+
+  // After the focus effect, so a map that only shows the zone ends on the whole circle.
+  useEffect(() => {
+    const current = map.current
+    if (!current) return
+
+    if (!focus || !radiusKm) {
+      circle.current?.remove()
+      circle.current = null
+      drawnRadius.current = undefined
+      return
+    }
+
+    const pinPoint = L.latLng(focus.lat, focus.lon)
+    const point = areaLat !== undefined && areaLon !== undefined ? L.latLng(areaLat, areaLon) : pinPoint
+    if (!circle.current) {
+      circle.current = L.circle(point, { radius: radiusKm * 1000, color: '#0ba756', weight: 2, fillOpacity: .12, interactive: false }).addTo(current)
+    } else {
+      circle.current.setLatLng(point).setRadius(radiusKm * 1000)
+    }
+
+    // While picking, choosing a place still goes close up (a tap there gives a precise address): the map
+    // only steps back to the whole circle when the radius is the thing that moved.
+    const radiusMoved = drawnRadius.current !== undefined && drawnRadius.current !== radiusKm
+    drawnRadius.current = radiusKm
+    if (!interactive || radiusMoved) current.fitBounds(circle.current.getBounds().extend(pinPoint), { padding: [12, 12] })
+  }, [focus, radiusKm, interactive, areaLat, areaLon])
 
   return <section ref={container} className="zone-map" aria-label={label} />
 }

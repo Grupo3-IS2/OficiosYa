@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../components/Button/Button'
 import Icon from '../../components/Icon/Icon'
@@ -11,7 +11,7 @@ import CancelRequestSection from './CancelRequestSection'
 import CompleteRequestSection from './CompleteRequestSection'
 import RequestResponseSection, { type ResponseMode } from './RequestResponseSection'
 import { canCompleteRequest, type Decision, type RequestOutcome } from './requestResponse'
-import { answersReschedule, rescheduleRequester } from './requestList'
+import { answersReschedule, outsideServiceAreaNote, rescheduleRequester } from './requestList'
 import { timeframeText } from './rescheduleTimeframe'
 import { canRateRequest } from './ratingForm'
 import './RequestDetailModal.css'
@@ -32,10 +32,17 @@ const paymentLabels: Record<PaymentState, string> = {
     REFUNDED: 'Reintegrado',
 }
 
-/** Where the job is done, on the map, so both sides can see how to get there. */
-function JobLocationMap({ location }: Readonly<{ location: string }>) {
-    const map = useZoneLookup(location)
-    if (map.status === 'found') return <ZoneMap focus={map.place} label={`Mapa de ${location}`} />
+/**
+ * Where the job is done, on the map, so both sides can see how to get there; with the professional's
+ * area around it, to see whether it reaches. The point chosen on the map if there is one, otherwise
+ * the address is looked up.
+ */
+function JobLocationMap({ request }: Readonly<{ request: JobRequest }>) {
+    const { location, latitude, longitude, professionalServiceArea: area } = request
+    const point = useMemo(() => latitude != null && longitude != null ? { lat: latitude, lon: longitude } : null, [latitude, longitude])
+    const map = useZoneLookup(point ? '' : location)
+    const focus = point ?? (map.status === 'found' ? map.place : null)
+    if (focus) return <ZoneMap focus={focus} radiusKm={area?.radiusKm} areaCentre={area ? { lat: area.latitude, lon: area.longitude } : undefined} label={`Mapa de ${location}`} />
     return <output className="request-detail-map-placeholder">
         {map.status === 'loading' && 'Buscando la dirección en el mapa…'}
         {map.status === 'not-found' && 'No pudimos ubicar esta dirección en el mapa.'}
@@ -81,6 +88,7 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
     /** Opens the form to propose a new timeframe for an accepted job, over the detail. */
     onReschedule: (request: JobRequest) => void
 }>) {
+    const outsideNote = outsideServiceAreaNote(request, isClient)
     const dialogRef = useRef<HTMLDialogElement>(null)
     const bodyRef = useRef<HTMLDivElement>(null)
     const restoredScroll = useRef(initialScrollTop)
@@ -215,7 +223,11 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                 <section className="request-detail-section">
                     <h3>Trabajo</h3>
                     <p className="request-detail-location"><Icon name="location" />{request.location}</p>
-                    <div className="request-detail-map"><JobLocationMap location={request.location} /></div>
+                    {outsideNote && <p className="request-detail-outside">{outsideNote}</p>}
+                    <div className="request-detail-map"><JobLocationMap request={request} /></div>
+                    {request.professionalServiceArea && <p className="request-detail-muted">
+                        El círculo es {isClient ? `la zona que cubre ${request.professionalName}` : 'tu zona de trabajo'} (hasta {request.professionalServiceArea.radiusKm} km).
+                    </p>}
                     <div className="request-detail-tasks">
                         {request.tasks.map((task, index) => <article key={task.id}>
                             <span>Tarea {index + 1}</span>

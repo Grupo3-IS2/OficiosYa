@@ -3,7 +3,7 @@ import { getCurrentUser, isAuthenticated, updateStoredUser } from '../../service
 import { addExpertiseTrade, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, setProfessionalPublished, updateNotifications, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, removeProfileImage, uploadProfileImage, verifyEmailChange } from '../../services/userService'
 import type { ProfessionalResponse } from '../../services/userService'
 import { ApiError } from '../../services/api'
-import { personalChanged, professionalChanged, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
+import { personalChanged, professionalChanged, sameServiceArea, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
 import type { PersonalData, ProfessionalData, ProfileSection, SecurityData } from './profileState'
 import type { PendingVerification } from '../../types/Auth'
 import type { Trade } from '../../types/Professional'
@@ -13,6 +13,7 @@ function professionalDataFrom(response: ProfessionalResponse): ProfessionalData 
     return {
         description: response.description ?? '',
         workingLocation: response.workingLocation ?? '',
+        serviceArea: response.serviceArea ?? null,
         published: response.published,
         trades: response.expertiseTrades.map(trade => ({
             id: trade.id,
@@ -42,6 +43,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
     const [savedProfessional, setSavedProfessional] = useState<ProfessionalData>({
         description: '',
         workingLocation: '',
+        serviceArea: null,
         trades: [],
         published: false,
     })
@@ -211,10 +213,13 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 if (persisted.published && (!professional.published || tradesChanged)) {
                     record(await setProfessionalPublished(false))
                 }
-                if (professional.description.trim() !== persisted.description || professional.workingLocation.trim() !== persisted.workingLocation) {
+                const area = professional.serviceArea
+                const areaChanged = area !== null && !sameServiceArea(area, persisted.serviceArea)
+                if (professional.description.trim() !== persisted.description || professional.workingLocation.trim() !== persisted.workingLocation || areaChanged) {
                     record(await updateProfessional({
                         ...(professional.description.trim() !== persisted.description && { description: professional.description.trim() }),
                         ...(professional.workingLocation.trim() !== persisted.workingLocation && { workingLocation: professional.workingLocation.trim() }),
+                        ...(areaChanged && { serviceArea: area }),
                     }))
                 }
                 for (const trade of professional.trades.filter(item => !persisted.trades.some(saved => saved.tradeId === item.tradeId))) {

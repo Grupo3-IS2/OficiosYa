@@ -1,5 +1,11 @@
 package com.um.uy.oficiosya.controller;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import com.um.uy.oficiosya.dto.request.JobRequestAcceptRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCancelRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestCompleteRequest;
@@ -7,16 +13,22 @@ import com.um.uy.oficiosya.dto.request.JobRequestCreateRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestRejectRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
+import com.um.uy.oficiosya.dto.response.ConversationResponse;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
+import com.um.uy.oficiosya.exception.JobRequestNotFoundException;
+import com.um.uy.oficiosya.service.interfaces.ChatService;
+import com.um.uy.oficiosya.service.interfaces.ChatService.FoundOrCreated;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,6 +38,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,6 +58,8 @@ class JobRequestControllerTest {
 
     @Mock
     private JobRequestService jobRequestService;
+    @Mock
+    private ChatService chatService;
 
     private MockMvc mvc;
     private final UUID userId = UUID.randomUUID();
@@ -54,7 +70,7 @@ class JobRequestControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         mvc = MockMvcBuilders
-                .standaloneSetup(new JobRequestController(jobRequestService))
+                .standaloneSetup(new JobRequestController(jobRequestService, chatService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -217,6 +233,19 @@ class JobRequestControllerTest {
     }
 
     @Test
+    void getMyReviews_passesThePage() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<ReviewResponse> page = new PageImpl<>(List.of(new ReviewResponse()));
+        when(jobRequestService.getMyReviews(userId, pageable)).thenReturn(page);
+
+        ResponseEntity<Page<ReviewResponse>> response = new JobRequestController(jobRequestService, chatService)
+                .getMyReviews(authentication, pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertSame(page, response.getBody());
+    }
+
+    @Test
     void getJobRequest() throws Exception {
         when(jobRequestService.getJobRequest(10L, userId)).thenReturn(job(JobStatus.PROPOSED));
 
@@ -249,5 +278,59 @@ class JobRequestControllerTest {
     void getMyJobRequests_unknownStatus_is400() throws Exception {
         mvc.perform(get(BASE + "/mine").param("status", "WHATEVER").principal(authentication))
                 .andExpect(status().isBadRequest());
+    }
+
+    // --- conversation of a job ---
+
+    private static ConversationResponse conversation() {
+        ConversationResponse conversation = new ConversationResponse();
+        conversation.setId(12L);
+        conversation.setCanWrite(true);
+        return conversation;
+    }
+
+    @Test
+    void openConversation_new_is201WithItsLocation() throws Exception {
+        when(chatService.openForJobRequest(10L, userId)).thenReturn(new FoundOrCreated<>(conversation(), true));
+
+        mvc.perform(post(BASE + "/10/conversation").principal(authentication))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "http://localhost/api/v1/conversations/12"))
+                .andExpect(jsonPath("$.id").value(12))
+                .andExpect(jsonPath("$.canWrite").value(true));
+    }
+
+    @Test
+    void openConversation_existing_is200() throws Exception {
+        when(chatService.openForJobRequest(10L, userId)).thenReturn(new FoundOrCreated<>(conversation(), false));
+
+        mvc.perform(post(BASE + "/10/conversation").principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Location"))
+                .andExpect(jsonPath("$.id").value(12));
+    }
+
+    @Test
+    void openConversation_outsideTheJob_is403() throws Exception {
+        when(chatService.openForJobRequest(10L, userId)).thenThrow(new AccessDeniedException("no"));
+
+        mvc.perform(post(BASE + "/10/conversation").principal(authentication))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    void openConversation_missingJob_is404() throws Exception {
+        when(chatService.openForJobRequest(10L, userId)).thenThrow(new JobRequestNotFoundException("Trabajo no encontrado."));
+
+        mvc.perform(post(BASE + "/10/conversation").principal(authentication))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Trabajo no encontrado."));
+    }
+
+    @Test
+    void openConversation_withoutAToken_is401() throws Exception {
+        mvc.perform(post(BASE + "/10/conversation"))
+                .andExpect(status().isUnauthorized());
     }
 }

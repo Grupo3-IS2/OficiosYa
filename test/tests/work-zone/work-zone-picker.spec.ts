@@ -368,6 +368,82 @@ test.describe('Elegir la zona en el mapa al registrarse', () => {
     expect(sent).toMatchObject({ workingLocation: 'Cordón, Montevideo', phoneNumber: '+59899123456' });
   });
 
+  test('UI: con la zona elegida se elige hasta dónde llega, el mapa dibuja el círculo y se manda con el registro', async ({ page }) => {
+    await mockMaps(page, { suggest: suggestions(photonCordon) });
+    let sent: Record<string, unknown> | null = null;
+    await page.route('**/api/v1/auth/register-professional', async (route) => {
+      sent = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify({ email: 'pro.radio@qa.test', verificationRequired: true, message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
+      });
+    });
+    await openProfessionalForm(page);
+    const radius = page.getByLabel('Hasta dónde llegás');
+
+    // Without a point there is nothing to measure from: the form says how to mark it.
+    await expect(radius).toHaveCount(0);
+    await expect(page.getByText('tocá el mapa para marcar desde dónde trabajás')).toBeVisible();
+
+    await page.locator('#register-location').fill('cordon');
+    await suggestedPlaces(page).getByRole('button', { name: /Cordón, Montevideo/ }).click();
+    await expect(radius).toHaveValue('10');
+    await expect(picker(page).locator('path')).toHaveCount(1);
+    const close = await settledZoom(picker(page));
+
+    // A wider radius steps the map back so the whole circle fits.
+    await radius.fill('30');
+    await expect(page.locator('.radius-field__selection strong')).toHaveText('30 km');
+    await expect.poll(() => currentZoom(picker(page))).toBeLessThan(close);
+
+    await page.locator('#register-name').fill('Profesional Radio');
+    await page.locator('#register-email').fill('pro.radio@qa.test');
+    await page.locator('#register-phone').fill('099123456');
+    await page.locator('#register-password').fill('ClaveSegura2026!');
+    await page.locator('#register-confirmation').fill('ClaveSegura2026!');
+    await page.locator('.terms input').check();
+    await page.locator('form button[type="submit"]').click();
+
+    await expect(page.getByRole('heading', { name: 'Ingresá el código' })).toBeVisible();
+    expect(sent).toMatchObject({
+      workingLocation: 'Cordón, Montevideo',
+      serviceArea: { latitude: -34.9016, longitude: -56.1779, radiusKm: 30 },
+    });
+  });
+
+  test('UI: si después se escribe la zona a mano, el punto se descarta y no se manda un área', async ({ page }) => {
+    await mockMaps(page, { suggest: suggestions(photonCordon) });
+    let sent: Record<string, unknown> | null = null;
+    await page.route('**/api/v1/auth/register-professional', async (route) => {
+      sent = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify({ email: 'pro.mano@qa.test', verificationRequired: true, message: 'OK', codeLength: 6, expiresInSeconds: 900, resendCooldownSeconds: 60 })
+      });
+    });
+    await openProfessionalForm(page);
+
+    await page.locator('#register-location').fill('cordon');
+    await suggestedPlaces(page).getByRole('button', { name: /Cordón, Montevideo/ }).click();
+    await expect(page.getByLabel('Hasta dónde llegás')).toBeVisible();
+    await page.locator('#register-location').fill('Cordón y alrededores');
+    await expect(page.getByLabel('Hasta dónde llegás')).toHaveCount(0);
+
+    await page.locator('#register-name').fill('Profesional Mano');
+    await page.locator('#register-email').fill('pro.mano@qa.test');
+    await page.locator('#register-phone').fill('099123456');
+    await page.locator('#register-password').fill('ClaveSegura2026!');
+    await page.locator('#register-confirmation').fill('ClaveSegura2026!');
+    await page.locator('.terms input').check();
+    await page.locator('form button[type="submit"]').click();
+
+    await expect(page.getByRole('heading', { name: 'Ingresá el código' })).toBeVisible();
+    expect(sent).toMatchObject({ workingLocation: 'Cordón y alrededores' });
+    expect(sent).not.toHaveProperty('serviceArea');
+  });
+
   test('con permiso de ubicación, el campo vacío se llena con la zona donde está la persona', async ({ page, context }) => {
     await context.grantPermissions(['geolocation']);
     await context.setGeolocation({ latitude: -34.9016, longitude: -56.1779 });

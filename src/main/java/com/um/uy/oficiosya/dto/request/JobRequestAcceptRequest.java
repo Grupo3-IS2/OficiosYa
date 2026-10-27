@@ -1,17 +1,15 @@
 package com.um.uy.oficiosya.dto.request;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.OffsetDateTime;
 
+/** The timeframe a professional picks when accepting a client's proposal; a client accepting a professional's sends no body. */
 @Data
 @NoArgsConstructor
 public class JobRequestAcceptRequest {
-    @NotNull(message = "El inicio del bloque es obligatorio")
     private OffsetDateTime startTimestamp;
 
-    @NotNull(message = "El fin del bloque es obligatorio")
     private OffsetDateTime endTimestamp;
 }

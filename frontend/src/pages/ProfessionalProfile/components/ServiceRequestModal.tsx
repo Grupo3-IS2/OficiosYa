@@ -2,15 +2,17 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
-import ZonePicker from '../../../components/ZonePicker/ZonePicker'
+import ZonePicker, { type ZonePoint } from '../../../components/ZonePicker/ZonePicker'
 import { getCurrentUser } from '../../../services/authService'
 import { ApiError } from '../../../services/api'
 import { createJobRequest } from '../../../services/jobRequestService'
 import { saveJobRequestPin } from '../../../services/jobRequestPinStore'
+import { distanceKm } from '../../../services/zoneMap'
 import type { ExpertiseTrade, Professional } from '../../../types/Professional'
 import {
     hasServiceRequestErrors,
     initialTradeId,
+    requestedTimeframe,
     validateServiceRequest,
     type ServiceRequestFormValue,
 } from '../serviceRequestForm'
@@ -27,21 +29,27 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
     const dialogRef = useRef<HTMLDialogElement>(null)
     const nextTaskId = useRef(2)
     const submissionInFlight = useRef(false)
-    const copyFeedbackTimeout = useRef<number | null>(null)
     const defaultTradeId = initialTradeId(
         professional.expertiseTrades.map(trade => trade.tradeId),
         preferredTradeId,
     )
     const [value, setValue] = useState<ServiceRequestFormValue>({
         location: '',
+        date: '',
+        startTime: '',
+        endTime: '',
         paymentAmount: '',
         tasks: [{ id: 1, tradeId: defaultTradeId, description: '' }],
     })
+    // Where the job is, when chosen on the map: typing the place by hand drops it.
+    const [point, setPoint] = useState<ZonePoint | null>(null)
+    const area = professional.serviceArea
+    // shortcut: the public centre is rounded (~1 km), so right at the edge this can disagree with the backend's exact answer.
+    const outside = point !== null && area !== null && distanceKm(point, { lat: area.latitude, lon: area.longitude }) > area.radiusKm
     const [showErrors, setShowErrors] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [submissionError, setSubmissionError] = useState('')
-    const [confirmationPin, setConfirmationPin] = useState('')
-    const [copyFeedback, setCopyFeedback] = useState('')
+    const [sent, setSent] = useState(false)
     const errors = useMemo(() => validateServiceRequest(value), [value])
 
     useEffect(() => {
@@ -57,7 +65,6 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
         dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus()
 
         return () => {
-            if (copyFeedbackTimeout.current !== null) window.clearTimeout(copyFeedbackTimeout.current)
             dialog.close()
             document.body.style.overflow = previousBodyOverflow
             document.documentElement.style.overflow = previousRootOverflow
@@ -96,12 +103,17 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
         setSubmissionError('')
         if (hasServiceRequestErrors(errors)) return
 
+        const timeframe = requestedTimeframe(value)
+        if (timeframe && 'error' in timeframe) return
+
         submissionInFlight.current = true
         setSubmitting(true)
         try {
             const response = await createJobRequest({
                 professionalId: professional.id,
+                ...(timeframe && { startTimestamp: timeframe.start.toISOString(), endTimestamp: timeframe.end.toISOString() }),
                 location: value.location.trim(),
+                ...(point && { latitude: point.lat, longitude: point.lon }),
                 paymentAmount: Number(value.paymentAmount),
                 tasks: value.tasks.map(task => ({
                     tradeId: task.tradeId,
@@ -112,7 +124,7 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
             // Scope the PIN to that creator instead of deriving ownership from their account role.
             const creatorId = getCurrentUser()?.id
             if (creatorId) saveJobRequestPin(creatorId, response.id, response.confirmationPin)
-            setConfirmationPin(response.confirmationPin)
+            setSent(true)
         } catch (error) {
             if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
                 setSubmissionError('Necesitás iniciar sesión como cliente para enviar una solicitud.')
@@ -127,29 +139,14 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
         }
     }
 
-    function showCopyFeedback(message: string) {
-        if (copyFeedbackTimeout.current !== null) window.clearTimeout(copyFeedbackTimeout.current)
-        setCopyFeedback(message)
-        copyFeedbackTimeout.current = window.setTimeout(() => setCopyFeedback(''), 2500)
-    }
-
-    async function copyPin() {
-        try {
-            await navigator.clipboard.writeText(confirmationPin)
-            showCopyFeedback('PIN copiado')
-        } catch {
-            showCopyFeedback('No se pudo copiar el PIN')
-        }
-    }
-
     const selectedTrade = professional.expertiseTrades.find(trade => trade.tradeId === defaultTradeId)
 
     return createPortal(
         <dialog
             ref={dialogRef}
-            className={`service-request-modal${confirmationPin ? ' service-request-modal--success' : ''}`}
+            className={`service-request-modal${sent ? ' service-request-modal--success' : ''}`}
             aria-labelledby="service-request-title"
-            aria-describedby={confirmationPin ? undefined : 'service-request-subtitle'}
+            aria-describedby={sent ? undefined : 'service-request-subtitle'}
             aria-busy={submitting}
             onCancel={event => {
                 event.preventDefault()
@@ -159,9 +156,9 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
             <header className="service-request-modal__header">
                 <div>
                     <h2 id="service-request-title">
-                        {confirmationPin ? 'Solicitud enviada' : 'Solicitar servicio'}
+                        {sent ? 'Solicitud enviada' : 'Solicitar servicio'}
                     </h2>
-                    {!confirmationPin && (
+                    {!sent && (
                         <p id="service-request-subtitle">
                             {professional.name}{selectedTrade ? ` · ${selectedTrade.tradeName}` : ''}
                         </p>
@@ -178,26 +175,18 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
                 </button>
             </header>
 
-            {confirmationPin ? (
+            {sent ? (
                 <div className="service-request-success">
                     <span className="service-request-success__icon" aria-hidden="true">
                         <Icon name="check" />
                     </span>
                     <h3>Solicitud enviada</h3>
-                    <section className="service-request-success__pin" aria-label="PIN de confirmación">
-                        <strong>PIN de confirmación</strong>
-                        <output>{confirmationPin}</output>
-                        <p>Guardá este PIN. El profesional lo necesitará para confirmar que el trabajo fue completado.</p>
-                    </section>
+                    <p>El profesional revisará tu solicitud. Podés seguir su estado en Mis solicitudes.</p>
                     <div className="service-request-success__actions">
-                        <Button type="button" variant="ghost" onClick={() => void copyPin()}>
-                            <Icon name="copy" /> Copiar PIN
-                        </Button>
                         <Button type="button" onClick={() => { window.location.href = '/mis-solicitudes' }}>
                             Ver mis solicitudes
                         </Button>
                     </div>
-                    <p className="service-request-success__feedback" aria-live="polite">{copyFeedback}</p>
                 </div>
             ) : (
                 <>
@@ -215,17 +204,48 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
                                     aria-invalid={showErrors && Boolean(errors.location)}
                                     aria-describedby={showErrors && errors.location ? 'service-request-location-error' : undefined}
                                     data-autofocus
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setValue(current => ({ ...current, location: event.target.value }))}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                        setValue(current => ({ ...current, location: event.target.value }))
+                                        setPoint(null)
+                                    }}
                                 />
                             </span>
                             {showErrors && errors.location && <small id="service-request-location-error" className="service-request-error">{errors.location}</small>}
                             {/* The same help as when a professional enters their zone: suggestions while typing, or a tap on the map */}
                             <ZonePicker
                                 query={value.location}
-                                onChoose={location => setValue(current => ({ ...current, location }))}
+                                onChoose={(location, chosen) => {
+                                    setValue(current => ({ ...current, location }))
+                                    setPoint(chosen)
+                                }}
                                 mapLabel="Mapa para elegir dónde se realizará el trabajo"
                             />
+                            {outside && area && <p className="service-request-outside" role="status">
+                                Este lugar queda fuera de la zona que cubre {professional.name} (hasta {area.radiusKm} km). Podés enviar la solicitud igual, pero puede que no llegue hasta ahí.
+                            </p>}
                         </div>
+
+                        <fieldset className="service-request-field service-request-when"
+                            aria-describedby={showErrors && errors.timeframe ? 'service-request-when-error' : undefined}>
+                            <legend>Horario recomendado (opcional)</legend>
+                            <p className="service-request-when__hint">Si tenés un horario en mente, el profesional lo va a ver como sugerencia.</p>
+                            <label className="service-request-when__date">
+                                Fecha
+                                <input type="date" value={value.date} aria-invalid={showErrors && Boolean(errors.timeframe)}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setValue(current => ({ ...current, date: event.target.value }))} />
+                            </label>
+                            <label>
+                                Desde
+                                <input type="time" step={900} value={value.startTime} aria-invalid={showErrors && Boolean(errors.timeframe)}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setValue(current => ({ ...current, startTime: event.target.value }))} />
+                            </label>
+                            <label>
+                                Hasta
+                                <input type="time" step={900} value={value.endTime} aria-invalid={showErrors && Boolean(errors.timeframe)}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setValue(current => ({ ...current, endTime: event.target.value }))} />
+                            </label>
+                            {showErrors && errors.timeframe && <small id="service-request-when-error" className="service-request-error">{errors.timeframe}</small>}
+                        </fieldset>
 
                         <label className="service-request-field" htmlFor="service-request-amount">
                             <span>Monto del servicio <em>*</em></span>

@@ -242,6 +242,36 @@ test.describe('Registro y login: validaciones visuales y roles', () => {
     expect(profile.status()).toBe(200);
     expect((await profile.json()).id).toBe(auth.id);
   });
+
+  test('contraseña débil muestra los requisitos y no envía el registro', async ({ page }) => {
+    let registrationCalls = 0;
+    await page.route('**/api/v1/auth/register-client', (route) => { registrationCalls++; return route.abort(); });
+    await page.goto(`${FRONTEND_BASE}/register`);
+    await page.locator('#register-name').fill('Cliente Clave Débil');
+    await page.locator('#register-email').fill(uniqueEmail('weak-password'));
+    await page.locator('#register-password').fill('debil');
+    await page.locator('#register-confirmation').fill('debil');
+    await page.locator('.terms input').check();
+    await page.locator('form button[type="submit"]').click();
+    expect(await page.locator('#register-password').evaluate((element: HTMLInputElement) => element.validity.tooShort)).toBeTruthy();
+    expect(registrationCalls).toBe(0);
+  });
+
+  test('login deshabilita el botón mientras espera la respuesta', async ({ page }) => {
+    let resolveLogin!: () => void;
+    await page.route('**/api/v1/auth/login', async route => {
+      await new Promise<void>(resolve => { resolveLogin = resolve; });
+      await route.fulfill({ status: 401, json: { error: 'Credenciales inválidas' } });
+    });
+    await page.goto(`${FRONTEND_BASE}/login`);
+    await page.locator('#email').fill('cliente@qa.test');
+    await page.locator('#password').fill(PASSWORD);
+    const submit = page.getByRole('button', { name: 'Iniciar sesión' });
+    await submit.click();
+    await expect(page.getByRole('button', { name: 'Ingresando...' })).toBeDisabled();
+    resolveLogin();
+    await expect(page.getByRole('alert')).toContainText('Credenciales inválidas');
+  });
 });
 test.describe('Términos y condiciones', () => {
   test('el enlace del registro abre los términos en otra pestaña, leídos del archivo de texto', async ({ page, context }) => {

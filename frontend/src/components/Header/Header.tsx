@@ -3,17 +3,17 @@ import Button from '../Button/Button'
 import Icon from '../Icon/Icon'
 import ProfileMenu from './ProfileMenu/ProfileMenu'
 import {
-    getCurrentUser,
-    isAuthenticated,
     logout,
 } from '../../services/authService'
+import { useUnreadChats } from './useUnreadChats'
 import { useAwaitingAnswers } from './useAwaitingAnswers'
 import './Header.css'
+import { useSession } from '../SessionProvider/useSession'
 
 function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
-    const [authenticated, setAuthenticated] = useState(isAuthenticated)
-    const user = getCurrentUser()
+    const { status, user } = useSession()
+    const authenticated = status === 'authenticated'
     const isProfessional = user?.role === 'PROFESSIONAL'
     const professionalLabel = !authenticated
         ? 'Soy profesional'
@@ -22,6 +22,11 @@ function Header() {
             : 'Convertirse en profesional'
     const requestsActive = window.location.pathname === '/mis-solicitudes'
     const awaiting = useAwaitingAnswers(authenticated)
+    const unreadChats = useUnreadChats(authenticated)
+
+    const openProfessionalPanel = isProfessional && user
+        ? () => { window.location.href = `/profesionales/${encodeURIComponent(user.id)}` }
+        : undefined
 
     const toggleMenu = () => {
         setIsMenuOpen((isOpen) => !isOpen)
@@ -29,8 +34,6 @@ function Header() {
 
     const handleLogout = async () => {
         await logout()
-        setAuthenticated(false)
-        window.location.href = '/'
     }
 
     return (
@@ -45,7 +48,7 @@ function Header() {
 
             {authenticated && (
                 <div className="mobile-professional">
-                    <Button type="button">{professionalLabel}</Button>
+                    <Button type="button" onClick={openProfessionalPanel}>{professionalLabel}</Button>
                 </div>
             )}
 
@@ -82,6 +85,19 @@ function Header() {
                     </a>
                 )}
 
+                {authenticated && (
+                    <a className="nav-item" href="/chat">
+                        <span className="nav-item__icon">
+                            <Icon name="message" />
+                            {unreadChats > 0 && <b className="nav-alert" aria-hidden="true">!</b>}
+                        </span>
+                        <span>Chat</span>
+                        {unreadChats > 0 && <span className="nav-alert-text">
+                            {unreadChats === 1 ? '(1 mensaje sin leer)' : `(${unreadChats} mensajes sin leer)`}
+                        </span>}
+                    </a>
+                )}
+
                 {authenticated ? (
                     <div className="profile-menu">
                         <ProfileMenu
@@ -97,9 +113,9 @@ function Header() {
                 )}
 
                 {authenticated && (
-                    <Button type="button">
+                    <Button type="button" onClick={openProfessionalPanel}>
                         <Icon name="user" />
-                        {professionalLabel}
+                        <span>{professionalLabel}</span>
                     </Button>
                 )}
             </nav>

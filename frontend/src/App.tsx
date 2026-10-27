@@ -1,11 +1,13 @@
 import Home from './pages/Home/Home'
 import Login from './pages/Login/Login'
+import ForgotPassword from './pages/Login/ForgotPassword'
 import Register from './pages/Register/Register'
 import EditProfilePage from './pages/EditProfile/EditProfilePage'
 import RequireAuth from './components/RequireAuth/RequireAuth'
 import ProfessionalProfilePage from './pages/ProfessionalProfile/ProfessionalProfilePage'
 import RequestsPage from './pages/Requests/RequestsPage'
 import TermsPage from './pages/Terms/TermsPage'
+import ChatPage from './pages/Chat/ChatPage'
 
 function App() {
     const currentPath = window.location.pathname
@@ -44,8 +46,20 @@ function App() {
         )
     }
 
+    if (currentPath === '/chat') {
+        return (
+            <RequireAuth>
+                <ChatPage />
+            </RequireAuth>
+        )
+    }
+
     if (currentPath === '/login') {
         return <Login />
+    }
+
+    if (currentPath === '/recuperar-contrasena') {
+        return <ForgotPassword />
     }
 
     if (currentPath === '/register') {

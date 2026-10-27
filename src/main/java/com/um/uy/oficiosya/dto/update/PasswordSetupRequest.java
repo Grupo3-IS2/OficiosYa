@@ -18,7 +18,7 @@ public class PasswordSetupRequest {
     private String code;
     @NotBlank(message = "La nueva contraseña es obligatoria")
     @Password
-    @Schema(minLength = 8, description = "Al menos 8 caracteres, con mayúscula, minúscula, número y carácter especial")
+    @Schema(minLength = 15, maxLength = 128, description = "Entre 15 y 128 caracteres, que no sea una contraseña común o filtrada")
     private String newPassword;
     @NotBlank(message = "La confirmación de la contraseña es obligatoria")
     private String newPasswordConfirmation;

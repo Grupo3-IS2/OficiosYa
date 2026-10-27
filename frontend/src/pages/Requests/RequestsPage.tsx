@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { publishAwaitingAnswers } from '../../components/Header/useAwaitingAnswers'
 import { toast } from 'sonner'
 import BackNavigation from '../../components/BackNavigation/BackNavigation'
@@ -8,15 +8,19 @@ import Icon from '../../components/Icon/Icon'
 import avatarPlaceholder from '../../assets/avatar-placeholder.svg'
 import { getCurrentUser } from '../../services/authService'
 import { getMyJobRequests } from '../../services/jobRequestService'
+import { onRatingChange } from '../../services/ratingEvents'
+import { onChatEvent } from '../../services/chatSocket'
 import { getJobRequestPin } from '../../services/jobRequestPinStore'
 import type { JobRequest, JobStatus, RequestParty } from '../../types/JobRequest'
-import { answersReschedule, awaitsAnswerFrom, filterAndOrderRequests, filterByDirection, groupRequestsByDate, localDateKey, requestDescription, serviceSummary, type RequestDirection, type RequestFilter, type RequestOrder } from './requestList'
+import { answersReschedule, awaitsAnswerFrom, filterAndOrderRequests, filterByDirection, groupRequestsByDate, localDateKey, outsideServiceAreaNote, requestDescription, serviceSummary, type RequestDirection, type RequestFilter, type RequestOrder } from './requestList'
 import RequestOrderControl from './RequestOrderControl'
 import RequestDetailModal from './RequestDetailModal'
 import RescheduleModal from './RescheduleModal'
 import RescheduleReviewModal from './RescheduleReviewModal'
+import ProfessionalRatingModal from './ProfessionalRatingModal'
+import { canRateRequest } from './ratingForm'
 import type { ResponseMode } from './RequestResponseSection'
-import type { Decision, RequestOutcome } from './requestResponse'
+import { canCompleteRequest, type Decision, type RequestOutcome } from './requestResponse'
 import { timeframeText } from './rescheduleTimeframe'
 import './RequestsPage.css'
 
@@ -110,6 +114,7 @@ const answeredToast: Record<RequestOutcome, (request: JobRequest, isClient: bool
     cancelled: (request, isClient) => toast('Solicitud cancelada', {
         description: `${isClient ? request.professionalName : request.clientName} va a ver que la cancelaste.`,
     }),
+    completed: () => toast.success('Trabajo completado', { description: 'El PIN fue confirmado. El cliente ya puede calificar el trabajo.' }),
 }
 
 function groupHeading(dateKey: string): string {
@@ -130,14 +135,16 @@ function DecisionButtons({ subject, onDecide }: Readonly<{
     </div>
 }
 
-function RequestCard({ request, side, onView, onRespond, onReschedule, onReviewReschedule }: Readonly<{
+function RequestCard({ request, side, viewerId, onView, onRespond, onReschedule, onReviewReschedule, onRate }: Readonly<{
     request: JobRequest
     side: Side
+    viewerId: string | undefined
     onView: (request: JobRequest) => void
     /** Accepting a request needs the timeframe and rejecting it takes a reason: both go on in the detail. */
     onRespond: (request: JobRequest, mode: ResponseMode) => void
     onReschedule: (request: JobRequest) => void
     onReviewReschedule: (request: JobRequest, decision: Decision) => void
+    onRate: (request: JobRequest) => void
 }>) {
     const status = statusContent[request.status]
     const detail = status.detail?.(request, side)
@@ -148,6 +155,7 @@ function RequestCard({ request, side, onView, onRespond, onReschedule, onReviewR
     // The other side of the job: who the viewer is dealing with.
     const otherName = side === 'professional' ? request.clientName : request.professionalName
     const otherImage = side === 'professional' ? request.clientProfileImageUrl : request.professionalProfileImageUrl
+    const outsideNote = outsideServiceAreaNote(request, side !== 'professional')
 
     return <article className={`request-card${urgent ? ' request-card--needs-answer' : ''}`}>
         <div className="request-card__professional">
@@ -158,6 +166,7 @@ function RequestCard({ request, side, onView, onRespond, onReschedule, onReviewR
             />
             <div className="request-card__copy">
                 {urgent && <span className="request-card__badge">Requiere tu respuesta</span>}
+                {outsideNote && <span className="request-card__badge">{outsideNote}</span>}
                 <h3>{serviceSummary(request)}</h3>
                 <strong>{otherName}</strong>
                 <p>{requestDescription(request)}</p>
@@ -174,6 +183,9 @@ function RequestCard({ request, side, onView, onRespond, onReschedule, onReviewR
             {detail && <p>{detail}</p>}
         </div>
         <div className="request-card__action">
+            {canRateRequest(request, viewerId) && <Button type="button" onClick={() => onRate(request)}>Calificar profesional</Button>}
+            {canCompleteRequest(request, viewerId) && <Button type="button" onClick={() => onView(request)}
+                aria-label={`Ingresar PIN para completar el trabajo de ${otherName}`}>Ingresar PIN</Button>}
             <Button type="button" variant={urgent ? 'ghost' : 'primary'} aria-label={`Ver solicitud de ${otherName}`}
                 onClick={() => onView(request)}>Ver solicitud</Button>
             {proposalToAnswer && <DecisionButtons subject={`solicitud de ${otherName}`}
@@ -191,14 +203,20 @@ export default function RequestsPage() {
     const [requests, setRequests] = useState<JobRequest[]>([])
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState(false)
+    // Bumped when a job changes (or pushes may have been missed), so the requests reload
+    const [jobPushes, setJobPushes] = useState(0)
     const [activeFilter, setActiveFilter] = useState<RequestFilter>('all')
     const [order, setOrder] = useState<RequestOrder>('newest')
     const [viewing, setViewing] = useState<JobRequest | null>(null)
+    const [ratingTarget, setRatingTarget] = useState<{ request: JobRequest; origin: 'detail' | 'list' } | null>(null)
+    const [detailScroll, setDetailScroll] = useState(0)
+    const linkedRequestId = useRef(Number(new URLSearchParams(window.location.search).get('request')) || null)
     // Which answer form the detail opens with, when it comes from the card's "Aceptar" or "Rechazar"
     const [viewingResponse, setViewingResponse] = useState<ResponseMode | undefined>()
     const [rescheduling, setRescheduling] = useState<JobRequest | null>(null)
     const [reviewing, setReviewing] = useState<{ request: JobRequest; decision: Decision } | null>(null)
     const view = (request: JobRequest, response?: ResponseMode) => {
+        setDetailScroll(0)
         setViewingResponse(response)
         setViewing(request)
     }
@@ -209,8 +227,17 @@ export default function RequestsPage() {
     const isProfessional = viewer?.role === 'PROFESSIONAL'
     const [chosenDirection, setDirection] = useState<RequestDirection>('all')
     const direction = isProfessional ? chosenDirection : 'all'
-    const replaceRequest = (updated: JobRequest) =>
+    const mutationRevision = useRef(0)
+    const replaceRequest = (updated: JobRequest) => {
+        mutationRevision.current++
         setRequests(previous => previous.map(item => item.id === updated.id ? { ...item, ...updated } : item))
+    }
+    const reconcileRating = (updated: JobRequest) => {
+        replaceRequest(updated)
+        setViewing(previous => previous?.id === updated.id ? { ...previous, ...updated } : previous)
+        setRatingTarget(previous => previous ? { ...previous, request: updated } : null)
+        setJobPushes(value => value + 1)
+    }
     const awaiting = requests.filter(request => awaitsAnswerFrom(request, viewerId))
     const awaitingProposals = awaiting.filter(request => request.status === 'PROPOSED').length
     const visible = useMemo(() => filterByDirection(requests, direction, viewerId), [requests, direction, viewerId])
@@ -224,11 +251,24 @@ export default function RequestsPage() {
         if (!loading && !loadError) publishAwaitingAnswers(awaiting.length)
     }, [loading, loadError, awaiting.length])
 
+    useEffect(() => onChatEvent(event => { if (event !== 'message') setJobPushes(n => n + 1) }), [])
+    useEffect(() => onRatingChange(() => setJobPushes(n => n + 1)), [])
+
     useEffect(() => {
         let active = true
+        const revision = mutationRevision.current
         void getMyJobRequests()
             .then(response => {
-                if (active) setRequests(response)
+                if (active && revision === mutationRevision.current) {
+                    setRequests(response)
+                    setViewing(previous => previous ? response.find(request => request.id === previous.id) ?? previous : null)
+                    if (linkedRequestId.current) {
+                        const linked = response.find(request => request.id === linkedRequestId.current)
+                        if (linked) setViewing(linked)
+                        else toast.error('No encontramos esa solicitud entre tus solicitudes.')
+                        linkedRequestId.current = null
+                    }
+                }
             })
             .catch(() => {
                 if (active) setLoadError(true)
@@ -237,7 +277,7 @@ export default function RequestsPage() {
                 if (active) setLoading(false)
             })
         return () => { active = false }
-    }, [])
+    }, [jobPushes])
 
     return <div id="top" className="requests-page">
         <Header />
@@ -303,18 +343,26 @@ export default function RequestsPage() {
                         <h2>{groupHeading(group.dateKey)}</h2>
                         <div className="request-group__items">
                             {group.requests.map(request => <RequestCard key={request.id} request={request}
+                                viewerId={viewerId}
                                 side={request.professionalId === viewerId ? 'professional' : 'client'}
                                 onView={request => view(request)} onRespond={view}
+                                onRate={request => setRatingTarget({ request, origin: 'list' })}
                                 onReschedule={setRescheduling} onReviewReschedule={review} />)}
                         </div>
                     </section>)}
             </section>
         </main>
-        {viewing && <RequestDetailModal
+        {viewing && !ratingTarget && <RequestDetailModal
+            key={viewing.id}
             request={viewing}
             isClient={viewing.clientId === viewerId}
             pin={viewing.clientId === viewerId && viewerId ? getJobRequestPin(viewerId, viewing.id) : null}
             initialResponse={viewingResponse}
+            initialScrollTop={detailScroll}
+            onRate={scrollTop => {
+                setDetailScroll(scrollTop)
+                setRatingTarget({ request: viewing, origin: 'detail' })
+            }}
             onClose={() => setViewing(null)}
             onReviewReschedule={review}
             onReschedule={setRescheduling}
@@ -323,7 +371,18 @@ export default function RequestsPage() {
                 // Stays open on the updated request: the new status, timeframe or reason is right there
                 setViewing(previous => previous && { ...previous, ...updated })
                 answeredToast[outcome](updated, updated.clientId === viewerId)
+                // The mutation response already updates the list and detail; no extra reload is needed.
             }}
+        />}
+        {ratingTarget && <ProfessionalRatingModal
+            request={ratingTarget.request}
+            viewerId={viewerId}
+            onClose={() => {
+                if (ratingTarget.origin === 'list') setViewing(null)
+                setRatingTarget(null)
+            }}
+            onSaved={reconcileRating}
+            onReconciled={reconcileRating}
         />}
         {rescheduling && <RescheduleModal
             request={rescheduling}

@@ -1,20 +1,20 @@
 import Icon from '../../../components/Icon/Icon'
+import { starLabel } from '../../../utils/ratingScale'
 import './Rating.css'
 
 interface RatingProps {
     value: number | null
     reviewCount?: number
-    max?: number
 }
 
-function Rating({ value, reviewCount, max = 10 }: RatingProps) {
+function Rating({ value, reviewCount }: RatingProps) {
     return (
         <span
             className={`rating${value === null ? ' rating--empty' : ''}`}
-            aria-label={value === null ? 'Sin calificaciones' : `Calificación ${value} de ${max}${reviewCount === undefined ? '' : `, ${reviewCount} reseñas`}`}
+            aria-label={value === null ? 'Sin calificaciones' : `Calificación ${starLabel(value)} de 5${reviewCount === undefined ? '' : `, ${reviewCount} reseñas`}`}
         >
             <Icon name="star" />
-            {value === null ? 'Sin calificaciones' : `${value.toFixed(1)} / ${max}`}
+            {value === null ? 'Sin calificaciones' : starLabel(value)}
             {reviewCount !== undefined && <small>({reviewCount})</small>}
         </span>
     )

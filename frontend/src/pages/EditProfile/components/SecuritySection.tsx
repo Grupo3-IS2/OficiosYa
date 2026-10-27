@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_HINT } from '../../../services/passwordPolicy'
 import type { SecurityData } from '../profileState'
 
 function PasswordField({ id, label, value, onChange, current = false }: {
@@ -10,10 +11,10 @@ function PasswordField({ id, label, value, onChange, current = false }: {
     return <div className="profile-field">
         <label htmlFor={id}>{label}</label>
         <div className="profile-password">
-            <input id={id} type={visible ? 'text' : 'password'} value={value} onChange={event => onChange(event.target.value)} required minLength={current ? undefined : 8} autoComplete={current ? 'current-password' : 'new-password'} aria-describedby={id === 'new-password' ? 'password-help' : undefined} />
+            <input id={id} type={visible ? 'text' : 'password'} value={value} onChange={event => onChange(event.target.value)} required minLength={current ? undefined : MIN_PASSWORD_LENGTH} maxLength={current ? undefined : MAX_PASSWORD_LENGTH} autoComplete={current ? 'current-password' : 'new-password'} aria-describedby={id === 'new-password' ? 'password-help' : undefined} />
             <button type="button" aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${label.toLowerCase()}`} aria-pressed={visible} onClick={() => setVisible(!visible)}><Icon name={visible ? 'eye-off' : 'eye'} /></button>
         </div>
-        {id === 'new-password' && <small id="password-help">Usa al menos 8 caracteres, con mayúscula, minúscula, número y símbolo.</small>}
+        {id === 'new-password' && <small id="password-help">{PASSWORD_HINT}</small>}
     </div>
 }
 

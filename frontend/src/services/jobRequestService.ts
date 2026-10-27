@@ -1,5 +1,6 @@
 import type { CreatedJobRequest, CreateJobRequestPayload, JobRequest } from '../types/JobRequest'
 import { apiRequest } from './api'
+import { publishRatingChange } from './ratingEvents'
 
 export function createJobRequest(payload: CreateJobRequestPayload): Promise<CreatedJobRequest> {
     return apiRequest<CreatedJobRequest>('/job-requests', {
@@ -10,6 +11,27 @@ export function createJobRequest(payload: CreateJobRequestPayload): Promise<Crea
 
 export function getMyJobRequests(): Promise<JobRequest[]> {
     return apiRequest<JobRequest[]>('/job-requests/mine')
+}
+
+export function getJobRequest(id: number): Promise<JobRequest> {
+    return apiRequest<JobRequest>(`/job-requests/${id}`)
+}
+
+/** The backend accepts one 1–10 integer rating per completed job. */
+export async function reviewJobRequest(id: number, payload: { rating: number; review: string }): Promise<JobRequest> {
+    const updated = await apiRequest<JobRequest>(`/job-requests/${id}/review`, {
+        method: 'POST', body: JSON.stringify(payload),
+    })
+    publishRatingChange(updated.professionalId)
+    return updated
+}
+
+/** Only the job's professional can confirm the client's PIN and complete the work. */
+export function completeJobRequest(id: number, pin: string): Promise<JobRequest> {
+    return apiRequest<JobRequest>(`/job-requests/${id}/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ pin }),
+    })
 }
 
 /** The professional takes the request and books the timeframe in their agenda: it becomes ACCEPTED. */

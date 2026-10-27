@@ -5,6 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 20px;
   padding: 0 max(32px, calc((100% - 1240px) / 2));
   overflow-x: hidden;
   border-bottom: 1px solid transparent;
@@ -13,6 +14,7 @@
 
 .brand {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 2px;
   color: #fff;
@@ -137,6 +139,10 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  line-height: 1.25;
+  white-space: nowrap;
   margin-left: 10px;
   color: #078747;
   background: #fff;
@@ -179,6 +185,58 @@
   display: none;
 }
 
+/* Window snapping leaves too little room for the wide desktop navigation. */
+@media (min-width: 701px) and (max-width: 1000px) {
+  .site-header {
+    gap: 12px;
+    padding-inline: 16px;
+  }
+
+  .site-header .brand {
+    font-size: 28px;
+  }
+
+  .site-header .brand-mark .icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .site-header nav {
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-end;
+    gap: clamp(8px, 1.3vw, 14px);
+  }
+
+  .site-header nav .nav-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
+  .site-header nav > .button {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 11rem;
+    gap: 8px;
+    margin-left: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    white-space: normal;
+  }
+
+  .site-header nav > .button > .icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+  }
+
+  .site-header nav > .button > span {
+    min-width: 0;
+    text-wrap: balance;
+  }
+}
+
 @media (max-width: 700px) {
   #root {
     padding-bottom: 72px;
@@ -201,20 +259,25 @@
 
   .mobile-professional {
     display: block;
+    flex: 0 1 auto;
+    min-width: 0;
     margin-left: auto;
     margin-right: 4px;
   }
 
-.mobile-professional .button {
+  .mobile-professional .button {
     display: inline-flex;
     align-items: center;
     gap: 9px;
-    padding: 11px 18px;
+    max-width: 12rem;
+    padding: 8px 12px;
     border-radius: 11px;
     color: #078747;
     background: #fff;
     font-size: 13px;
-    white-space: nowrap;
+    line-height: 1.25;
+    white-space: normal;
+    text-wrap: balance;
   }
 
   .menu-toggle {

@@ -1,7 +1,11 @@
 import avatarPlaceholder from '../../../assets/avatar-placeholder.svg'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
+import { starLabel } from '../../../utils/ratingScale'
 import type { ExpertiseTrade, Professional } from '../../../types/Professional'
+import { openConversation } from '../../../services/chatService'
+import { toast } from 'sonner'
+import { getCurrentUser } from '../../../services/authService'
 
 interface ProfessionalProfileHeaderProps {
     professional: Professional
@@ -30,7 +34,7 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                     <Icon name="star" />
                     {professional.rating === null
                         ? <span>Sin calificaciones</span>
-                        : <><strong>{professional.rating.toFixed(1)}</strong><span>de 10</span></>}
+                        : <strong>{starLabel(professional.rating)}</strong>}
                 </div>
             </div>
 
@@ -41,19 +45,17 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                         <strong>${startingPrice.toLocaleString('es-UY')}</strong>
                     </span>
                 )}
-                <div className="profile-summary__actions">
-                    <span title="El chat estará disponible próximamente">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            className="profile-summary__chat"
-                            disabled
-                            aria-describedby="chat-coming-soon"
-                        >
-                            <Icon name="message" /> Hablar por chat
-                        </Button>
-                    </span>
-                    <span id="chat-coming-soon" className="visually-hidden">Chat disponible próximamente.</span>
+                {professional.id !== getCurrentUser()?.id && <div className="profile-summary__actions">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        className="profile-summary__chat"
+                        onClick={() => openConversation(professional.id, getCurrentUser()?.id)
+                            .then(conversation => window.location.assign(`/chat?c=${conversation.id}`))
+                            .catch((error: Error) => toast.error(error.message))}
+                    >
+                        <Icon name="message" /> Hablar por chat
+                    </Button>
                     {/* The service is chosen in the request itself, if it wasn't chosen on the profile already */}
                     <Button
                         type="button"
@@ -63,7 +65,7 @@ function ProfessionalProfileHeader({ professional, selectedTrade, onRequestServi
                     >
                         Solicitar servicio
                     </Button>
-                </div>
+                </div>}
             </div>
         </section>
     )

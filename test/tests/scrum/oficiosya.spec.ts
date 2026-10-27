@@ -20,21 +20,8 @@ async function postJson(request: APIRequestContext, url: string, payload: unknow
 }
 
 async function completePendingVerification(request: APIRequestContext, email: string) {
-  const inboxResponse = await request.get('http://localhost:8025/api/v1/messages?limit=50');
-  expect(inboxResponse.status()).toBe(200);
-
-  const inbox = await inboxResponse.json();
-  const messages = Array.isArray(inbox?.messages) ? inbox.messages : [];
-  const message = [...messages].reverse().find((item: any) => {
-    const recipients = Array.isArray(item?.To) ? item.To : [];
-    return recipients.some((recipient: any) => recipient?.Address?.toLowerCase() === email.toLowerCase());
-  });
-
-  expect(message).toBeTruthy();
-
-  const snippet = message?.Snippet ?? message?.Text ?? '';
-  const match = snippet.match(/\b\d{6}\b/);
-  expect(match).toBeTruthy();
+  // Waits for the mail: with parallel workers it can land after the 202, or past a fixed-size inbox page
+  const code = await waitForVerificationCode(request, email);
 
   const verifyResponse = await request.post(`${API_BASE}/api/v1/auth/verify-email`, {
     headers: {
@@ -42,7 +29,7 @@ async function completePendingVerification(request: APIRequestContext, email: st
     },
     data: JSON.stringify({
       email,
-      code: match![0]
+      code
     })
   });
 
@@ -293,6 +280,28 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.error).toMatch(/password|contraseña|validaci|bad request|at least|uppercase|lowercase|number|special|mayúsc|minúsc|número|símbolo/i);
   });
 
+  test('API: registro rechaza una contraseña de 14 caracteres', async ({ request }) => {
+    const response = await postJson(request, `${API_BASE}/api/v1/auth/register-client`, {
+      name: 'Cliente Clave Corta',
+      email: uniqueEmail('cliente.clave.corta'),
+      password: 'catorce letras'
+    });
+
+    expect(response.status()).toBe(400);
+    expect((await response.json()).details.password).toMatch(/15 caracteres/);
+  });
+
+  test('API: registro rechaza una contraseña común o filtrada', async ({ request }) => {
+    const response = await postJson(request, `${API_BASE}/api/v1/auth/register-client`, {
+      name: 'Cliente Clave Comun',
+      email: uniqueEmail('cliente.clave.comun'),
+      password: '123456789012345'
+    });
+
+    expect(response.status()).toBe(400);
+    expect((await response.json()).details.password).toMatch(/muy común/);
+  });
+
   test('SCRUM-10: Inicio de sesión con credenciales válidas', async ({ request }) => {
     const payload = {
       name: 'Cliente QA Login',
@@ -463,11 +472,11 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.message).toMatch(/correo es válido|código de verificación/i);
   });
 
-  test('API: contraseña con longitud mínima exacta (8) es válida cuando cumple requisitos', async ({ request }) => {
+  test('API: contraseña con longitud mínima exacta (15) es válida sin reglas de composición', async ({ request }) => {
     const response = await registerClient(request, {
       name: 'Cliente Longitud Exacta',
       email: uniqueEmail('cliente.minlength.exacta'),
-      password: 'Aa1!bcde'
+      password: 'frase de quince'
     });
 
     expect(response.status()).toBe(200);
@@ -480,7 +489,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const response = await registerClient(request, {
       name: 'Cliente Espacios Pass',
       email: uniqueEmail('cliente.password.spaces'),
-      password: '  Aa1!bcde  '
+      password: '  frase de quince  '
     });
 
     expect(response.status()).toBe(200);
@@ -871,7 +880,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
       data: {
         oldPassword: 'ClaveSegura2026!',
         newPassword: 'NuevaClaveSegura2026!',
-        newPasswordConfirmation: 'OtraClave2026!'
+        newPasswordConfirmation: 'OtraClaveSegura2026!'
       }
     });
 
@@ -959,7 +968,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.error).toMatch(/igual|actual|contraseña|bad request/i);
   });
 
-  test('API: cambiar email a uno ya registrado falla', async ({ request }) => {
+  test('API: cambiar email a uno ya registrado no lo cambia ni revela que existe', async ({ request }) => {
     const first = {
       name: 'Cliente Email Conflict Uno',
       email: uniqueEmail('cliente.email.conflict1'),
@@ -989,9 +998,13 @@ test.describe('OficiosYa - QA suite expandida', () => {
       }
     });
 
-    expect(response.status()).toBe(409);
+    // A taken address answers like a free one, so the form can't reveal who has an account
+    expect(response.status()).toBe(202);
     const body = await response.json();
-    expect(body.error).toMatch(/ya existe|already exists|duplicate|email|conflict/i);
+    expect(body.token).toBeUndefined();
+
+    const profile = await getAuthenticatedUser(request, secondAuth.token);
+    expect((await profile.json()).email).toBe(second.email.toLowerCase());
   });
 
   test('API: perfil sin autenticación devuelve 401 al intentar actualizar', async ({ request }) => {
@@ -1189,42 +1202,6 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const body = await response.json();
     expect(body.status).toBe(401);
     expect(body.error).toMatch(/token|autenticación|expir|inválido/i);
-  });
-
-  test('API: manejo de errores 409 por conflicto de email devuelve JSON estándar', async ({ request }) => {
-    const first = {
-      name: 'Cliente Error Conflict Uno',
-      email: uniqueEmail('cliente.error.conflict1'),
-      password: 'ClaveSegura2026!'
-    };
-    const second = {
-      name: 'Cliente Error Conflict Dos',
-      email: uniqueEmail('cliente.error.conflict2'),
-      password: 'ClaveSegura2026!'
-    };
-
-    const firstCreated = await registerClient(request, first);
-    expect(firstCreated.status()).toBe(200);
-    const firstAuth = await firstCreated.json();
-
-    const secondCreated = await registerClient(request, second);
-    expect(secondCreated.status()).toBe(200);
-    const secondAuth = await secondCreated.json();
-
-    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
-      headers: {
-        Authorization: `Bearer ${secondAuth.token}`
-      },
-      data: {
-        newEmail: first.email,
-        currentPassword: second.password
-      }
-    });
-
-    expect(response.status()).toBe(409);
-    const body = await response.json();
-    expect(body.status).toBe(409);
-    expect(body.error).toMatch(/ya existe|already exists|duplicate|email|conflict/i);
   });
 
   test.fixme('API: manejo de errores 500 interno del servidor devuelve JSON estándar', async ({ request }) => {
@@ -1928,16 +1905,40 @@ test.describe('OficiosYa - QA suite expandida', () => {
       contentType: 'image/svg+xml',
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" />'
     }));
+    // Seven 9s and three 8s average 8.7 on the API scale. The paginated opinions
+    // must agree with the existing reputation instead of inheriting the empty default page.
+    const reviews = [9, 9, 9, 9, 9, 9, 9, 8, 8, 8].map((rating, index) => ({
+      jobRequestId: index + 1,
+      clientName: `Cliente ${index + 1}`,
+      clientProfileImageUrl: null,
+      professionalId,
+      professionalName: 'Profesional con reputación',
+      rating,
+      review: 'Trabajo realizado con profesionalismo.',
+    }));
+    await page.route(`**/api/v1/professionals/${professionalId}/reviews?**`, route => {
+      const params = new URL(route.request().url()).searchParams;
+      const number = Number(params.get('page') ?? 0);
+      const size = Number(params.get('size') ?? 5);
+      return route.fulfill({ json: {
+        content: reviews.slice(number * size, (number + 1) * size),
+        number, size, totalElements: reviews.length, totalPages: Math.ceil(reviews.length / size),
+        last: (number + 1) * size >= reviews.length,
+      } });
+    });
 
     await page.goto(`${FRONTEND_BASE}/profesionales/${professionalId}?tradeId=11`);
 
     await expect(page.getByRole('heading', { name: 'Profesional con reputación' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'Foto de Profesional con reputación' })).toHaveAttribute('src', '/uploads/profile-images/qa-profile.svg');
-    await expect(page.locator('.profile-summary__rating')).toContainText('8.7');
+    await expect(page.locator('.profile-summary__rating')).toContainText('4,4');
     await expect(page.getByRole('button', { name: 'Electricista' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Plomería' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.profile-summary__price')).toContainText('$500');
     await expect(page.getByText('Este profesional todavía no tiene calificaciones.')).toHaveCount(0);
+    await expect(page.locator('.reviews-summary')).toContainText('10 opiniones');
+    await expect(page.locator('.profile-review')).toHaveCount(5);
+    await expect(page.locator('.profile-review').first().getByRole('img', { name: '4,5 de 5 estrellas' })).toBeVisible();
   });
 
   test('SCRUM-15: navegar a un perfil inexistente muestra el estado 404', async ({ page, request }) => {

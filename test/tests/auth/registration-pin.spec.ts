@@ -193,7 +193,7 @@ test.describe('Registro con código por correo', () => {
     await waitForVerificationCode(request, email);
 
     // Same email, still inside the cooldown: no second code so soon.
-    const soon = await startClientRegistration(request, { name: 'Cliente Reemplaza Dos', email, password: 'OtraClave2026!' });
+    const soon = await startClientRegistration(request, { name: 'Cliente Reemplaza Dos', email, password: 'OtraClaveSegura2026!' });
     expect(soon.status()).toBe(429);
     expect(await mailsTo(request, email)).toHaveLength(1);
   });

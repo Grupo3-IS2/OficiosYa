@@ -20,14 +20,19 @@ public interface ScheduleService {
     void deleteSchedule(Long id, UUID professionalId);
 
     /**
+     * Exports a professional's agenda in RFC 5545 iCalendar (VCALENDAR) format.
+     */
+    String exportAgendaICalendar(UUID professionalId, OffsetDateTime from, OffsetDateTime to, boolean ownerOrAdmin);
+
+    /**
      * Blocks the professional's agenda for a job that was just accepted. Not exposed through a
      * controller: it's meant to be called by the job-acceptance flow, never directly by a client.
      */
     ScheduleResponse createJobSchedule(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end);
 
     /**
-     * Checks that an accepted job's SCHEDULED_JOB block could move to the given timeframe without
-     * overlapping anything else on the agenda (its own block doesn't count).
+     * Checks that a job could take the given timeframe without overlapping anything else on the
+     * professional's agenda: an accepted job's own block doesn't count, and a proposal has none yet.
      */
     void checkJobSlotAvailable(JobRequest jobRequest, OffsetDateTime start, OffsetDateTime end);
 

@@ -30,10 +30,23 @@ public class JobRequestResponse {
     private String professionalPhoneNumber;
 
     private String location;
+    /** The location's point, when it was chosen on the map; null otherwise. */
+    private Double latitude;
+    private Double longitude;
+    /** Whether the location falls outside the professional's service area; null when it can't be told. */
+    private Boolean outsideServiceArea;
+    /** The area the professional covers, its centre rounded like on their public profile; null if not set. */
+    private ServiceAreaResponse professionalServiceArea;
     private BigDecimal paymentAmount;
     private PaymentState paymentState;
     private JobStatus status;
     private List<TaskResponse> tasks;
+
+    /** Which side proposed it (CLIENT or PROFESSIONAL): the other side accepts or rejects it. */
+    private Role proposedBy;
+    /** The timeframe the proposing side asked for, while the proposal waits for an answer; null otherwise. */
+    private OffsetDateTime proposedStart;
+    private OffsetDateTime proposedEnd;
 
     /** The timeframe the professional agreed to when accepting; null while PROPOSED, REJECTED or CANCELLED. */
     private OffsetDateTime scheduledStart;
@@ -57,6 +70,9 @@ public class JobRequestResponse {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
-    /** Only populated in the response to the client that just created the job; shown on site to confirm completion. */
+    /**
+     * Only in the response that creates it: to the client that proposed the job, or to the client that
+     * accepts a professional's proposal. Shown on site to confirm completion.
+     */
     private String confirmationPin;
 }

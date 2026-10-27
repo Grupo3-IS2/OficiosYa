@@ -1,4 +1,5 @@
 import type { Professional } from '../../types/Professional'
+import { starsToRating } from '../../utils/ratingScale.ts'
 import { availabilityWindow, type DayRange } from './professionalAvailability.ts'
 import type { ProfessionalFilters } from './professionalFilters.ts'
 import type { ProfessionalOrder } from './professionalOrder.ts'
@@ -17,8 +18,9 @@ export interface ProfessionalPage {
     totalPages: number
 }
 
-/** The order as the backend names it; the ones it doesn't have ("Más cercanos") are by relevance. */
+/** The order as the backend names it; the ones it doesn't have are by relevance. */
 const BACKEND_ORDER: Partial<Record<NonNullable<ProfessionalOrder>, string>> = {
+    distance: 'DISTANCE',
     'price-asc': 'PRICE_ASC',
     'price-desc': 'PRICE_DESC',
     'rating-desc': 'RATING_DESC',
@@ -38,10 +40,17 @@ export function searchParams(search: ProfessionalSearch, page: number, size: num
     for (const tradeId of tradeIds) params.append('tradeIds', String(tradeId))
     if (filters.minimumPrice !== null) params.set('minPrice', String(filters.minimumPrice))
     if (filters.maximumPrice !== null) params.set('maxPrice', String(filters.maximumPrice))
-    if (filters.minimumRating !== null) params.set('minRating', String(filters.minimumRating))
+    if (filters.minimumRating !== null) params.set('minRating', String(starsToRating(filters.minimumRating)))
+    // The name still goes with a point: it finds the professionals who haven't picked their area yet.
     if (filters.location.trim()) params.set('location', filters.location.trim())
+    if (filters.point) {
+        params.set('lat', String(filters.point.lat))
+        params.set('lon', String(filters.point.lon))
+        if (filters.maxDistanceKm !== null) params.set('maxDistanceKm', String(filters.maxDistanceKm))
+    }
     for (const [name, value] of availabilityParams(filters.availability, reference)) params.set(name, value)
-    const backendOrder = order ? BACKEND_ORDER[order] : undefined
+    // Nearest first needs a point to be near to.
+    const backendOrder = order && (order !== 'distance' || filters.point) ? BACKEND_ORDER[order] : undefined
     if (backendOrder) params.set('order', backendOrder)
     return params
 }

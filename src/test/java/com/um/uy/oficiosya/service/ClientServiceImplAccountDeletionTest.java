@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.service;
 
+import com.um.uy.oficiosya.entity.ServiceArea;
 import com.um.uy.oficiosya.dto.update.AccountDeletionRequest;
 import com.um.uy.oficiosya.entity.AuthProvider;
 import com.um.uy.oficiosya.entity.Client;
@@ -196,6 +197,7 @@ class ClientServiceImplAccountDeletionTest {
         Professional professional = Professional.builder().id(1L).publicId(id).name("Bruno Díaz").email("bruno@example.com")
                 .password("{argon2}own").authProvider(AuthProvider.LOCAL).published(true).phoneNumber("+59899123456")
                 .description("Plomero").workingLocation("Cordón, Montevideo")
+                .serviceArea(ServiceArea.builder().latitude(-34.9).longitude(-56.18).radiusKm(5).build())
                 .expertiseTrades(new ArrayList<>(List.of(new ExpertiseTrade())))
                 .schedules(new ArrayList<>(List.of(free, job))).build();
         when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(professional));
@@ -205,6 +207,7 @@ class ClientServiceImplAccountDeletionTest {
         assertFalse(professional.isPublished());
         assertEquals(ClientServiceImpl.DELETED_FIELD, professional.getPhoneNumber());
         assertEquals(ClientServiceImpl.DELETED_FIELD, professional.getWorkingLocation());
+        assertNull(professional.getServiceArea());
         assertNull(professional.getDescription());
         assertTrue(professional.getExpertiseTrades().isEmpty());
         assertEquals(List.of(job), professional.getSchedules());

@@ -34,6 +34,26 @@ public class RequestNotificationListener {
 
     @Async
     @TransactionalEventListener
+    public void onJobProposed(JobRequestEvents.JobProposed event) {
+        notifyJobChanged(event.jobRequestId(), null, null);
+    }
+
+    @Async
+    @TransactionalEventListener
+    public void onJobStatusChanged(JobRequestEvents.JobStatusChanged event) {
+        notifyJobChanged(event.jobRequestId(), event.change(), event.actorId());
+    }
+
+    private void notifyJobChanged(Long jobRequestId, JobRequestEvents.Change change, UUID actorId) {
+        try {
+            notifications.notifyJobChanged(jobRequestId, change, actorId);
+        } catch (RuntimeException e) {
+            log.error("Could not notify the change of job request {}", jobRequestId, e);
+        }
+    }
+
+    @Async
+    @TransactionalEventListener
     public void onAwaitingAnswersChanged(JobRequestEvents.AwaitingAnswersChanged event) {
         for (UUID userId : event.userIds()) {
             try {

@@ -3,6 +3,7 @@ import BackNavigation from '../../components/BackNavigation/BackNavigation'
 import Header from '../../components/Header/Header'
 import { ApiError } from '../../services/api'
 import { getProfessional } from '../../services/professionalService'
+import { onRatingChange } from '../../services/ratingEvents'
 import { getProfessionalSchedule } from '../../services/scheduleService'
 import type { Professional } from '../../types/Professional'
 import type { Schedule } from '../../types/Schedule'
@@ -32,6 +33,10 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [requestModalOpen, setRequestModalOpen] = useState(false)
+    const [ratingRevision, setRatingRevision] = useState(0)
+    useEffect(() => onRatingChange(id => {
+        if (!id || id === professionalId) setRatingRevision(value => value + 1)
+    }), [professionalId])
     const [scheduleState, setScheduleState] = useState<ScheduleState>({
         professionalId,
         schedules: [],
@@ -42,7 +47,7 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
         let active = true
 
         void getProfessional(professionalId)
-            .then(response => { if (active) setProfessional(response) })
+            .then(response => { if (active) { setProfessional(response); setError('') } })
             .catch(error => {
                 if (!active) return
                 setError(error instanceof ApiError && error.status === 404
@@ -52,7 +57,7 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
             .finally(() => { if (active) setLoading(false) })
 
         return () => { active = false }
-    }, [professionalId])
+    }, [professionalId, ratingRevision])
 
     useEffect(() => {
         let active = true
@@ -115,13 +120,13 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                         selectedTradeId={selectedTrade?.tradeId ?? null}
                         onSelect={selectTrade}
                     />
-                    <WorkZone workingLocation={professional.workingLocation} />
+                    <WorkZone workingLocation={professional.workingLocation} serviceArea={professional.serviceArea ?? null} />
                     <WeeklyAvailability
                         schedules={scheduleState.professionalId === professionalId ? scheduleState.schedules : []}
                         loading={scheduleState.professionalId !== professionalId || scheduleState.status === 'loading'}
                         error={scheduleState.professionalId === professionalId && scheduleState.status === 'error'}
                     />
-                    <ReviewsSection rating={professional.rating} />
+                    <ReviewsSection key={`${professionalId}:${ratingRevision}`} professionalId={professionalId} rating={professional.rating} />
                     {requestModalOpen && (
                         <ServiceRequestModal
                             professional={professional}

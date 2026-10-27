@@ -11,10 +11,15 @@ import java.util.UUID;
 
 public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
 
+    // A completed job's block stays (it holds the job's timeframe) but leaves the agenda: the slot is free again.
+
     @Query("""
-            SELECT s FROM Schedule s
+            SELECT s FROM Schedule s LEFT JOIN s.jobRequest j
             WHERE s.professional.publicId = :professionalPublicId
-            AND (CAST(:from AS OffsetDateTime) IS NULL OR s.endTimestamp > :from)
+            AND (j IS NULL OR j.status <> com.um.uy.oficiosya.entity.JobStatus.COMPLETED)
+            AND (CAST(:from AS OffsetDateTime) IS NULL
+                 OR COALESCE(s.recurrenceEnd, s.endTimestamp) > :from
+                 OR (s.rrule IS NOT NULL AND s.recurrenceEnd IS NULL))
             AND (CAST(:to AS OffsetDateTime) IS NULL OR s.startTimestamp < :to)
             ORDER BY s.startTimestamp ASC
             """)
@@ -24,8 +29,9 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
 
     /** excludeId lets an update check for overlaps against every block except itself; pass 0L when creating. */
     @Query("""
-            SELECT COUNT(s) > 0 FROM Schedule s
+            SELECT COUNT(s) > 0 FROM Schedule s LEFT JOIN s.jobRequest j
             WHERE s.professional.publicId = :professionalPublicId
+            AND (j IS NULL OR j.status <> com.um.uy.oficiosya.entity.JobStatus.COMPLETED)
             AND s.id <> :excludeId
             AND s.startTimestamp < :end
             AND s.endTimestamp > :start
@@ -34,4 +40,23 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
                                @Param("start") OffsetDateTime start,
                                @Param("end") OffsetDateTime end,
                                @Param("excludeId") Long excludeId);
+
+    /**
+     * Fetches candidate schedules (including recurring ones) that can overlap a window starting at {@code from}.
+     */
+    @Query("""
+            SELECT s FROM Schedule s LEFT JOIN s.jobRequest j
+            WHERE s.professional.publicId = :professionalPublicId
+            AND (j IS NULL OR j.status <> com.um.uy.oficiosya.entity.JobStatus.COMPLETED)
+            AND s.id <> :excludeId
+            AND (CAST(:from AS OffsetDateTime) IS NULL
+                 OR COALESCE(s.recurrenceEnd, s.endTimestamp) > :from
+                 OR (s.rrule IS NOT NULL AND s.recurrenceEnd IS NULL))
+            AND (CAST(:to AS OffsetDateTime) IS NULL OR s.startTimestamp < :to)
+            ORDER BY s.startTimestamp ASC
+            """)
+    List<Schedule> findActiveCandidates(@Param("professionalPublicId") UUID professionalPublicId,
+                                         @Param("from") OffsetDateTime from,
+                                         @Param("to") OffsetDateTime to,
+                                         @Param("excludeId") Long excludeId);
 }

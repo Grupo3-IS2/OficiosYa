@@ -33,17 +33,22 @@ public class RequestRateLimiter {
     /** Past this many tracked clients, windows that already ended are dropped. */
     private static final int PURGE_THRESHOLD = 10_000;
 
+    public static final String LOGIN_BUCKET = "login";
+
     private final int maxRequestsPerWindow;
+    private final int maxLoginsPerWindow;
     private final Clock clock;
     private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
 
     @Autowired
-    public RequestRateLimiter(@Value("${app.rate-limit.auth-requests-per-minute}") int maxRequestsPerWindow) {
-        this(maxRequestsPerWindow, Clock.systemUTC());
+    public RequestRateLimiter(@Value("${app.rate-limit.auth-requests-per-minute}") int maxRequestsPerWindow,
+                              @Value("${app.rate-limit.login-requests-per-minute}") int maxLoginsPerWindow) {
+        this(maxRequestsPerWindow, maxLoginsPerWindow, Clock.systemUTC());
     }
 
-    RequestRateLimiter(int maxRequestsPerWindow, Clock clock) {
+    RequestRateLimiter(int maxRequestsPerWindow, int maxLoginsPerWindow, Clock clock) {
         this.maxRequestsPerWindow = maxRequestsPerWindow;
+        this.maxLoginsPerWindow = maxLoginsPerWindow;
         this.clock = clock;
     }
 
@@ -59,7 +64,7 @@ public class RequestRateLimiter {
         Window window = windows.compute(key, (k, current) ->
                 current == null || current.hasEnded(now) ? new Window(now) : current.increment());
 
-        if (window.count > maxRequestsPerWindow) {
+        if (window.count > (LOGIN_BUCKET.equals(bucket) ? maxLoginsPerWindow : maxRequestsPerWindow)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Hiciste demasiados intentos, esperá un minuto y probá de nuevo");
         }

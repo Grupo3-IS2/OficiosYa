@@ -8,16 +8,29 @@ import com.um.uy.oficiosya.dto.request.JobRequestRejectRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestRescheduleRequest;
 import com.um.uy.oficiosya.dto.request.JobRequestReviewRequest;
 import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.entity.JobStatus;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.UUID;
 
 public interface JobRequestService {
-    JobRequestResponse createJobRequest(JobRequestCreateRequest request, UUID clientId);
-    JobRequestResponse acceptJobRequest(Long id, JobRequestAcceptRequest request, UUID professionalId);
-    /** The request (and its reason) is optional. */
-    JobRequestResponse rejectJobRequest(Long id, JobRequestRejectRequest request, UUID professionalId);
+    /**
+     * The caller proposes a job, either as a client to a professional (who picks the timeframe when
+     * accepting; the PIN is in this response) or as a professional to a client they already have a
+     * conversation with (with the timeframe; the PIN comes when the client accepts).
+     */
+    JobRequestResponse createJobRequest(JobRequestCreateRequest request, UUID callerId);
+
+    /**
+     * The side that didn't propose accepts: a professional with the timeframe they pick, a client with
+     * no request (the professional's timeframe), getting the PIN in this response.
+     */
+    JobRequestResponse acceptJobRequest(Long id, JobRequestAcceptRequest request, UUID requesterId);
+    /** The side that didn't propose turns it down; the request (and its reason) is optional. */
+    JobRequestResponse rejectJobRequest(Long id, JobRequestRejectRequest request, UUID requesterId);
 
     /**
      * Either side can cancel; the request (and its reason) is optional. Once accepted, it needs the
@@ -25,11 +38,11 @@ public interface JobRequestService {
      */
     JobRequestResponse cancelJobRequest(Long id, JobRequestCancelRequest request, UUID requesterId);
 
-    /** The client asks to move an ACCEPTED job; it stays at its original time until the professional approves. */
+    /** Either side asks to move an ACCEPTED job; it stays at its original time until the other side approves. */
     JobRequestResponse requestReschedule(Long id, JobRequestRescheduleRequest request, UUID requesterId);
-    /** The professional approves the client's new timeframe, which moves the job's agenda block. */
+    /** The side that didn't ask approves the new timeframe, which moves the job's agenda block. */
     JobRequestResponse acceptReschedule(Long id, UUID requesterId);
-    /** The professional turns down the new timeframe; the job stays at its original one. */
+    /** The side that didn't ask turns down the new timeframe; the job stays at its original one. */
     JobRequestResponse rejectReschedule(Long id, UUID requesterId);
 
     /** The professional enters the client's PIN on site; this is what moves the job to COMPLETED. */
@@ -37,6 +50,8 @@ public interface JobRequestService {
 
     /** The client rates a COMPLETED job once; the professional's rating becomes the average of their reviews. */
     JobRequestResponse reviewJobRequest(Long id, JobRequestReviewRequest request, UUID clientId);
+    Page<ReviewResponse> getProfessionalReviews(UUID professionalId, Pageable pageable);
+    Page<ReviewResponse> getMyReviews(UUID clientId, Pageable pageable);
     JobRequestResponse getJobRequest(Long id, UUID requesterId);
     /** The jobs the user takes part in, as client or as professional; only those in the given status if not null. */
     List<JobRequestResponse> getMyJobRequests(UUID userId, JobStatus status);

@@ -30,7 +30,6 @@ export default function DeleteAccountSection({ hasPassword, email }: Readonly<{ 
         try {
             const code = mailedCode.code
             await deleteUser(hasPassword ? { currentPassword: confirmation, code } : { email: confirmation, code })
-            window.location.href = '/'
         } catch (reason) {
             setError(reason instanceof Error ? reason.message : 'No se pudo eliminar la cuenta. Inténtalo nuevamente.')
             setBusy(false)

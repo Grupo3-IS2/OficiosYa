@@ -1,3 +1,6 @@
+import type { ServiceArea } from '../../types/Professional'
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, passwordLength } from '../../services/passwordPolicy'
+
 export interface PersonalData {
     name: string
     email: string
@@ -15,6 +18,8 @@ export interface SecurityData {
 export interface ProfessionalData {
     description: string
     workingLocation: string
+    /** Null while the zone is only typed: it is chosen on the map. */
+    serviceArea: ServiceArea | null
     trades: ProfessionalTradeData[]
     published: boolean
 }
@@ -35,8 +40,13 @@ export function personalChanged(current: PersonalData, saved: PersonalData) {
         || current.emailNotifications !== saved.emailNotifications
 }
 
+export function sameServiceArea(current: ServiceArea | null, saved: ServiceArea | null) {
+    return current?.latitude === saved?.latitude && current?.longitude === saved?.longitude && current?.radiusKm === saved?.radiusKm
+}
+
 export function professionalChanged(current: ProfessionalData, saved: ProfessionalData) {
     return current.description !== saved.description || current.workingLocation !== saved.workingLocation
+        || !sameServiceArea(current.serviceArea, saved.serviceArea)
         || current.published !== saved.published
         || current.trades.length !== saved.trades.length
         || current.trades.some(trade => {
@@ -52,6 +62,8 @@ export function validateProfessional(current: ProfessionalData, saved: Professio
         return 'La descripción debe tener entre 20 y 500 caracteres.'
     }
     if (!current.workingLocation.trim()) return 'Ingresá una ubicación de trabajo.'
+    // Once saved it can be moved but not taken away: a zone typed by hand alone has no point to keep.
+    if (saved.serviceArea && !current.serviceArea) return 'Marcá en el mapa desde dónde trabajás.'
     if (current.published && (description.length < 20 || current.trades.length === 0)) {
         return 'Para ofrecer tus servicios, completá la descripción y elegí al menos un oficio.'
     }
@@ -60,8 +72,8 @@ export function validateProfessional(current: ProfessionalData, saved: Professio
         const maximum = Number(trade.maximumHourlyWage)
         if (!trade.minimumHourlyWage.trim() || !trade.maximumHourlyWage.trim()
             || !Number.isFinite(minimum) || !Number.isFinite(maximum)
-            || minimum < 0 || maximum < minimum) {
-            return `Ingresá tarifas válidas para ${trade.tradeName}: la máxima debe ser mayor o igual a la mínima.`
+            || minimum <= 0 || maximum <= 0 || maximum < minimum) {
+            return `Ingresá tarifas válidas para ${trade.tradeName}: ambas deben ser mayores a $0 y la máxima debe ser mayor o igual a la mínima.`
         }
     }
     return ''
@@ -83,11 +95,8 @@ export function validatePhone(phone: string): string {
 
 export function validateSecurity(value: SecurityData): string {
     if (!value.current || !value.password || !value.confirmation) return 'Completa los tres campos de contraseña.'
-    if (value.password.length < 8) return 'La nueva contraseña debe tener al menos 8 caracteres.'
-    if (!/[A-Z]/.test(value.password)) return 'La nueva contraseña debe incluir al menos una mayúscula.'
-    if (!/[a-z]/.test(value.password)) return 'La nueva contraseña debe incluir al menos una minúscula.'
-    if (!/\d/.test(value.password)) return 'La nueva contraseña debe incluir al menos un número.'
-    if (!/[^A-Za-z0-9]/.test(value.password)) return 'La nueva contraseña debe incluir al menos un carácter especial.'
+    if (passwordLength(value.password) < MIN_PASSWORD_LENGTH) return `La nueva contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`
+    if (passwordLength(value.password) > MAX_PASSWORD_LENGTH) return `La nueva contraseña puede tener como máximo ${MAX_PASSWORD_LENGTH} caracteres.`
     if (value.password !== value.confirmation) return 'Las contraseñas nuevas no coinciden.'
     if (value.password === value.current) return 'La nueva contraseña debe ser diferente de la actual.'
     return ''

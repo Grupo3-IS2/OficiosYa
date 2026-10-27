@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { searchProfessionals } from '../../services/professionalService'
+import { onRatingChange } from '../../services/ratingEvents'
 import type { ProfessionalSearch } from './professionalSearch'
 import type { Professional } from '../../types/Professional'
 
@@ -29,6 +30,8 @@ export function useProfessionalSearch(search: ProfessionalSearch) {
     const [moreFailed, setMoreFailed] = useState(false)
     // Which search the answers belong to.
     const generation = useRef(0)
+    const [ratingRevision, setRatingRevision] = useState(0)
+    useEffect(() => onRatingChange(() => setRatingRevision(value => value + 1)), [])
 
     useEffect(() => {
         const current = ++generation.current
@@ -43,7 +46,8 @@ export function useProfessionalSearch(search: ProfessionalSearch) {
                 setStatus('ready')
             })
             .catch(() => { if (generation.current === current) setStatus('error') })
-    }, [key])
+        return () => { generation.current = current + 1 }
+    }, [key, ratingRevision])
 
     const hasMore = status === 'ready' && results.loadedPages < results.totalPages
 

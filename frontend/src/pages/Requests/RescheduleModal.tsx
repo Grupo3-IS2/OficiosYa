@@ -3,8 +3,11 @@ import type { SubmitEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../components/Button/Button'
 import { requestReschedule } from '../../services/jobRequestService'
+import { getProfessionalSchedule } from '../../services/scheduleService'
 import type { JobRequest } from '../../types/JobRequest'
 import { rescheduleDraftFrom, rescheduleTimeframe } from './rescheduleForm'
+import OutsideAvailabilityModal from './OutsideAvailabilityModal'
+import { withinAvailability } from './requestResponse'
 import './RescheduleModal.css'
 
 export default function RescheduleModal({ request, onRescheduled, onClose }: Readonly<{
@@ -18,6 +21,8 @@ export default function RescheduleModal({ request, onRescheduled, onClose }: Rea
     const unchanged = draft.date === initialDraft.date && draft.startTime === initialDraft.startTime && draft.endTime === initialDraft.endTime
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState('')
+    // A timeframe outside the professional's availability, waiting for the user to confirm it
+    const [unavailable, setUnavailable] = useState<{ start: Date; end: Date } | null>(null)
 
     useEffect(() => {
         const previousFocus = document.activeElement
@@ -43,6 +48,19 @@ export default function RescheduleModal({ request, onRescheduled, onClose }: Rea
 
         setBusy(true)
         setError('')
+        // shortcut: an agenda that can't be loaded skips the warning; the backend still rejects real clashes
+        const available = await getProfessionalSchedule(request.professionalId, timeframe.start, timeframe.end)
+            .then(schedules => withinAvailability(schedules, timeframe.start, timeframe.end), () => true)
+        if (available) await propose(timeframe)
+        else {
+            setUnavailable(timeframe)
+            setBusy(false)
+        }
+    }
+
+    const propose = async (timeframe: { start: Date; end: Date }) => {
+        setUnavailable(null)
+        setBusy(true)
         try {
             onRescheduled(await requestReschedule(request.id, timeframe.start, timeframe.end))
         } catch (reason) {
@@ -77,6 +95,7 @@ export default function RescheduleModal({ request, onRescheduled, onClose }: Rea
                     <Button type="submit" disabled={busy || unchanged} title={unchanged ? 'Cambiá la fecha o el horario para proponer uno nuevo.' : undefined}>{busy ? 'Enviando…' : 'Proponer horario'}</Button>
                 </div>
             </form>
+            {unavailable && <OutsideAvailabilityModal onConfirm={() => { void propose(unavailable) }} onCancel={() => setUnavailable(null)} />}
         </dialog>,
         document.body,
     )

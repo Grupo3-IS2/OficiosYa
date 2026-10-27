@@ -1,6 +1,6 @@
-import { clearSession, expireSession, getToken, getTokenExpiration, storeLogin } from './session'
-import { RENEW_MARGIN_MS, createSessionRefresher, type RefreshOutcome } from './sessionRefresher'
-import type { LoginResponse } from '../types/Auth'
+import { clearSession, expireSession, getToken, getTokenExpiration, storeLogin } from './session.ts'
+import { RENEW_MARGIN_MS, createSessionRefresher, type RefreshOutcome } from './sessionRefresher.ts'
+import type { LoginResponse } from '../types/Auth.ts'
 
 const REFRESH_URL = '/api/v1/auth/refresh'
 
@@ -66,7 +66,9 @@ export function keepSessionFresh(): void {
   if (delay > MAX_TIMEOUT_DELAY) return
 
   timer = window.setTimeout(async () => {
-    const outcome = await renewSession(getToken())
+    const currentToken = getToken()
+    if (!currentToken) return
+    const outcome = await renewSession(currentToken)
     if (outcome === 'expired') expireSession()
     else if (outcome === 'unavailable') timer = window.setTimeout(keepSessionFresh, RETRY_DELAY_MS)
     // Also when another tab renewed it: this tab still has to schedule the next renewal
@@ -79,15 +81,17 @@ export function keepSessionFresh(): void {
  * quietly; if the session is over it is just dropped, without sending a visitor of a public page
  * to log in.
  */
-export async function resumeSession(): Promise<void> {
+export async function resumeSession(): Promise<RefreshOutcome> {
   const token = getToken()
-  if (!token) return
+  if (!token) return 'expired'
   if (isTokenFresh(token)) {
     keepSessionFresh()
-    return
+    return 'refreshed'
   }
 
   const outcome = await renewSession(token)
   if (outcome === 'expired') clearSession()
-  else if (outcome === 'unavailable') keepSessionFresh()
+  // Startup failures stay unresolved until the shared session check is retried.
+  // Scheduling an already expired token here would immediately retry behind the error screen.
+  return outcome
 }

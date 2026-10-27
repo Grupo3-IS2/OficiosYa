@@ -1,7 +1,7 @@
 import type { ReactNode, SVGProps } from 'react'
 import './Icon.css'
 
-export type IconName = 'location' | 'document' | 'user' | 'search' | 'money' | 'calendar' | 'star' | 'wrench' | 'home' | 'mail' | 'phone' | 'lock' | 'eye' | 'eye-off' | 'filter' | 'chevron-down' | 'message' | 'close' | 'plus' | 'trash' | 'copy' | 'check'
+export type IconName = 'location' | 'document' | 'user' | 'search' | 'money' | 'calendar' | 'star' | 'wrench' | 'home' | 'mail' | 'phone' | 'lock' | 'eye' | 'eye-off' | 'filter' | 'chevron-down' | 'message' | 'close' | 'plus' | 'trash' | 'copy' | 'check' | 'send' | 'more' | 'arrow-left' | 'ban'
 interface IconProps extends SVGProps<SVGSVGElement> { name: IconName }
 
 function Icon({ name, ...props }: IconProps) {
@@ -28,6 +28,10 @@ function Icon({ name, ...props }: IconProps) {
     trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6" /></>,
     copy: <><rect x="8" y="8" width="11" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2" /></>,
     check: <path d="m5 12 4 4L19 6" />,
+    send: <><path d="m3 3 19 9-19 9 4-9-4-9ZM7 12h15" /></>,
+    more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
+    'arrow-left': <path d="m12 4-8 8 8 8M4 12h17" />,
+    ban: <><circle cx="12" cy="12" r="9" /><path d="m6 6 12 12" /></>,
   }
   return <svg className="icon" viewBox="0 0 24 24" aria-hidden="true" {...props}>{paths[name]}</svg>
 }

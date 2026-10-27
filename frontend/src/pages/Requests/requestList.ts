@@ -24,6 +24,12 @@ export function serviceSummary(request: JobRequest): string {
     return `${firstTask.tradeName} + ${additionalTasks} ${additionalTasks === 1 ? 'tarea' : 'tareas'}`
 }
 
+/** What each side is told when the job is beyond the professional's service area; null otherwise or when unknown. */
+export function outsideServiceAreaNote(request: JobRequest, viewerIsClient: boolean): string | null {
+    if (!request.outsideServiceArea) return null
+    return viewerIsClient ? `Fuera de la zona que cubre ${request.professionalName}` : 'Fuera de tu zona de trabajo'
+}
+
 export function requestDescription(request: JobRequest): string {
     return request.tasks[0]?.description ?? 'Sin descripción.'
 }

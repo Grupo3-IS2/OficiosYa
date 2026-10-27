@@ -8,5 +8,7 @@ public enum VerificationPurpose {
     /** Proves the owner of an account created with Google before it gets a password of its own. */
     PASSWORD_SETUP,
     /** Confirms, with the account's own email, that its owner wants it deleted. */
-    ACCOUNT_DELETION
+    ACCOUNT_DELETION,
+    /** Proves, from the login page, that whoever forgot the password reads the account's email. */
+    PASSWORD_RESET
 }

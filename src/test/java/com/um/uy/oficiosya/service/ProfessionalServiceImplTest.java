@@ -1,5 +1,7 @@
 package com.um.uy.oficiosya.service;
 
+import com.um.uy.oficiosya.entity.ServiceArea;
+import com.um.uy.oficiosya.dto.request.ServiceAreaRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
@@ -146,6 +148,29 @@ class ProfessionalServiceImplTest {
     }
 
     @Test
+    void updateProfessional_withAServiceArea_replacesIt() {
+        found();
+        ServiceAreaRequest area = new ServiceAreaRequest(-34.9, -56.15, 8);
+        ServiceArea mappedArea = ServiceArea.builder().latitude(-34.9).longitude(-56.15).radiusKm(8).build();
+        when(professionalMapper.toServiceArea(area)).thenReturn(mappedArea);
+
+        service.updateProfessional(ProfessionalUpdateRequest.builder().serviceArea(area).build(), id);
+
+        assertSame(mappedArea, professional.getServiceArea());
+    }
+
+    @Test
+    void updateProfessional_withoutAServiceArea_keepsTheCurrentOne() {
+        found();
+        ServiceArea current = ServiceArea.builder().latitude(-34.9).longitude(-56.15).radiusKm(8).build();
+        professional.setServiceArea(current);
+
+        service.updateProfessional(new ProfessionalUpdateRequest(), id);
+
+        assertSame(current, professional.getServiceArea());
+    }
+
+    @Test
     void updateProfessional_blankOrMissingFields_keepTheCurrentValues() {
         found();
         ProfessionalUpdateRequest request = ProfessionalUpdateRequest.builder().name(" ")
@@ -191,14 +216,23 @@ class ProfessionalServiceImplTest {
         ProfessionalPublicResponse publicResponse = new ProfessionalPublicResponse();
         when(professionalMapper.toPublicResponse(professional)).thenReturn(publicResponse);
 
-        assertSame(publicResponse, service.getPublicProfessional(id));
+        assertSame(publicResponse, service.getPublicProfessional(id, false));
     }
 
     @Test
     void getPublicProfessional_unpublished_isNotFound() {
         found();
 
-        assertThrows(ClientNotFoundException.class, () -> service.getPublicProfessional(id));
+        assertThrows(ClientNotFoundException.class, () -> service.getPublicProfessional(id, false));
+    }
+
+    @Test
+    void getPublicProfessional_unpublished_isVisibleToItsOwner() {
+        found();
+        ProfessionalPublicResponse publicResponse = new ProfessionalPublicResponse();
+        when(professionalMapper.toPublicResponse(professional)).thenReturn(publicResponse);
+
+        assertSame(publicResponse, service.getPublicProfessional(id, true));
     }
 
     @Test
@@ -406,7 +440,7 @@ class ProfessionalServiceImplTest {
 
     private static ProfessionalSearchFilters filters(List<Long> tradeIds, BigDecimal minPrice, BigDecimal maxPrice, Double minRating,
                                                      String location, String query) {
-        return new ProfessionalSearchFilters(tradeIds, minPrice, maxPrice, minRating, location, query, null, null, null);
+        return new ProfessionalSearchFilters(tradeIds, minPrice, maxPrice, minRating, location, query, null, null, null, null, null, null);
     }
 
     @Test
@@ -414,7 +448,7 @@ class ProfessionalServiceImplTest {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Professional> page = new PageImpl<>(List.of(professional));
         when(professionalRepository.search(List.of(3L), BigDecimal.ONE, BigDecimal.TEN, 5.0, "Montevideo", "beto",
-                null, null, "RELEVANCE", pageable)).thenReturn(page);
+                null, null, null, null, null, "RELEVANCE", pageable)).thenReturn(page);
         when(professionalMapper.toPublicResponse(professional)).thenReturn(new ProfessionalPublicResponse());
 
         Page<ProfessionalPublicResponse> result = service.searchProfessionals(
@@ -426,25 +460,25 @@ class ProfessionalServiceImplTest {
     @Test
     void searchProfessionals_emptyFilters_areSentAsNull() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(professionalRepository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Page.empty());
+        when(professionalRepository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Page.empty());
 
         service.searchProfessionals(filters(List.of(), null, null, null, " ", " "), pageable);
         service.searchProfessionals(filters(null, BigDecimal.ONE, null, null, null, null), pageable);
         service.searchProfessionals(filters(null, null, BigDecimal.ONE, null, null, null), pageable);
 
-        verify(professionalRepository).search(null, null, null, null, null, null, null, null, "RELEVANCE", pageable);
+        verify(professionalRepository).search(null, null, null, null, null, null, null, null, null, null, null, "RELEVANCE", pageable);
     }
 
     @Test
     void searchProfessionals_passesTheOrderAndAvailability_andIgnoresTheSortAndHugePages() {
         OffsetDateTime from = OffsetDateTime.parse("2030-01-02T10:00:00-03:00");
         OffsetDateTime to = OffsetDateTime.parse("2030-01-03T00:00:00-03:00");
-        when(professionalRepository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Page.empty());
+        when(professionalRepository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Page.empty());
 
         service.searchProfessionals(new ProfessionalSearchFilters(null, null, null, null, null, null, from, to,
-                ProfessionalSearchFilters.Order.PRICE_ASC), PageRequest.of(2, 500, Sort.by("name")));
+                null, null, null, ProfessionalSearchFilters.Order.PRICE_ASC), PageRequest.of(2, 500, Sort.by("name")));
 
-        verify(professionalRepository).search(null, null, null, null, null, null, from, to, "PRICE_ASC",
+        verify(professionalRepository).search(null, null, null, null, null, null, from, to, null, null, null, "PRICE_ASC",
                 PageRequest.of(2, ProfessionalServiceImpl.MAX_PAGE_SIZE));
     }
 
@@ -454,10 +488,10 @@ class ProfessionalServiceImplTest {
         Pageable pageable = PageRequest.of(0, 10);
 
         assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(
-                new ProfessionalSearchFilters(null, null, null, null, null, null, now, null, null), pageable));
+                new ProfessionalSearchFilters(null, null, null, null, null, null, now, null, null, null, null, null), pageable));
         assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(
-                new ProfessionalSearchFilters(null, null, null, null, null, null, now, now, null), pageable));
-        verify(professionalRepository, never()).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+                new ProfessionalSearchFilters(null, null, null, null, null, null, now, now, null, null, null, null), pageable));
+        verify(professionalRepository, never()).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -474,5 +508,34 @@ class ProfessionalServiceImplTest {
 
         assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(
                 filters(null, BigDecimal.TEN, BigDecimal.ONE, null, null, null), pageable));
+    }
+
+    @Test
+    void searchProfessionals_withAPoint_passesIt_andAddsTheDistanceRoundedToHalfAKilometre() {
+        Pageable pageable = PageRequest.of(0, 10);
+        professional.setServiceArea(new ServiceArea(-34.9058, -56.1913, 20)); // Plaza Independencia
+        when(professionalRepository.search(null, null, null, null, null, null, null, null, -34.8838, -56.0581, 15,
+                "DISTANCE", pageable)).thenReturn(new PageImpl<>(List.of(professional)));
+        when(professionalMapper.toPublicResponse(professional)).thenReturn(new ProfessionalPublicResponse());
+
+        Page<ProfessionalPublicResponse> result = service.searchProfessionals(new ProfessionalSearchFilters(null, null, null, null,
+                null, null, null, null, -34.8838, -56.0581, 15, ProfessionalSearchFilters.Order.DISTANCE), pageable); // Carrasco
+
+        assertEquals(12.5, result.getContent().getFirst().getDistanceKm());
+    }
+
+    @Test
+    void searchProfessionals_withHalfAPoint_aDistanceWithoutOne_orNearestFirstWithoutOne_isRejected() {
+        Pageable pageable = PageRequest.of(0, 10);
+
+        assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(
+                new ProfessionalSearchFilters(null, null, null, null, null, null, null, null, -34.9, null, null, null), pageable));
+        assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(
+                new ProfessionalSearchFilters(null, null, null, null, null, null, null, null, null, null, 5, null), pageable));
+        assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(
+                new ProfessionalSearchFilters(null, null, null, null, null, null, null, null, -34.9, -56.1, 0, null), pageable));
+        assertThrows(ResponseStatusException.class, () -> service.searchProfessionals(new ProfessionalSearchFilters(
+                null, null, null, null, null, null, null, null, null, null, null, ProfessionalSearchFilters.Order.DISTANCE), pageable));
+        verify(professionalRepository, never()).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

@@ -169,7 +169,11 @@ test.describe('Elegir la zona en el mapa al editar el perfil', () => {
 
     await expect(section.getByText('Perfil profesional actualizado.')).toBeVisible();
     expect(mocks.patches).toHaveLength(1);
-    expect(mocks.patches[0]).toEqual({ workingLocation: 'Pando, Canelones' });
+    // The point of the place chosen, with the radius a professional starts with.
+    expect(mocks.patches[0]).toEqual({
+      workingLocation: 'Pando, Canelones',
+      serviceArea: { latitude: -34.7167, longitude: -55.9583, radiusKm: 10 },
+    });
   });
 
   test('UI: el mapa de editar el perfil también se acerca y se aleja', async ({ page }) => {

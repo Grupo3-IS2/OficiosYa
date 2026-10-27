@@ -8,7 +8,8 @@ import java.util.regex.Pattern;
 
 public class FullNameValidator implements ConstraintValidator<FullName, String> {
 
-    private static final Pattern NAME_FORMAT = Pattern.compile("\\p{L}+( \\p{L}+)+");
+    // Possessive: a plain repeated group recurses per repetition and can overflow the stack
+    private static final Pattern NAME_FORMAT = Pattern.compile("\\p{L}+( \\p{L}+)++");
 
     private static final int MIN_LENGTH = 3;
 

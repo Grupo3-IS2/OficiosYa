@@ -195,6 +195,40 @@
   text-align: center;
 }
 
+.login-notice--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.login-hint {
+  margin: -10px 0 18px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.login-secondary-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.login-secondary-actions button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #078747;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.login-secondary-actions button:disabled {
+  color: #9ca3af;
+  cursor: default;
+}
+
 .login-divider {
   height: 1px;
   margin: 30px 0 22px;

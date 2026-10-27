@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Button from '../../../components/Button/Button'
-import ZonePicker from '../../../components/ZonePicker/ZonePicker'
+import ZonePicker, { type ZonePoint } from '../../../components/ZonePicker/ZonePicker'
+import RadiusField, { DEFAULT_RADIUS_KM } from '../../../components/RadiusField/RadiusField'
 import type { Trade } from '../../../types/Professional'
 import type { ProfessionalData, ProfessionalTradeData } from '../profileState'
 
@@ -8,9 +9,13 @@ export default function ProfessionalProfileSection({ value, onChange, onSave, me
     value: ProfessionalData; onChange: (value: ProfessionalData) => void; onSave: () => Promise<boolean>
     message?: string; error?: string; trades: Trade[]; tradesLoading: boolean; tradesError: string
 }>) {
-    const { description, workingLocation, published } = value
+    const { description, workingLocation, serviceArea, published } = value
     const setDescription = (description: string) => onChange({ ...value, description })
-    const setWorkingLocation = (workingLocation: string) => onChange({ ...value, workingLocation })
+    // Typed by hand, the zone no longer matches the point it had: it is marked on the map again.
+    const typeWorkingLocation = (workingLocation: string) => onChange({ ...value, workingLocation, serviceArea: null })
+    const chooseWorkingLocation = (workingLocation: string, point: ZonePoint) => onChange({ ...value, workingLocation,
+        serviceArea: { latitude: point.lat, longitude: point.lon, radiusKm: serviceArea?.radiusKm ?? DEFAULT_RADIUS_KM } })
+    const savedPoint = serviceArea ? { lat: serviceArea.latitude, lon: serviceArea.longitude } : null
     const [selectedTradeId, setSelectedTradeId] = useState('')
     const availableTrades = trades.filter(trade => !value.trades.some(selected => selected.tradeId === trade.id))
 
@@ -40,8 +45,11 @@ export default function ProfessionalProfileSection({ value, onChange, onSave, me
             </div>
             <div className="profile-field">
                 <label htmlFor="profile-working-location">Ubicación de trabajo</label>
-                <input id="profile-working-location" value={workingLocation} onChange={event => setWorkingLocation(event.target.value)} />
-                <ZonePicker query={workingLocation} onChoose={setWorkingLocation} locateSaved />
+                <input id="profile-working-location" value={workingLocation} onChange={event => typeWorkingLocation(event.target.value)} />
+                <ZonePicker query={workingLocation} onChoose={chooseWorkingLocation} locateSaved savedPoint={savedPoint} radiusKm={serviceArea?.radiusKm} />
+                {serviceArea
+                    ? <RadiusField id="profile-radius" value={serviceArea.radiusKm} onChange={radiusKm => onChange({ ...value, serviceArea: { ...serviceArea, radiusKm } })} />
+                    : <small role="status">Marcá en el mapa hasta dónde llegás para aparecer en las búsquedas por cercanía: elegí una sugerencia o tocá el mapa.</small>}
             </div>
             <div className="profile-field">
                 <label htmlFor="profile-trade-select">Oficios que realizás</label>
@@ -60,8 +68,8 @@ export default function ProfessionalProfileSection({ value, onChange, onSave, me
                         <button type="button" onClick={() => onChange({ ...value, trades: value.trades.filter(item => item.tradeId !== trade.tradeId) })}>Quitar</button>
                     </div>
                     <div className="profile-trade-prices">
-                        <label>Tarifa mínima por hora<input type="number" min="0" step="0.01" value={trade.minimumHourlyWage} onChange={event => updateTrade(trade.tradeId, { minimumHourlyWage: event.target.value })} /></label>
-                        <label>Tarifa máxima por hora<input type="number" min="0" step="0.01" value={trade.maximumHourlyWage} onChange={event => updateTrade(trade.tradeId, { maximumHourlyWage: event.target.value })} /></label>
+                        <label>Tarifa mínima por hora<input type="number" min="0.01" step="0.01" value={trade.minimumHourlyWage} onChange={event => updateTrade(trade.tradeId, { minimumHourlyWage: event.target.value })} /></label>
+                        <label>Tarifa máxima por hora<input type="number" min="0.01" step="0.01" value={trade.maximumHourlyWage} onChange={event => updateTrade(trade.tradeId, { maximumHourlyWage: event.target.value })} /></label>
                     </div>
                 </div>)}
             </div>

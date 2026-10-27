@@ -72,8 +72,7 @@
   font-size: 16px;
 }
 
-.profile-summary__rating .icon,
-.reviews-summary .icon {
+.profile-summary__rating .icon {
   width: 30px;
   height: 30px;
   color: #ffad00;
@@ -312,8 +311,20 @@
   margin-bottom: 13px;
   color: #5273b8;
 }
-.reviews-summary .icon { width: 42px; height: 42px; }
 .reviews-summary strong { color: #0a225e; font-size: 36px; }
+.reviews-summary > div { display: grid; gap: 5px; }
+.reviews-summary p { margin: 0; font-size: 14px; }
+.profile-reviews { list-style: none; padding: 0; margin: 22px 0 0; }
+.profile-review { display: flex; gap: 16px; padding: 22px 0; border-top: 1px solid #dfe7ee; }
+.profile-review__avatar { width: 48px; height: 48px; flex-shrink: 0; border-radius: 50%; object-fit: cover; background: #e7f2eb; }
+.profile-review__body { min-width: 0; }
+.profile-review h3 { margin: 0 0 7px; color: #0a225e; font-size: 16px; overflow-wrap: anywhere; }
+.profile-review p { margin: 10px 0 0; color: #5273b8; font-size: 15px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.profile-reviews__more, .profile-reviews__error button { border: 1px solid #b7dcc8; border-radius: 9px; padding: 10px 18px; color: #067038; background: #f3faf6; font: inherit; font-weight: 600; cursor: pointer; }
+.profile-reviews__more:hover, .profile-reviews__error button:hover { background: #dff7e7; }
+.profile-reviews__more:focus-visible, .profile-reviews__error button:focus-visible { outline: 3px solid rgba(7, 152, 76, .25); outline-offset: 3px; }
+.profile-reviews__more:disabled, .profile-reviews__error button:disabled { opacity: .6; cursor: default; }
+.profile-reviews__error p { color: #b42318; line-height: 1.5; }
 
 .profile-status {
   display: grid;

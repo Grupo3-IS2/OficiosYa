@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { getCountryCodes, parseCountryCodes } from '../src/services/countryCodes.ts'
+import { flagUrl, getCountryCodes, parseCountryCodes } from '../src/services/countryCodes.ts'
 
 const country = (cca2: string, spa: string, root: string, suffixes: string[]) =>
     ({ cca2, name: { common: spa }, translations: { spa: { common: spa } }, idd: { root, suffixes } })
@@ -17,7 +17,6 @@ test('the prefix joins root and suffix, and area codes under +1 or +7 are left o
     assert.deepEqual(parsed.map(item => [item.iso, item.dial]),
         [['ax', '+358'], ['ag', '+1268'], ['va', '+379'], ['us', '+1'], ['ru', '+7'], ['uy', '+598']])
 })
-
 test('countries without a prefix, and malformed entries, are left out; names are sorted in Spanish', () => {
     const parsed = parseCountryCodes([
         country('AQ', 'Antártida', '', []),
@@ -35,4 +34,9 @@ test('a failed or empty answer is an error, so the page falls back to writing th
     await assert.rejects(getCountryCodes(answer(503, {})))
     await assert.rejects(getCountryCodes(answer(200, [])))
     assert.equal((await getCountryCodes(answer(200, [country('UY', 'Uruguay', '+5', ['98'])])))[0].dial, '+598')
+})
+
+test('flagUrl builds the SVG flag link for the ISO code', () => {
+    assert.equal(flagUrl('uy'), 'https://flagcdn.com/uy.svg')
+    assert.equal(flagUrl('ar'), 'https://flagcdn.com/ar.svg')
 })

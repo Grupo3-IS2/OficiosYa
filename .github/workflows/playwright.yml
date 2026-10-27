@@ -19,7 +19,7 @@ jobs:
         cp .env.example .env
         # The suite registers dozens of accounts from one IP, each with an emailed code:
         # lift the per-IP limit and shorten the resend cooldown so the resend cases can run.
-        for setting in RATE_LIMIT_AUTH_PER_MINUTE=100000 VERIFICATION_RESEND_COOLDOWN_SECONDS=3; do
+        for setting in RATE_LIMIT_AUTH_PER_MINUTE=100000 RATE_LIMIT_LOGIN_PER_MINUTE=100000 VERIFICATION_RESEND_COOLDOWN_SECONDS=3; do
           sed -i "/^${setting%%=*}=/d" .env
           echo "$setting" >> .env
         done
@@ -28,12 +28,26 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
+        cache: npm
+        cache-dependency-path: |
+          test/package-lock.json
+          frontend/package-lock.json
     - name: Install dependencies
       # No lifecycle scripts: Playwright doesn't need any, its browsers are installed in the next step.
       run: npm ci --ignore-scripts
+    - name: Playwright version
+      id: playwright
+      run: echo "version=$(./node_modules/.bin/playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+    - name: Cache Playwright browsers
+      id: browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}-chromium
     - name: Install Playwright Browsers
-      # The binary from the lockfile, never one npx would download.
-      run: ./node_modules/.bin/playwright install --with-deps
+      if: steps.browsers.outputs.cache-hit != 'true'
+      timeout-minutes: 10
+      run: ./node_modules/.bin/playwright install chromium
     - name: Run Playwright tests
       run: ./node_modules/.bin/playwright test
     - name: Backend logs

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { blockExternalMaps, mockProfileViewer } from '../support/ui';
 
 const profileId = '66666666-6666-4666-8666-666666666666';
@@ -6,7 +6,7 @@ const profileId = '66666666-6666-4666-8666-666666666666';
 function professional(trades: { tradeId: number; tradeName: string }[]) {
   return {
     id: profileId, name: 'Elena Electricista', profileImageUrl: null, workingLocation: 'Pocitos, Montevideo',
-    description: 'Instalaciones y reparaciones eléctricas.', rating: null,
+    description: 'Instalaciones y reparaciones eléctricas.', rating: null, serviceArea: null,
     expertiseTrades: trades.map((trade, index) => ({ id: index + 1, ...trade, minimumHourlyWage: 500, maximumHourlyWage: 900 })),
   };
 }
@@ -19,6 +19,15 @@ async function openProfile(page: Page, trades: { tradeId: number; tradeName: str
   await page.route(`**/api/v1/professionals/${profileId}`, route => route.fulfill({ json: professional(trades) }));
   await page.goto(`/profesionales/${profileId}${query}`);
   await expect(page.getByRole('heading', { name: 'Elena Electricista' })).toBeVisible();
+}
+
+/** The timeframe the client asks for: a week from now, so it's always in the future. */
+async function fillWhen(dialog: Locator) {
+  const day = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  await dialog.getByLabel('Fecha').fill(`${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`);
+  await dialog.getByLabel('Desde').fill('09:00');
+  await dialog.getByLabel('Hasta').fill('11:00');
 }
 
 test('"Solicitar servicio" works without choosing a service first: it is chosen in the request', async ({ page }) => {
@@ -40,6 +49,7 @@ test('"Solicitar servicio" works without choosing a service first: it is chosen 
 
   await dialog.getByLabel(/¿Dónde se realizará el trabajo\?/).fill('Av. Brasil 2500');
   await dialog.getByLabel(/Monto del servicio/).fill('1200');
+  await fillWhen(dialog);
   await dialog.getByLabel('Descripción').fill('Cambiar un tomacorriente');
   await dialog.getByRole('button', { name: 'Enviar solicitud' }).click();
   await expect(dialog.getByText('Seleccioná un oficio.')).toBeVisible();
@@ -49,8 +59,13 @@ test('"Solicitar servicio" works without choosing a service first: it is chosen 
   await dialog.getByRole('button', { name: 'Enviar solicitud' }).click();
 
   // Once sent, the dialog is titled after it
-  await expect(page.getByRole('dialog', { name: 'Solicitud enviada' })).toContainText('482731');
+  const success = page.getByRole('dialog', { name: 'Solicitud enviada' });
+  await expect(success).toBeVisible();
+  await expect(success).not.toContainText('482731');
+  await expect(success.getByRole('button', { name: 'Copiar PIN' })).toHaveCount(0);
+  await expect(success.getByRole('button', { name: 'Ver mis solicitudes' })).toBeVisible();
   expect(sent).toMatchObject({ professionalId: profileId, tasks: [{ tradeId: 5, description: 'Cambiar un tomacorriente' }] });
+  expect(sent).toHaveProperty('startTimestamp');
 });
 
 test('a service chosen on the profile comes already selected in the request', async ({ page }) => {
@@ -103,10 +118,12 @@ test('the job location gets the same help as a professional\'s zone: suggestions
   await expect(location).toHaveValue(chosen);
   await expect(dialog.getByRole('list', { name: 'Lugares encontrados' })).toHaveCount(0);
 
+  // The recommended timeframe is optional: left blank, it isn't sent
   await dialog.getByLabel(/Monto del servicio/).fill('900');
   await dialog.getByLabel('Descripción').fill('Revisar el tablero');
   await dialog.getByRole('button', { name: 'Enviar solicitud' }).click();
 
   await expect(page.getByRole('dialog', { name: 'Solicitud enviada' })).toBeVisible();
   expect(sent).toMatchObject({ location: chosen });
+  expect(sent).not.toHaveProperty('startTimestamp');
 });

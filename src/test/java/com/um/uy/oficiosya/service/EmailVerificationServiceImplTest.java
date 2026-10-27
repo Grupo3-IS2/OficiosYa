@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -75,6 +76,17 @@ class EmailVerificationServiceImplTest {
     }
 
     @Test
+    void holdCode_storesACodeButMailsNothing() {
+        when(repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(EMAIL, VerificationPurpose.REGISTER))
+                .thenReturn(Optional.empty());
+
+        service.holdCode(EMAIL, VerificationPurpose.REGISTER, null);
+
+        verify(repository).save(any(VerificationCode.class));
+        verify(emailSenderService, never()).sendVerificationCode(anyString(), anyString(), any());
+    }
+
+    @Test
     void sendCode_beforeTheCooldownElapsed_isRejected() {
         VerificationCode recent = VerificationCode.builder()
                 .email(EMAIL)
@@ -90,6 +102,23 @@ class EmailVerificationServiceImplTest {
                 () -> service.sendCode(EMAIL, VerificationPurpose.REGISTER, USER_ID, PAYLOAD));
 
         verify(repository, times(0)).save(any());
+    }
+
+    @Test
+    void sendCode_afterAUsedCode_ignoresTheCooldown() {
+        VerificationCode used = VerificationCode.builder()
+                .email(EMAIL)
+                .purpose(VerificationPurpose.REGISTER)
+                .lastSentAt(OffsetDateTime.now())
+                .consumed(true)
+                .build();
+
+        when(repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(EMAIL, VerificationPurpose.REGISTER))
+                .thenReturn(Optional.of(used));
+
+        service.sendCode(EMAIL, VerificationPurpose.REGISTER, null, PAYLOAD);
+
+        verify(repository).save(any(VerificationCode.class));
     }
 
     @Test

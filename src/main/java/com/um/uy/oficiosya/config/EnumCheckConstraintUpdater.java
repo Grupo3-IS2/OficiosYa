@@ -20,8 +20,10 @@ public class EnumCheckConstraintUpdater implements CommandLineRunner {
     static final String STATUS_VALUES =
             "'PROPOSED', 'ACCEPTED', 'RESCHEDULE_REQUESTED', 'REJECTED', 'CANCELLED', 'COMPLETED'";
     static final String PAYMENT_STATE_VALUES = "'PENDING', 'RETAINED', 'PAID', 'REFUNDED'";
-    static final String PURPOSE_VALUES = "'REGISTER', 'EMAIL_CHANGE', 'PASSWORD_SETUP', 'ACCOUNT_DELETION'";
+    static final String PURPOSE_VALUES = "'REGISTER', 'EMAIL_CHANGE', 'PASSWORD_SETUP', 'ACCOUNT_DELETION', 'PASSWORD_RESET'";
 
+    private static final String EXPIRED_TO_CANCELLED =
+            "UPDATE job_request SET status = 'CANCELLED' WHERE status = 'EXPIRED'";
     private static final String DROP_STATUS_CHECK =
             "ALTER TABLE job_request DROP CONSTRAINT IF EXISTS job_request_status_check";
     private static final String ADD_STATUS_CHECK =
@@ -38,6 +40,10 @@ public class EnumCheckConstraintUpdater implements CommandLineRunner {
             "ALTER TABLE verification_codes ADD CONSTRAINT verification_codes_purpose_check CHECK (purpose IN ("
                     + PURPOSE_VALUES + "))";
 
+    /** Nullable since a professional's proposal has no PIN until the client accepts it; update never drops a NOT NULL. */
+    private static final String PIN_HASH_NULLABLE =
+            "ALTER TABLE job_request ALTER COLUMN confirmation_pin_hash DROP NOT NULL";
+
     private final JdbcTemplate jdbcTemplate;
 
     public EnumCheckConstraintUpdater(JdbcTemplate jdbcTemplate) {
@@ -48,10 +54,12 @@ public class EnumCheckConstraintUpdater implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         jdbcTemplate.execute(DROP_STATUS_CHECK);
+        jdbcTemplate.execute(EXPIRED_TO_CANCELLED);
         jdbcTemplate.execute(ADD_STATUS_CHECK);
         jdbcTemplate.execute(DROP_PAYMENT_STATE_CHECK);
         jdbcTemplate.execute(ADD_PAYMENT_STATE_CHECK);
         jdbcTemplate.execute(DROP_PURPOSE_CHECK);
         jdbcTemplate.execute(ADD_PURPOSE_CHECK);
+        jdbcTemplate.execute(PIN_HASH_NULLABLE);
     }
 }

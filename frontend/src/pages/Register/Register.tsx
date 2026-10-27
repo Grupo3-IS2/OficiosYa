@@ -2,12 +2,14 @@ import { useEffect, useState, type SubmitEvent } from 'react'
 import Button from '../../components/Button/Button'
 import GoogleButton from '../../components/GoogleButton/GoogleButton'
 import PhoneField from '../../components/PhoneField/PhoneField'
-import ZonePicker from '../../components/ZonePicker/ZonePicker'
+import ZonePicker, { type ZonePoint } from '../../components/ZonePicker/ZonePicker'
+import RadiusField, { DEFAULT_RADIUS_KM } from '../../components/RadiusField/RadiusField'
 import Icon from '../../components/Icon/Icon'
 import { googleRegister, register } from '../../services/authService'
 import { profileFromCredential, takeGoogleSignup } from '../../services/googleCredential'
 import { isGoogleEnabled } from '../../services/googleIdentity'
 import type { AccountType, PendingVerification } from '../../types/Auth'
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '../../services/passwordPolicy'
 import { joinSpanish, missingToRegister } from './registerRequirements'
 import VerifyEmailStep from './VerifyEmailStep'
 import './Register.css'
@@ -62,6 +64,9 @@ function Register() {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [location, setLocation] = useState('')
+  // Where on the map the zone was chosen: null while it is only typed, and then no area is sent.
+  const [point, setPoint] = useState<ZonePoint | null>(null)
+  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM)
   // Whole, with the country's prefix: "+59899123456".
   const [phoneNumber, setPhoneNumber] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -76,6 +81,7 @@ function Register() {
   const [googleNotice, setGoogleNotice] = useState('')
 
   const missing = () => missingToRegister(accountType, phoneNumber, location, acceptedTerms)
+  const serviceArea = point ? { latitude: point.lat, longitude: point.lon, radiusKm } : null
 
   const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -107,6 +113,7 @@ function Register() {
           accountType,
           location: accountType === 'professional' ? location.trim() : null,
           phoneNumber: accountType === 'professional' ? phoneNumber : null,
+          serviceArea: accountType === 'professional' ? serviceArea : null,
         },
       )
 
@@ -189,7 +196,7 @@ function Register() {
         credential,
         accountType,
         accountType === 'professional'
-          ? { phoneNumber, workingLocation: location.trim() }
+          ? { phoneNumber, workingLocation: location.trim(), ...(serviceArea && { serviceArea }) }
           : undefined,
         chosenName.trim() !== googleName ? chosenName.trim() : undefined,
       )
@@ -296,12 +303,16 @@ function Register() {
                 <input
                   id="register-location"
                   value={location}
-                  onChange={(event) => setLocation(event.target.value)}
+                  onChange={(event) => { setLocation(event.target.value); setPoint(null) }}
                   required
                   placeholder="Ej. Cordón, Montevideo"
                 />
               </div>
-              <ZonePicker query={location} onChoose={setLocation} />
+              <ZonePicker query={location} onChoose={(label, chosen) => { setLocation(label); setPoint(chosen) }}
+                radiusKm={point ? radiusKm : undefined} />
+              {point
+                ? <RadiusField id="register-radius" value={radiusKm} onChange={setRadiusKm} />
+                : <small className="register-hint">Elegí una sugerencia o tocá el mapa para marcar desde dónde trabajás y hasta dónde llegás.</small>}
             </>
           )}
 
@@ -315,9 +326,10 @@ function Register() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  minLength={8}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  maxLength={MAX_PASSWORD_LENGTH}
                   required
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres`}
                 />
                 <button
                   type="button"
@@ -336,7 +348,8 @@ function Register() {
                   type={showConfirmation ? 'text' : 'password'}
                   value={confirmation}
                   onChange={(event) => setConfirmation(event.target.value)}
-                  minLength={8}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  maxLength={MAX_PASSWORD_LENGTH}
                   required
                   placeholder="Repetí tu contraseña"
                 />

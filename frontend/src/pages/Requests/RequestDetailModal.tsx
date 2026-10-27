@@ -1,15 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../components/Button/Button'
 import Icon from '../../components/Icon/Icon'
+import RatingStars from '../../components/RatingStars/RatingStars'
 import ZoneMap from '../../components/ZoneMap/ZoneMap'
 import { useZoneLookup } from '../../components/ZoneMap/useZoneLookup'
+import { getCurrentUser } from '../../services/authService'
 import type { JobRequest, JobStatus, PaymentState } from '../../types/JobRequest'
 import CancelRequestSection from './CancelRequestSection'
+import CompleteRequestSection from './CompleteRequestSection'
 import RequestResponseSection, { type ResponseMode } from './RequestResponseSection'
-import type { Decision, RequestOutcome } from './requestResponse'
-import { answersReschedule, rescheduleRequester } from './requestList'
+import { canCompleteRequest, type Decision, type RequestOutcome } from './requestResponse'
+import { answersReschedule, outsideServiceAreaNote, rescheduleRequester } from './requestList'
 import { timeframeText } from './rescheduleTimeframe'
+import { canRateRequest } from './ratingForm'
 import './RequestDetailModal.css'
 
 const statusLabels: Record<JobStatus, string> = {
@@ -28,10 +32,17 @@ const paymentLabels: Record<PaymentState, string> = {
     REFUNDED: 'Reintegrado',
 }
 
-/** Where the job is done, on the map, so both sides can see how to get there. */
-function JobLocationMap({ location }: Readonly<{ location: string }>) {
-    const map = useZoneLookup(location)
-    if (map.status === 'found') return <ZoneMap focus={map.place} label={`Mapa de ${location}`} />
+/**
+ * Where the job is done, on the map, so both sides can see how to get there; with the professional's
+ * area around it, to see whether it reaches. The point chosen on the map if there is one, otherwise
+ * the address is looked up.
+ */
+function JobLocationMap({ request }: Readonly<{ request: JobRequest }>) {
+    const { location, latitude, longitude, professionalServiceArea: area } = request
+    const point = useMemo(() => latitude != null && longitude != null ? { lat: latitude, lon: longitude } : null, [latitude, longitude])
+    const map = useZoneLookup(point ? '' : location)
+    const focus = point ?? (map.status === 'found' ? map.place : null)
+    if (focus) return <ZoneMap focus={focus} radiusKm={area?.radiusKm} areaCentre={area ? { lat: area.latitude, lon: area.longitude } : undefined} label={`Mapa de ${location}`} />
     return <output className="request-detail-map-placeholder">
         {map.status === 'loading' && 'Buscando la dirección en el mapa…'}
         {map.status === 'not-found' && 'No pudimos ubicar esta dirección en el mapa.'}
@@ -61,21 +72,26 @@ const dateFormatter = new Intl.DateTimeFormat('es-UY', {
     timeZone: 'America/Montevideo',
 })
 
-export default function RequestDetailModal({ request, isClient, pin, initialResponse, onClose, onAnswered, onReviewReschedule, onReschedule }: Readonly<{
+export default function RequestDetailModal({ request, isClient, pin, initialResponse, initialScrollTop = 0, onRate, onClose, onAnswered, onReviewReschedule, onReschedule }: Readonly<{
     request: JobRequest
     isClient: boolean
     pin: string | null
     /** Opened from the card's "Aceptar" or "Rechazar": that form comes already open. */
     initialResponse?: ResponseMode
+    initialScrollTop?: number
+    onRate?: (scrollTop: number) => void
     onClose: () => void
-    /** Accepted or rejected by the professional, or cancelled by the client, from here. */
+    /** The updated request after accepting, rejecting, cancelling or completing. */
     onAnswered: (updated: JobRequest, outcome: RequestOutcome) => void
     /** Shows the change to confirm accepting or rejecting a reschedule the other side asked for. */
     onReviewReschedule: (request: JobRequest, decision: Decision) => void
     /** Opens the form to propose a new timeframe for an accepted job, over the detail. */
     onReschedule: (request: JobRequest) => void
 }>) {
+    const outsideNote = outsideServiceAreaNote(request, isClient)
     const dialogRef = useRef<HTMLDialogElement>(null)
+    const bodyRef = useRef<HTMLDivElement>(null)
+    const restoredScroll = useRef(initialScrollTop)
     const feedbackTimeout = useRef<number | null>(null)
     const [copyFeedback, setCopyFeedback] = useState('')
     // While an answer is on its way the modal stays open, so its outcome isn't lost
@@ -85,8 +101,10 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
     const needsAnswer = !isClient && request.status === 'PROPOSED'
     const canCancel = (isClient ? cancellableByClient : cancellableByProfessional).includes(request.status)
     const answersChange = answersReschedule(request, isClient ? 'CLIENT' : 'PROFESSIONAL')
+    const canShowPin = isClient && (request.status === 'ACCEPTED' || request.status === 'RESCHEDULE_REQUESTED')
+    const canComplete = canCompleteRequest(request, getCurrentUser()?.id)
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const dialog = dialogRef.current
         if (!dialog) return
 
@@ -94,6 +112,7 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
         const previousBodyOverflow = document.body.style.overflow
         const previousRootOverflow = document.documentElement.style.overflow
         dialog.showModal()
+        if (bodyRef.current) bodyRef.current.scrollTop = restoredScroll.current
         document.body.style.overflow = 'hidden'
         document.documentElement.style.overflow = 'hidden'
 
@@ -102,12 +121,12 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
             dialog.close()
             document.body.style.overflow = previousBodyOverflow
             document.documentElement.style.overflow = previousRootOverflow
-            if (previousFocus instanceof HTMLElement) previousFocus.focus()
+            if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus()
         }
     }, [])
 
     async function copyPin() {
-        if (!pin) return
+        if (!canShowPin || !pin) return
         try {
             await navigator.clipboard.writeText(pin)
             setCopyFeedback('PIN copiado')
@@ -138,7 +157,10 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                 </button>
             </header>
 
-            <div className="request-detail-modal__body">
+            <div className="request-detail-modal__body" ref={bodyRef}>
+                {canComplete && !cancelling && <CompleteRequestSection
+                    request={request} onCompleted={onAnswered} onBusyChange={setAnswering}
+                />}
                 {needsAnswer && <RequestResponseSection
                     request={request}
                     initialMode={initialResponse}
@@ -161,8 +183,8 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                         <strong>{withoutArticle(timeframeText(request.rescheduleStart, request.rescheduleEnd))}</strong>.
                     </p>}
                     <div className="request-response__actions">
-                        <Button type="button" variant="ghost" className="request-detail-reject" onClick={() => onReviewReschedule(request, 'reject')}>Rechazar</Button>
-                        <Button type="button" onClick={() => onReviewReschedule(request, 'accept')}>Aceptar</Button>
+                        <Button type="button" variant="ghost" className="request-detail-reject" disabled={answering} onClick={() => onReviewReschedule(request, 'reject')}>Rechazar</Button>
+                        <Button type="button" disabled={answering} onClick={() => onReviewReschedule(request, 'accept')}>Aceptar</Button>
                     </div>
                 </section>}
 
@@ -201,7 +223,11 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                 <section className="request-detail-section">
                     <h3>Trabajo</h3>
                     <p className="request-detail-location"><Icon name="location" />{request.location}</p>
-                    <div className="request-detail-map"><JobLocationMap location={request.location} /></div>
+                    {outsideNote && <p className="request-detail-outside">{outsideNote}</p>}
+                    <div className="request-detail-map"><JobLocationMap request={request} /></div>
+                    {request.professionalServiceArea && <p className="request-detail-muted">
+                        El círculo es {isClient ? `la zona que cubre ${request.professionalName}` : 'tu zona de trabajo'} (hasta {request.professionalServiceArea.radiusKm} km).
+                    </p>}
                     <div className="request-detail-tasks">
                         {request.tasks.map((task, index) => <article key={task.id}>
                             <span>Tarea {index + 1}</span>
@@ -234,12 +260,26 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                     {request.professionalPhoneNumber && <p><Icon name="phone" />{request.professionalPhoneNumber}</p>}
                 </section>}
 
-                <section className="request-detail-pin" aria-labelledby="request-pin-title">
+                {request.status === 'COMPLETED' ? <section className={`request-detail-finished${request.rating != null ? ' request-detail-finished--rated' : ''}`}>
+                    <div>
+                        <h3>{request.rating != null ? 'Trabajo finalizado y calificado' : 'Trabajo finalizado'}</h3>
+                        <p>{request.rating != null
+                            ? isClient ? 'El PIN fue confirmado y tu valoración fue enviada correctamente.' : 'El PIN fue confirmado y el cliente ya calificó el trabajo.'
+                            : 'El PIN fue confirmado y el trabajo quedó completado.'}</p>
+                        {request.rating != null && <div className="request-detail-review">
+                            <RatingStars rating={request.rating} />
+                            {request.review && <p>{request.review}</p>}
+                        </div>}
+                    </div>
+                    {onRate && canRateRequest(request, getCurrentUser()?.id) && <Button type="button" onClick={() => onRate(bodyRef.current?.scrollTop ?? 0)}>Calificar</Button>}
+                </section> : !(canComplete && !cancelling) && <section className="request-detail-pin" aria-labelledby="request-pin-title">
                     <div>
                         <h3 id="request-pin-title">PIN de confirmación</h3>
-                        {isClient && pin && <output>{pin}</output>}
+                        {canShowPin && pin && <output>{pin}</output>}
                     </div>
-                    {isClient && pin
+                    {isClient && request.status === 'PROPOSED'
+                        ? <p>Una vez que el profesional acepte la solicitud se mostrará el PIN.</p>
+                        : canShowPin && pin
                         ? <>
                             <p>Mostrale este PIN al profesional cuando el trabajo esté terminado.</p>
                             <Button type="button" variant="ghost" onClick={() => void copyPin()}>
@@ -248,14 +288,14 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                             <span className="request-detail-pin__feedback" aria-live="polite">{copyFeedback}</span>
                         </>
                         : isClient
-                            ? <p>Este PIN solo se entrega al crear la solicitud. No está disponible en este navegador.</p>
+                            ? <p>{canShowPin ? 'No pudimos cargar el PIN de confirmación.' : 'Esta solicitud ya no requiere un PIN de confirmación.'}</p>
                             : <p>El PIN lo conserva el cliente y debe mostrártelo cuando el trabajo esté terminado.</p>}
-                </section>
+                </section>}
             </div>
 
             <footer className="request-detail-modal__footer">
                 {canCancel && !cancelling && <Button type="button" variant="ghost" className="request-detail-cancel"
-                    onClick={() => setCancelling(true)}>Cancelar solicitud</Button>}
+                    disabled={answering} onClick={() => setCancelling(true)}>Cancelar solicitud</Button>}
                 {/* As on the card: only an accepted job has a timeframe to move, and either side can ask */}
                 {request.status === 'ACCEPTED' && !cancelling && <Button type="button" variant="ghost"
                     disabled={answering} onClick={() => onReschedule(request)}>Reagendar</Button>}

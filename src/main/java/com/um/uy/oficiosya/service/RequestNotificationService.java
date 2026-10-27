@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -93,6 +94,62 @@ public class RequestNotificationService {
                 current, timeframe(job.getRescheduleStart(), job.getRescheduleEnd()), siteUrl) + SIGNATURE;
 
         emailSender.sendNotification(recipient.getEmail(), "Te pidieron cambiar el horario de un trabajo", body);
+    }
+
+    /**
+     * Tells both sides what happened to the job, who did it and its timeframe; {@code change} null
+     * means it was just proposed. Never the PIN. A reschedule asked for is left to
+     * {@link #notifyRescheduleRequested}, which already tells the side that has to answer it.
+     */
+    @Transactional(readOnly = true)
+    public void notifyJobChanged(Long jobRequestId, JobRequestEvents.Change change, UUID actorId) {
+        if (change == JobRequestEvents.Change.RESCHEDULE_REQUESTED) return;
+        JobRequest job = jobRequestRepository.findById(jobRequestId).orElse(null);
+        if (job == null) return;
+
+        Client actor = actorOf(job, change, actorId);
+        String what = switch (change) {
+            case null -> "propuso un trabajo";
+            case ACCEPTED -> "aceptó el trabajo";
+            case REJECTED -> "rechazó el trabajo";
+            case CANCELLED -> "canceló el trabajo";
+            case RESCHEDULE_ACCEPTED -> "aceptó el cambio de horario del trabajo";
+            case RESCHEDULE_REJECTED -> "rechazó el cambio de horario del trabajo";
+            case COMPLETED -> "marcó como completado el trabajo";
+            case RESCHEDULE_REQUESTED -> null;
+        };
+        String event = actor.getName() + " " + what;
+
+        // The scheduled block once accepted, otherwise the timeframe the professional offered
+        String when = job.getSchedules().stream()
+                .filter(schedule -> schedule.getType() == ScheduleType.SCHEDULED_JOB)
+                .findFirst()
+                .map(schedule -> timeframe(schedule.getStartTimestamp(), schedule.getEndTimestamp()))
+                .orElse(job.getProposedStart() != null
+                        ? timeframe(job.getProposedStart(), job.getProposedEnd()) : "a confirmar");
+
+        for (Client recipient : List.of(job.getClient(), job.getProfessional())) {
+            if (!recipient.isEmailNotifications()) continue;
+            String body = """
+                    Hola %s,
+
+                    %s "%s" (%s).
+
+                    Horario: %s
+
+                    Mirá el detalle en Mis solicitudes:
+                    %s/mis-solicitudes
+                    """.formatted(recipient.getName(), event, service(job), job.getLocation(), when, siteUrl) + SIGNATURE;
+            emailSender.sendNotification(recipient.getEmail(), "Novedades de un trabajo en OficiosYa", body);
+        }
+    }
+
+    /** Who made the change: whoever proposed it for a new job. */
+    private static Client actorOf(JobRequest job, JobRequestEvents.Change change, UUID actorId) {
+        if (change == null) {
+            return job.getProposedBy() == Role.PROFESSIONAL ? job.getProfessional() : job.getClient();
+        }
+        return job.getClient().getPublicId().equals(actorId) ? job.getClient() : job.getProfessional();
     }
 
     /**

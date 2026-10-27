@@ -143,6 +143,7 @@
 .service-request-remove-task:hover { color: #ad2a21; }
 
 .service-request-error { display: block; margin-top: 6px; color: #ba3329; font-size: 12px; line-height: 1.35; }
+.service-request-outside { margin: 10px 0 0; padding: 10px 12px; border-radius: 8px; color: #8a4f00; background: #fff7e5; font-size: 14px; line-height: 1.4; }
 .service-request-submit-error { margin: 18px 0 0; padding: 12px 14px; border-radius: 8px; color: #9f2f27; background: #fff1ef; font-size: 14px; line-height: 1.4; }
 
 .service-request-modal__footer {
@@ -191,8 +192,8 @@
 .service-request-success__pin strong { color: #07984c; font-size: 16px; }
 .service-request-success__pin output { margin: 6px 0 8px; color: #006743; font-size: clamp(42px, 9vw, 55px); font-weight: 800; line-height: 1; letter-spacing: 3px; }
 .service-request-success__pin p { max-width: 430px; margin: 0 auto; color: #5f7185; font-size: 14px; line-height: 1.45; }
-.service-request-success__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 24px; }
-.service-request-success__actions .button { min-height: 48px; border-radius: 8px; font-size: 14px; }
+.service-request-success__actions { display: grid; grid-template-columns: 1fr; justify-items: center; gap: 14px; margin-top: 24px; }
+.service-request-success__actions .button { width: min(100%, 280px); min-height: 48px; border-radius: 8px; font-size: 14px; }
 .service-request-success__actions .button--ghost { color: #526178; background: #eef1f4; }
 .service-request-success__actions .icon { width: 19px; height: 19px; vertical-align: -4px; }
 .service-request-success__feedback { min-height: 20px; margin: 8px 0 -8px; color: #07984c; font-size: 13px; }
@@ -214,3 +215,13 @@
 @media (max-width: 380px) {
   .service-request-modal__footer { grid-template-columns: 1fr; }
 }
+
+.service-request-when { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; padding: 0; border: 0; }
+.service-request-when legend { grid-column: 1 / -1; margin-bottom: 8px; padding: 0; color: #102557; font-size: 14px; font-weight: 700; }
+.service-request-when label { display: grid; gap: 5px; color: #51647b; font-size: 13px; }
+.service-request-when .service-request-when__date,
+.service-request-when .service-request-error { grid-column: 1 / -1; }
+.service-request-when input { min-height: 44px; padding: 9px 12px; border: 1px solid #cad6e1; border-radius: 8px; color: #1a2d4e; background: #fff; outline: none; font: inherit; }
+.service-request-when input:focus { border-color: #07984c; box-shadow: 0 0 0 3px rgb(7 152 76 / 12%); }
+.service-request-when input[aria-invalid="true"] { border-color: #d94b3d; }
+.service-request-when .service-request-when__hint { grid-column: 1 / -1; margin: -4px 0 2px; color: #60728a; font-size: 13px; }

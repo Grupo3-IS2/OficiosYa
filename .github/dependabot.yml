@@ -12,12 +12,16 @@ updates:
   - package-ecosystem: "maven"
     directory: "/" # El pom.xml del backend está en la raíz del repositorio.
     schedule:
-      interval: "weekly"
+      interval: "daily"
     target-branch: "dev"
+    groups:
+      # jjwt-api/impl/jackson deben ir siempre en la misma versión.
+      jjwt:
+        patterns: ["io.jsonwebtoken:*"]
 
-  # 3. Docker Compose (imágenes base de los servicios)
-  - package-ecosystem: "docker-compose"
-    directory: "/" # Carpeta donde se encuentra tu docker-compose.yml
+  # 3. Docker (imagen base del Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/" # El Dockerfile está en la raíz del repositorio.
     schedule:
       interval: "weekly"
     target-branch: "dev"

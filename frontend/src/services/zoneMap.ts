@@ -405,3 +405,11 @@ export async function lookupBestZone(
   }
   return null
 }
+
+/** Great-circle (Haversine) distance in km between two points: the same the backend computes. */
+export function distanceKm(from: { lat: number; lon: number }, to: { lat: number; lon: number }): number {
+  const radians = (degrees: number) => degrees * Math.PI / 180
+  const h = Math.sin(radians(to.lat - from.lat) / 2) ** 2
+    + Math.cos(radians(from.lat)) * Math.cos(radians(to.lat)) * Math.sin(radians(to.lon - from.lon) / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.sqrt(h))
+}

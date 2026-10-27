@@ -2,6 +2,7 @@ package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
+import com.um.uy.oficiosya.dto.request.ServiceAreaRequest;
 import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
 import com.um.uy.oficiosya.dto.response.LoginResponse;
@@ -79,16 +80,18 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Override
     public PendingVerificationResponse startRegistration(ClientCreateRequest request) {
-        return start(request, Role.CLIENT, null, null);
+        return start(request, Role.CLIENT, null, null, null);
     }
 
     @Override
     public PendingVerificationResponse startRegistration(ProfessionalCreateRequest request) {
-        return start(request, Role.PROFESSIONAL, request.getPhoneNumber(), request.getWorkingLocation());
+        return start(request, Role.PROFESSIONAL, request.getPhoneNumber(), request.getWorkingLocation(),
+                request.getServiceArea());
     }
 
     private PendingVerificationResponse start(ClientCreateRequest request, Role accountType,
-                                              String phoneNumber, String workingLocation) {
+                                              String phoneNumber, String workingLocation,
+                                              ServiceAreaRequest serviceArea) {
         String email = normalize(request.getEmail());
 
         // Hashed before looking at the email so an existing one doesn't answer any faster.
@@ -97,11 +100,12 @@ public class RegistrationServiceImpl implements RegistrationService {
         // Without a code step there is no pending answer that hides the account: creating it fails instead.
         if (verificationEnabled && clientRepository.existsByEmailIgnoreCase(email)) {
             log.info("Registration started for an email that already has an account, nothing sent");
+            emailVerificationService.holdCode(email, VerificationPurpose.REGISTER, null);
             return pendingResponse(email);
         }
 
         PendingRegistration pending = new PendingRegistration(
-                accountType, request.getName(), passwordHash, phoneNumber, workingLocation);
+                accountType, request.getName(), passwordHash, phoneNumber, workingLocation, serviceArea);
 
         if (!verificationEnabled) {
             return PendingVerificationResponse.builder()
@@ -143,6 +147,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                             .email(email)
                             .phoneNumber(pending.phoneNumber())
                             .workingLocation(pending.workingLocation())
+                            .serviceArea(pending.serviceArea())
                             .build(),
                     pending.passwordHash());
             case ADMIN -> throw new IllegalStateException("An admin cannot register through the public flow");
@@ -166,11 +171,10 @@ public class RegistrationServiceImpl implements RegistrationService {
 
         boolean hasAccount = clientRepository.existsByEmailIgnoreCase(email);
 
-        if (!hasAccount) {
-            emailVerificationService.findPending(email, VerificationPurpose.REGISTER)
-                    .ifPresent(pending -> emailVerificationService.sendCode(
-                            email, VerificationPurpose.REGISTER, null, pending.payload()));
-        }
+        emailVerificationService.findPending(email, VerificationPurpose.REGISTER).ifPresent(pending -> {
+            if (hasAccount) emailVerificationService.holdCode(email, VerificationPurpose.REGISTER, null);
+            else emailVerificationService.sendCode(email, VerificationPurpose.REGISTER, null, pending.payload());
+        });
 
         return pendingResponse(email);
     }

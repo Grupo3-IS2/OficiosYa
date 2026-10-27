@@ -4,12 +4,11 @@ import com.um.uy.oficiosya.entity.VerificationPurpose;
 import com.um.uy.oficiosya.service.interfaces.EmailSenderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @Slf4j
@@ -24,6 +23,11 @@ public class EmailSenderServiceImpl implements EmailSenderService {
         this.mailSender = mailSender;
     }
 
+    /**
+     * Async: the answer can't wait on the mail server, or how long it takes (or a failure) would
+     * tell an address without an account, which gets mailed, from one that has an account and doesn't.
+     */
+    @Async
     @Override
     public void sendVerificationCode(String to, String code, VerificationPurpose purpose) {
         SimpleMailMessage message = new SimpleMailMessage();
@@ -35,9 +39,8 @@ public class EmailSenderServiceImpl implements EmailSenderService {
         try {
             mailSender.send(message);
         } catch (MailException e) {
+            // Nobody waits for this answer: the user can ask for the code again
             log.error("Failed to send a verification email to {}", to, e);
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "No pudimos enviar el correo de verificación, intentá de nuevo en unos minutos");
         }
     }
 
@@ -64,6 +67,7 @@ public class EmailSenderServiceImpl implements EmailSenderService {
             case EMAIL_CHANGE -> "Confirmá tu nuevo correo de OficiosYa";
             case PASSWORD_SETUP -> "Creá tu contraseña de OficiosYa";
             case ACCOUNT_DELETION -> "Confirmá que querés eliminar tu cuenta de OficiosYa";
+            case PASSWORD_RESET -> "Restablecé tu contraseña de OficiosYa";
         };
     }
 
@@ -72,12 +76,14 @@ public class EmailSenderServiceImpl implements EmailSenderService {
             case REGISTER -> "para activar tu cuenta";
             case EMAIL_CHANGE -> "para confirmar tu nuevo correo";
             case PASSWORD_SETUP -> "para crear la contraseña de tu cuenta";
-            case ACCOUNT_DELETION -> "para eliminar tu cuenta (si no lo pediste vos, ignorá este correo)";
+            case ACCOUNT_DELETION -> "para eliminar tu cuenta";
+            case PASSWORD_RESET -> "para elegir una contraseña nueva";
         };
 
         return """
                 Tu código de verificación %s es: %s
-
+                Si no lo pediste vos, ignorá este correo.
+                
                 Equipo de OficiosYa
                 """.formatted(action, code);
     }

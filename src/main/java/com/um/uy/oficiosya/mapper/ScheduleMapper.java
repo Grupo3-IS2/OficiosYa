@@ -12,9 +12,19 @@ public interface ScheduleMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "professional", ignore = true)
     @Mapping(target = "jobRequest", ignore = true)
+    @Mapping(target = "recurrenceEnd", ignore = true)
     Schedule toEntity(ScheduleCreateRequest dto);
 
     @Mapping(target = "professionalId", source = "professional.publicId")
     @Mapping(target = "jobRequestId", source = "jobRequest.id")
     ScheduleResponse toResponse(Schedule schedule);
+
+    default ScheduleResponse toOccurrenceResponse(Schedule schedule, Schedule.Occurrence occurrence) {
+        ScheduleResponse response = toResponse(schedule);
+        if (response != null && occurrence != null) {
+            response.setStartTimestamp(occurrence.startTimestamp());
+            response.setEndTimestamp(occurrence.endTimestamp());
+        }
+        return response;
+    }
 }

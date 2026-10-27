@@ -1,8 +1,13 @@
+import type { ZonePoint } from '../../components/ZonePicker/ZonePicker'
 import type { Professional } from '../../types/Professional'
 import type { DayRange } from './professionalAvailability.ts'
 
 export interface ProfessionalFilters {
     location: string
+    /** Where the service is needed, chosen on the map: only professionals whose area covers it. */
+    point: ZonePoint | null
+    /** "A menos de X km", from the point: only with one. */
+    maxDistanceKm: number | null
     minimumPrice: number | null
     maximumPrice: number | null
     minimumRating: number | null
@@ -17,6 +22,8 @@ export interface PriceRange {
 
 export const emptyProfessionalFilters: ProfessionalFilters = {
     location: '',
+    point: null,
+    maxDistanceKm: null,
     minimumPrice: null,
     maximumPrice: null,
     minimumRating: null,

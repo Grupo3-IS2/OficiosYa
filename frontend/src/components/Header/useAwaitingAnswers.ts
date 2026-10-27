@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getCurrentUser } from '../../services/authService'
 import { getMyJobRequests } from '../../services/jobRequestService'
 import { awaitsAnswerFrom } from '../../pages/Requests/requestList'
+import { onChatEvent } from '../../services/chatSocket'
 
 const EVENT = 'oficiosya:awaiting-answers'
 const REQUESTS_PATH = '/mis-solicitudes'
@@ -19,9 +20,15 @@ export function publishAwaitingAnswers(count: number): void {
     window.dispatchEvent(new CustomEvent<number>(EVENT, { detail: count }))
 }
 
+function countAwaiting(): Promise<number> {
+    const viewerId = getCurrentUser()?.id
+    return getMyJobRequests().then(requests => requests.filter(request => awaitsAnswerFrom(request, viewerId)).length)
+}
+
 /**
  * How many requests wait for the logged in user's answer (the same as "Por responder"), for the
- * alert on the header's "Mis solicitudes". It is asked once per page load; it is not live.
+ * alert on the header's "Mis solicitudes". It is asked once per page load, and again when a job
+ * changes (the socket's job-updates) or pushes may have been missed.
  */
 export function useAwaitingAnswers(enabled: boolean): number {
     const [count, setCount] = useState(known ?? 0)
@@ -30,11 +37,16 @@ export function useAwaitingAnswers(enabled: boolean): number {
         if (!enabled) return
         const follow = (event: Event) => setCount((event as CustomEvent<number>).detail)
         window.addEventListener(EVENT, follow)
+        // On Mis solicitudes the page reloads on these pushes itself and publishes the count
+        const stopLive = window.location.pathname === REQUESTS_PATH
+            ? () => {}
+            : onChatEvent(event => {
+                if (event !== 'message') countAwaiting().then(publishAwaitingAnswers).catch(() => {})
+            })
 
         // On Mis solicitudes the page loads the requests itself and publishes the count
         if (known === null && window.location.pathname !== REQUESTS_PATH) {
-            const viewerId = getCurrentUser()?.id
-            lookup ??= getMyJobRequests().then(requests => requests.filter(request => awaitsAnswerFrom(request, viewerId)).length)
+            lookup ??= countAwaiting()
             let active = true
             lookup
                 .then(found => {
@@ -46,9 +58,13 @@ export function useAwaitingAnswers(enabled: boolean): number {
             return () => {
                 active = false
                 window.removeEventListener(EVENT, follow)
+                stopLive()
             }
         }
-        return () => window.removeEventListener(EVENT, follow)
+        return () => {
+            window.removeEventListener(EVENT, follow)
+            stopLive()
+        }
     }, [enabled])
 
     return enabled ? count : 0

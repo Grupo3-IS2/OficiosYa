@@ -52,6 +52,37 @@ function tomorrow() {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+test('a pending request hides even a saved PIN and explains when it becomes visible', async ({ page }) => {
+  await page.addInitScript(id => {
+    localStorage.setItem(`oficiosya_job_request_pins:${id}`, JSON.stringify({ 71: '482731' }));
+  }, clientId);
+  const dialog = await openRequests(page, clientId);
+  await expect(dialog.getByText('Una vez que el profesional acepte la solicitud se mostrará el PIN.')).toBeVisible();
+  await expect(dialog).not.toContainText('482731');
+  await expect(dialog).not.toContainText('navegador');
+  await expect(dialog.getByRole('button', { name: 'Copiar PIN' })).toHaveCount(0);
+});
+
+for (const status of ['ACCEPTED', 'RESCHEDULE_REQUESTED']) {
+  test(`the creator can see and copy a saved PIN after acceptance (${status})`, async ({ page }) => {
+    await page.addInitScript(id => {
+      localStorage.setItem(`oficiosya_job_request_pins:${id}`, JSON.stringify({ 71: '482731' }));
+    }, clientId);
+    const dialog = await openRequests(page, clientId, proposedRequest({ status }));
+    await expect(dialog.getByText('482731', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Copiar PIN' })).toBeVisible();
+  });
+}
+
+test('the professional cannot see the client PIN even when it is saved on the same browser', async ({ page }) => {
+  await page.addInitScript(id => {
+    localStorage.setItem(`oficiosya_job_request_pins:${id}`, JSON.stringify({ 71: '482731' }));
+  }, clientId);
+  const dialog = await openRequests(page, professionalId, proposedRequest({ status: 'ACCEPTED' }));
+  await expect(dialog).not.toContainText('482731');
+  await expect(dialog.getByRole('button', { name: 'Copiar PIN' })).toHaveCount(0);
+});
+
 test('the professional accepts a request choosing when to do the job', async ({ page }) => {
   let sent: Record<string, string> | null = null;
   await page.route('**/api/v1/job-requests/71/accept', async route => {
@@ -208,6 +239,43 @@ test('the professional is not offered to cancel a request still pending: "Rechaz
 test('a completed request cannot be cancelled', async ({ page }) => {
   const dialog = await openRequests(page, clientId, proposedRequest({ status: 'COMPLETED' }));
   await expect(dialog.getByRole('button', { name: 'Cancelar solicitud' })).toHaveCount(0);
+});
+
+test('SCRUM-25: a client rates a completed job and the updated rating is visible publicly', async ({ page }) => {
+  const completed = proposedRequest({ status: 'COMPLETED', rating: null, review: null });
+  let sent: Record<string, unknown> | null = null;
+  await page.route('**/api/v1/job-requests/71/review', async route => {
+    sent = route.request().postDataJSON();
+    await route.fulfill({ json: { ...completed, rating: 9, review: 'Excelente servicio.' } });
+  });
+  await listRequests(page, clientId, [completed], 'CLIENT');
+  await page.getByRole('button', { name: 'Calificar profesional' }).click();
+
+  const rating = page.getByRole('dialog', { name: 'Calificá tu experiencia' });
+  await rating.getByRole('radio', { name: '4,5 de 5 estrellas' }).check();
+  await rating.getByLabel('Contanos tu experiencia').fill('  Excelente servicio.  ');
+  await rating.getByRole('button', { name: 'Enviar valoración' }).click();
+
+  await expect(page.getByRole('heading', { name: '¡Gracias por tu valoración!' })).toBeVisible();
+  expect(sent).toEqual({ rating: 9, review: 'Excelente servicio.' });
+
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await page.route(`**/api/v1/professionals/${professionalId}`, route => route.fulfill({ json: {
+    id: professionalId, name: 'Pablo Profesional', profileImageUrl: null,
+    workingLocation: 'Montevideo', description: 'Soluciones profesionales para tu hogar.',
+    rating: 9, expertiseTrades: [],
+  } }));
+  await page.route(`**/api/v1/professionals/${professionalId}/reviews?**`, route => route.fulfill({ json: {
+    content: [{
+      jobRequestId: 71, clientName: 'Carla Cliente', clientProfileImageUrl: null,
+      professionalId, professionalName: 'Pablo Profesional', rating: 9, review: 'Excelente servicio.',
+    }],
+    number: 0, size: 5, totalElements: 1, totalPages: 1, last: true,
+  } }));
+  await page.route('**/api/v1/schedules?**', route => route.fulfill({ json: [] }));
+  await page.goto(`/profesionales/${professionalId}`);
+  await expect(page.locator('.profile-summary__rating')).toContainText('4,5');
+  await expect(page.locator('.reviews-section')).toContainText('Excelente servicio.');
 });
 
 /** A professional who also hired someone: one request to answer and one of their own, both pending. */

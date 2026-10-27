@@ -1,13 +1,16 @@
 package com.um.uy.oficiosya.controller;
 
 import com.um.uy.oficiosya.config.AuthenticatedUser;
+import com.um.uy.oficiosya.config.ViewerAccess;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.response.PriceRangeResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
+import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
+import com.um.uy.oficiosya.service.interfaces.JobRequestService;
 import com.um.uy.oficiosya.service.interfaces.ProfessionalService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
@@ -32,9 +35,11 @@ import java.util.UUID;
 public class ProfessionalController {
 
     private final ProfessionalService professionalService;
+    private final JobRequestService jobRequestService;
 
-    public ProfessionalController(ProfessionalService professionalService) {
+    public ProfessionalController(ProfessionalService professionalService, JobRequestService jobRequestService) {
         this.professionalService = professionalService;
+        this.jobRequestService = jobRequestService;
     }
 
     /** The caller's full profile, contact data included and whether published or not. */
@@ -52,11 +57,18 @@ public class ProfessionalController {
         return ResponseEntity.ok(professional);
     }
 
-    /** Public view, without email or phone; not found unless the professional is published. */
+    /** Public view, without email or phone; not found unless published, except for the owner and admins. */
     @SecurityRequirements
     @GetMapping("/{id}")
-    public ResponseEntity<ProfessionalPublicResponse> getProfessional(@PathVariable UUID id) {
-        return ResponseEntity.ok(professionalService.getPublicProfessional(id));
+    public ResponseEntity<ProfessionalPublicResponse> getProfessional(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(professionalService.getPublicProfessional(id, ViewerAccess.isOwnerOrAdmin(authentication, id)));
+    }
+
+    @PreAuthorize("hasRole('CLIENT')")
+    @GetMapping("/{id}/reviews")
+    public ResponseEntity<Page<ReviewResponse>> getProfessionalReviews(@PathVariable UUID id,
+                                                                       @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(jobRequestService.getProfessionalReviews(id, pageable));
     }
 
     /**
@@ -75,10 +87,13 @@ public class ProfessionalController {
             @RequestParam(required = false) String query,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime availableFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime availableTo,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lon,
+            @RequestParam(required = false) Integer maxDistanceKm,
             @RequestParam(required = false) ProfessionalSearchFilters.Order order,
             @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
         ProfessionalSearchFilters filters = new ProfessionalSearchFilters(tradeIds, minPrice, maxPrice, minRating,
-                location, query, availableFrom, availableTo, order);
+                location, query, availableFrom, availableTo, lat, lon, maxDistanceKm, order);
         return ResponseEntity.ok(professionalService.searchProfessionals(filters, pageable));
     }
 

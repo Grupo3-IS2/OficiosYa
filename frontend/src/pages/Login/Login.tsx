@@ -1,4 +1,5 @@
-import { useState, type SubmitEvent } from 'react'
+import { useEffect, useState, type SubmitEvent } from 'react'
+import { useSession } from '../../components/SessionProvider/useSession'
 import Button from '../../components/Button/Button'
 import GoogleButton from '../../components/GoogleButton/GoogleButton'
 import Icon from '../../components/Icon/Icon'
@@ -9,7 +10,7 @@ import { isGoogleEnabled } from '../../services/googleIdentity'
 import LinkGoogleModal from './LinkGoogleModal'
 import './Login.css'
 
-function Brand() {
+export function Brand() {
     return (
         <a className="login-brand" href="/" aria-label="OficiosYa inicio">
             <span>
@@ -22,6 +23,10 @@ function Brand() {
 }
 
 function Login() {
+    const { status } = useSession()
+    useEffect(() => {
+        if (status === 'authenticated') window.location.replace('/')
+    }, [status])
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
@@ -32,6 +37,9 @@ function Login() {
     const [credentialToLink, setCredentialToLink] = useState<string | null>(null)
     const [sessionExpired] = useState(
         () => new URLSearchParams(window.location.search).get('expired') === '1',
+    )
+    const [passwordReset] = useState(
+        () => new URLSearchParams(window.location.search).get('reset') === '1',
     )
 
     const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
@@ -78,6 +86,7 @@ function Login() {
         }
     }
 
+    if (status === 'authenticated') return null
     return (
         <main className="login-page">
             <div className="login-decoration login-decoration--top" />
@@ -103,6 +112,12 @@ function Login() {
                 {sessionExpired && (
                     <output className="login-notice">
                         Tu sesión venció. Iniciá sesión nuevamente.
+                    </output>
+                )}
+
+                {passwordReset && (
+                    <output className="login-notice login-notice--success">
+                        Cambiaste tu contraseña. Iniciá sesión con la nueva.
                     </output>
                 )}
 
@@ -143,7 +158,7 @@ function Login() {
                         </button>
                     </div>
 
-                    <a className="forgot-password" href="#forgot-password">
+                    <a className="forgot-password" href="/recuperar-contrasena">
                         ¿Olvidaste tu contraseña?
                     </a>
 

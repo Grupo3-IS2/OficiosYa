@@ -1,4 +1,4 @@
-import { apiRequest } from './api'
+import { apiRequest } from './api.ts'
 import {
   PROFILE_KEY,
   TOKEN_KEY,
@@ -7,8 +7,9 @@ import {
   getToken,
   isTokenUsable,
   storeLogin,
-} from './session'
-import { keepSessionFresh } from './sessionRenewal'
+  notifySessionChange,
+} from './session.ts'
+import { keepSessionFresh } from './sessionRenewal.ts'
 import type {
   AccountType,
   LoginRequest,
@@ -18,7 +19,8 @@ import type {
   RegistrationProfile,
   StoredUser,
   TokenResponse,
-} from '../types/Auth'
+} from '../types/Auth.ts'
+import type { ServiceArea } from '../types/Professional.ts'
 
 /** A new login: the cached profile belonged to whoever was logged in before. */
 function storeSession(response: LoginResponse): void {
@@ -56,6 +58,7 @@ export async function register(
         ...request,
         phoneNumber: profile.phoneNumber,
         workingLocation: profile.location,
+        serviceArea: profile.serviceArea ?? undefined,
       }
     : request
 
@@ -113,7 +116,7 @@ export async function googleLink(credential: string, password: string): Promise<
 export async function googleRegister(
   credential: string,
   accountType: AccountType,
-  professional?: { phoneNumber: string; workingLocation: string },
+  professional?: { phoneNumber: string; workingLocation: string; serviceArea?: ServiceArea },
   name?: string,
 ): Promise<LoginResponse> {
   const isProfessional = accountType === 'professional'
@@ -138,6 +141,27 @@ export async function resendCode(email: string): Promise<PendingVerification> {
   })
 }
 
+/** Same answer whether the email has an account or not; asking again is the resend. */
+export async function startPasswordReset(email: string): Promise<PendingVerification> {
+  return apiRequest<PendingVerification>('/auth/password-reset', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+/** Doesn't log in: every session of the account ends, and the new password is used from the login. */
+export async function completePasswordReset(
+  email: string,
+  code: string,
+  newPassword: string,
+  newPasswordConfirmation: string,
+): Promise<void> {
+  await apiRequest('/auth/password-reset/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, newPassword, newPasswordConfirmation }),
+  })
+}
+
 export async function verifyToken(): Promise<TokenResponse> {
   return apiRequest<TokenResponse>('/auth/verify')
 }
@@ -151,13 +175,14 @@ export async function logout(): Promise<void> {
   try {
     await apiRequest<unknown>('/auth/logout', { method: 'POST' })
   } catch { /* already invalid or backend unreachable: clearing locally is all that is left */ }
-  clearSession()
+  clearSession('/')
 }
 
 /** Follows a logout done in another tab: localStorage changes there fire `storage` here. */
 export function watchSessionFromOtherTabs(): void {
   window.addEventListener('storage', event => {
     if (event.storageArea !== localStorage) return
+    if (event.key === TOKEN_KEY || event.key === USER_KEY || event.key === null) notifySessionChange()
     if ((event.key === TOKEN_KEY || event.key === null) && event.oldValue !== null && !getToken()) {
       window.location.href = '/login'
     }
@@ -167,6 +192,7 @@ export function watchSessionFromOtherTabs(): void {
 export function updateStoredUser(user: StoredUser): void {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
   localStorage.removeItem(PROFILE_KEY)
+  notifySessionChange()
 }
 
 /**

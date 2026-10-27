@@ -153,8 +153,9 @@ class RegistrationServiceImplTest {
         PendingVerificationResponse free = service.startRegistration(clientRequest());
 
         assertEquals(free, taken);
-        // Only the second call sent a code.
+        // Only the second call sent a code; the first one holds an unsent code, for the same cooldown
         verify(emailVerificationService).sendCode(anyString(), any(), any(), anyString());
+        verify(emailVerificationService).holdCode(EMAIL, VerificationPurpose.REGISTER, null);
     }
 
     @Test
@@ -304,13 +305,15 @@ class RegistrationServiceImplTest {
     }
 
     @Test
-    void resendCode_whenTheAccountAlreadyExists_sendsNothing() {
+    void resendCode_whenTheAccountAlreadyExists_sendsNothingButHoldsANewCode() {
         when(clientRepository.existsByEmailIgnoreCase(EMAIL)).thenReturn(true);
+        when(emailVerificationService.findPending(EMAIL, VerificationPurpose.REGISTER))
+                .thenReturn(Optional.of(new VerificationResult(null, null)));
 
         service.resendCode(ResendCodeRequest.builder().email(EMAIL).build());
 
-        assertTrue(true);
         verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());
+        verify(emailVerificationService).holdCode(EMAIL, VerificationPurpose.REGISTER, null);
     }
 
     private ClientResponse clientResponse(UUID publicId, Role role) {

@@ -74,9 +74,8 @@ function VerifyEmailStep({ pending, onResent, onChangeEmail, onVerified }: Verif
       <p className="register-eyebrow">VERIFICÁ TU CORREO</p>
       <h1 id="register-title">Ingresá el código</h1>
       <p className="register-intro">
-        Te enviamos un código de {pending.codeLength} dígitos a <strong>{pending.email}</strong>.
+        Si no existe una cuenta con <strong>{pending.email}</strong>, te enviamos un código de {pending.codeLength} dígitos.
         Vence en {expiresInMinutes} {expiresInMinutes === 1 ? 'minuto' : 'minutos'}.
-        Tu cuenta se crea cuando lo ingreses.
       </p>
 
       <form className="register-form" onSubmit={handleSubmit}>

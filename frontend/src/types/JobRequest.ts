@@ -24,6 +24,9 @@ export interface JobRequest {
     paymentState?: PaymentState
     status: JobStatus
     tasks: JobTask[]
+    /** The timeframe the proposing side asked for, while the proposal waits for an answer. */
+    proposedStart?: string | null
+    proposedEnd?: string | null
     /** The agreed timeframe; null until the professional accepts. */
     scheduledStart?: string | null
     scheduledEnd?: string | null
@@ -50,6 +53,9 @@ export interface JobRequestTaskInput {
 
 export interface CreateJobRequestPayload {
     professionalId: string
+    /** The timeframe the client recommends, if any; the professional confirms or changes it when accepting. */
+    startTimestamp?: string
+    endTimestamp?: string
     location: string
     paymentAmount: number
     tasks: JobRequestTaskInput[]

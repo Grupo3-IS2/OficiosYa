@@ -214,3 +214,13 @@
 @media (max-width: 380px) {
   .service-request-modal__footer { grid-template-columns: 1fr; }
 }
+
+.service-request-when { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; padding: 0; border: 0; }
+.service-request-when legend { grid-column: 1 / -1; margin-bottom: 8px; padding: 0; color: #102557; font-size: 14px; font-weight: 700; }
+.service-request-when label { display: grid; gap: 5px; color: #51647b; font-size: 13px; }
+.service-request-when .service-request-when__date,
+.service-request-when .service-request-error { grid-column: 1 / -1; }
+.service-request-when input { min-height: 44px; padding: 9px 12px; border: 1px solid #cad6e1; border-radius: 8px; color: #1a2d4e; background: #fff; outline: none; font: inherit; }
+.service-request-when input:focus { border-color: #07984c; box-shadow: 0 0 0 3px rgb(7 152 76 / 12%); }
+.service-request-when input[aria-invalid="true"] { border-color: #d94b3d; }
+.service-request-when .service-request-when__hint { grid-column: 1 / -1; margin: -4px 0 2px; color: #60728a; font-size: 13px; }

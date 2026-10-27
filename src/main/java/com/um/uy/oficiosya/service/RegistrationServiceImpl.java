@@ -97,6 +97,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         // Without a code step there is no pending answer that hides the account: creating it fails instead.
         if (verificationEnabled && clientRepository.existsByEmailIgnoreCase(email)) {
             log.info("Registration started for an email that already has an account, nothing sent");
+            emailVerificationService.holdCode(email, VerificationPurpose.REGISTER, null);
             return pendingResponse(email);
         }
 
@@ -166,11 +167,10 @@ public class RegistrationServiceImpl implements RegistrationService {
 
         boolean hasAccount = clientRepository.existsByEmailIgnoreCase(email);
 
-        if (!hasAccount) {
-            emailVerificationService.findPending(email, VerificationPurpose.REGISTER)
-                    .ifPresent(pending -> emailVerificationService.sendCode(
-                            email, VerificationPurpose.REGISTER, null, pending.payload()));
-        }
+        emailVerificationService.findPending(email, VerificationPurpose.REGISTER).ifPresent(pending -> {
+            if (hasAccount) emailVerificationService.holdCode(email, VerificationPurpose.REGISTER, null);
+            else emailVerificationService.sendCode(email, VerificationPurpose.REGISTER, null, pending.payload());
+        });
 
         return pendingResponse(email);
     }

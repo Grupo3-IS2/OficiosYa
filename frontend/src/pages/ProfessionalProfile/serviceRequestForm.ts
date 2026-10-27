@@ -1,10 +1,13 @@
+import { rescheduleTimeframe, type RescheduleDraft } from '../Requests/rescheduleForm.ts'
+
 export interface ServiceRequestTaskDraft {
     id: number
     tradeId: number
     description: string
 }
 
-export interface ServiceRequestFormValue {
+/** date, startTime and endTime: optional, the timeframe the client recommends, which the professional starts from when accepting. */
+export interface ServiceRequestFormValue extends RescheduleDraft {
     location: string
     paymentAmount: string
     tasks: ServiceRequestTaskDraft[]
@@ -17,6 +20,7 @@ export interface ServiceRequestTaskErrors {
 
 export interface ServiceRequestFormErrors {
     location?: string
+    timeframe?: string
     paymentAmount?: string
     tasks?: string
     taskErrors: ServiceRequestTaskErrors[]
@@ -31,11 +35,13 @@ export function initialTradeId(availableTradeIds: number[], preferredTradeId: nu
     return availableTradeIds.length === 1 ? availableTradeIds[0] : 0
 }
 
-export function validateServiceRequest(value: ServiceRequestFormValue): ServiceRequestFormErrors {
+export function validateServiceRequest(value: ServiceRequestFormValue, now = new Date()): ServiceRequestFormErrors {
     const errors: ServiceRequestFormErrors = { taskErrors: [] }
     const amount = Number(value.paymentAmount)
+    const timeframe = requestedTimeframe(value, now)
 
     if (!value.location.trim()) errors.location = 'Ingresá la dirección o ubicación.'
+    if (timeframe && 'error' in timeframe) errors.timeframe = timeframe.error
     if (!value.paymentAmount.trim()) errors.paymentAmount = 'Ingresá el monto del servicio.'
     else if (!Number.isFinite(amount) || amount < 0) errors.paymentAmount = 'El monto no puede ser negativo.'
     if (value.tasks.length === 0) errors.tasks = 'Agregá al menos una tarea.'
@@ -48,9 +54,16 @@ export function validateServiceRequest(value: ServiceRequestFormValue): ServiceR
     return errors
 }
 
+/** The timeframe the client recommends, null when they left it blank. */
+export function requestedTimeframe(value: RescheduleDraft, now = new Date()): ReturnType<typeof rescheduleTimeframe> | null {
+    if (!value.date && !value.startTime && !value.endTime) return null
+    return rescheduleTimeframe(value, {}, now)
+}
+
 export function hasServiceRequestErrors(errors: ServiceRequestFormErrors): boolean {
     return Boolean(
         errors.location
+        || errors.timeframe
         || errors.paymentAmount
         || errors.tasks
         || errors.taskErrors.some(task => task.tradeId || task.description),

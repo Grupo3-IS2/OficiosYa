@@ -24,7 +24,7 @@ public class JobRequestCreateRequest {
 
     private UUID clientId;
 
-    /** Only when a professional proposes (with clientId); a client's proposal gets its timeframe when accepted. */
+    /** Required when a professional proposes; optional for a client, as the timeframe they'd like, which the professional confirms or changes. */
     private OffsetDateTime startTimestamp;
     private OffsetDateTime endTimestamp;
 

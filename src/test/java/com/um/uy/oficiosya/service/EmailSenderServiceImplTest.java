@@ -10,11 +10,10 @@ import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -65,13 +64,11 @@ class EmailSenderServiceImplTest {
     }
 
     @Test
-    void whenTheMailServerFails_theAnswerIsA503() {
+    void whenTheMailServerFails_itIsOnlyLogged() {
         doThrow(new MailSendException("smtp down")).when(mailSender).send(any(SimpleMailMessage.class));
 
-        ResponseStatusException e = assertThrows(ResponseStatusException.class,
-                () -> service.sendVerificationCode("ana@example.com", "123456", VerificationPurpose.REGISTER));
-
-        assertEquals(503, e.getStatusCode().value());
+        // Sent in the background: nobody is waiting for an answer to give an error to
+        assertDoesNotThrow(() -> service.sendVerificationCode("ana@example.com", "123456", VerificationPurpose.REGISTER));
     }
 
     @Test

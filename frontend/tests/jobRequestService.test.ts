@@ -51,6 +51,8 @@ function bodyAt(index = 0): unknown {
 test('creates a request with the service payload and reads the current user requests', async () => {
     const payload = {
         professionalId: 'professional-uuid',
+        startTimestamp: '2030-05-06T09:00:00.000Z',
+        endTimestamp: '2030-05-06T11:00:00.000Z',
         location: 'Av. Italia 1234',
         paymentAmount: 2500,
         tasks: [{ tradeId: 4, description: 'Reparar la pérdida de agua.' }],

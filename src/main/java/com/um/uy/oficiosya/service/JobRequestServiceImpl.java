@@ -156,9 +156,17 @@ public class JobRequestServiceImpl implements JobRequestService {
             jobRequest.setProposedStart(request.getStartTimestamp());
             jobRequest.setProposedEnd(request.getEndTimestamp());
         } else {
-            if (request.getStartTimestamp() != null || request.getEndTimestamp() != null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "El horario lo elige el profesional al aceptar el trabajo");
+            // The client's timeframe is only what they'd like: the professional confirms or changes it when accepting
+            if ((request.getStartTimestamp() == null) != (request.getEndTimestamp() == null)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Indicá el inicio y el fin del horario");
+            }
+            if (request.getStartTimestamp() != null) {
+                if (!request.getStartTimestamp().isBefore(request.getEndTimestamp())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El inicio del horario tiene que ser anterior al fin");
+                }
+                requireFuture(request.getStartTimestamp());
+                jobRequest.setProposedStart(request.getStartTimestamp());
+                jobRequest.setProposedEnd(request.getEndTimestamp());
             }
             pin = generatePin();
             jobRequest.setConfirmationPinHash(passwordEncoder.encode(pin));
@@ -216,6 +224,8 @@ public class JobRequestServiceImpl implements JobRequestService {
             }
             requireFuture(request.getStartTimestamp());
             scheduleService.createJobSchedule(jobRequest, request.getStartTimestamp(), request.getEndTimestamp());
+            jobRequest.setProposedStart(null);
+            jobRequest.setProposedEnd(null);
         }
 
         jobRequest.setStatus(JobStatus.ACCEPTED);

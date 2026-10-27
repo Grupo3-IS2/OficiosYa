@@ -6,7 +6,7 @@ const profileId = '66666666-6666-4666-8666-666666666666';
 function professional(trades: { tradeId: number; tradeName: string }[]) {
   return {
     id: profileId, name: 'Elena Electricista', profileImageUrl: null, workingLocation: 'Pocitos, Montevideo',
-    description: 'Instalaciones y reparaciones eléctricas.', rating: null,
+    description: 'Instalaciones y reparaciones eléctricas.', rating: null, serviceArea: null,
     expertiseTrades: trades.map((trade, index) => ({ id: index + 1, ...trade, minimumHourlyWage: 500, maximumHourlyWage: 900 })),
   };
 }

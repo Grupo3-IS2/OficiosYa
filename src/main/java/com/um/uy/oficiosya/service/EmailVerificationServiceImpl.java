@@ -89,7 +89,9 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     /** Stores a new code for the pair after the resend cooldown, and returns it in plain text. */
     private String issue(String normalizedEmail, VerificationPurpose purpose, UUID userId, String payload) {
 
+        // A used code is no longer pending: counting it would answer 429 only for addresses that just signed up
         repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(normalizedEmail, purpose)
+                .filter(previous -> !previous.isConsumed())
                 .ifPresent(previous -> {
                     OffsetDateTime cooldownEnds = previous.getLastSentAt().plusSeconds(resendCooldownSeconds);
                     if (cooldownEnds.isAfter(now())) {

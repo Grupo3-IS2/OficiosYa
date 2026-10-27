@@ -105,6 +105,23 @@ class EmailVerificationServiceImplTest {
     }
 
     @Test
+    void sendCode_afterAUsedCode_ignoresTheCooldown() {
+        VerificationCode used = VerificationCode.builder()
+                .email(EMAIL)
+                .purpose(VerificationPurpose.REGISTER)
+                .lastSentAt(OffsetDateTime.now())
+                .consumed(true)
+                .build();
+
+        when(repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(EMAIL, VerificationPurpose.REGISTER))
+                .thenReturn(Optional.of(used));
+
+        service.sendCode(EMAIL, VerificationPurpose.REGISTER, null, PAYLOAD);
+
+        verify(repository).save(any(VerificationCode.class));
+    }
+
+    @Test
     void sendCode_forARegistration_needsNoUserYet() {
         when(repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(EMAIL, VerificationPurpose.REGISTER))
                 .thenReturn(Optional.empty());

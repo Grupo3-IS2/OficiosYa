@@ -128,6 +128,7 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
                         .email(identity.email())
                         .phoneNumber(request.getPhoneNumber())
                         .workingLocation(request.getWorkingLocation())
+                        .serviceArea(request.getServiceArea())
                         .build(),
                 unusablePasswordHash());
 

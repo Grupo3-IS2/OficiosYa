@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../../components/Button/Button'
 import Icon from '../../../components/Icon/Icon'
-import ZonePicker from '../../../components/ZonePicker/ZonePicker'
+import ZonePicker, { type ZonePoint } from '../../../components/ZonePicker/ZonePicker'
 import { getCurrentUser } from '../../../services/authService'
 import { ApiError } from '../../../services/api'
 import { createJobRequest } from '../../../services/jobRequestService'
 import { saveJobRequestPin } from '../../../services/jobRequestPinStore'
+import { distanceKm } from '../../../services/zoneMap'
 import type { ExpertiseTrade, Professional } from '../../../types/Professional'
 import {
     hasServiceRequestErrors,
@@ -40,6 +41,11 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
         paymentAmount: '',
         tasks: [{ id: 1, tradeId: defaultTradeId, description: '' }],
     })
+    // Where the job is, when chosen on the map: typing the place by hand drops it.
+    const [point, setPoint] = useState<ZonePoint | null>(null)
+    const area = professional.serviceArea
+    // shortcut: the public centre is rounded (~1 km), so right at the edge this can disagree with the backend's exact answer.
+    const outside = point !== null && area !== null && distanceKm(point, { lat: area.latitude, lon: area.longitude }) > area.radiusKm
     const [showErrors, setShowErrors] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [submissionError, setSubmissionError] = useState('')
@@ -107,6 +113,7 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
                 professionalId: professional.id,
                 ...(timeframe && { startTimestamp: timeframe.start.toISOString(), endTimestamp: timeframe.end.toISOString() }),
                 location: value.location.trim(),
+                ...(point && { latitude: point.lat, longitude: point.lon }),
                 paymentAmount: Number(value.paymentAmount),
                 tasks: value.tasks.map(task => ({
                     tradeId: task.tradeId,
@@ -197,16 +204,25 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
                                     aria-invalid={showErrors && Boolean(errors.location)}
                                     aria-describedby={showErrors && errors.location ? 'service-request-location-error' : undefined}
                                     data-autofocus
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setValue(current => ({ ...current, location: event.target.value }))}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                        setValue(current => ({ ...current, location: event.target.value }))
+                                        setPoint(null)
+                                    }}
                                 />
                             </span>
                             {showErrors && errors.location && <small id="service-request-location-error" className="service-request-error">{errors.location}</small>}
                             {/* The same help as when a professional enters their zone: suggestions while typing, or a tap on the map */}
                             <ZonePicker
                                 query={value.location}
-                                onChoose={location => setValue(current => ({ ...current, location }))}
+                                onChoose={(location, chosen) => {
+                                    setValue(current => ({ ...current, location }))
+                                    setPoint(chosen)
+                                }}
                                 mapLabel="Mapa para elegir dónde se realizará el trabajo"
                             />
+                            {outside && area && <p className="service-request-outside" role="status">
+                                Este lugar queda fuera de la zona que cubre {professional.name} (hasta {area.radiusKm} km). Podés enviar la solicitud igual, pero puede que no llegue hasta ahí.
+                            </p>}
                         </div>
 
                         <fieldset className="service-request-field service-request-when"

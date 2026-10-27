@@ -17,6 +17,7 @@ import java.util.List;
 public class ProfessionalResponse extends ClientResponse {
     private String phoneNumber;
     private String workingLocation;
+    private ServiceAreaResponse serviceArea;
     private String description;
     private boolean published;
     private Double rating;

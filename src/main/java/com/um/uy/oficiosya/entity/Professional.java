@@ -2,7 +2,9 @@ package com.um.uy.oficiosya.entity;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Max;
@@ -22,7 +24,7 @@ import java.util.List;
 @Entity
 @Getter
 @Setter
-@Table(name = "professional")
+@Table(name = "professional", indexes = @Index(columnList = "latitude, longitude"))
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -33,6 +35,10 @@ public class Professional extends Client {
 
     @NotBlank
     private String phoneNumber;
+
+    /** Null until the professional picks it: profiles from before it existed have none. */
+    @Embedded
+    private ServiceArea serviceArea;
 
     @Builder.Default
     @OneToMany(mappedBy = "professional")

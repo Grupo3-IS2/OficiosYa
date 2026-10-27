@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.dto.request;
 
 import com.um.uy.oficiosya.validation.annotations.PhoneNumber;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -18,4 +19,8 @@ public class ProfessionalCreateRequest extends ClientCreateRequest {
 
     @NotBlank(message = "La ubicación de trabajo es obligatoria")
     private String workingLocation;
+
+    /** Optional while profiles from before it exist; see {@link ServiceAreaRequest}. */
+    @Valid
+    private ServiceAreaRequest serviceArea;
 }

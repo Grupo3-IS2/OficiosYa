@@ -4,16 +4,18 @@ import type { ProfessionalOrder } from '../professionalOrder'
 
 const options: { value: ProfessionalOrder; label: string; disabled?: boolean }[] = [
     { value: 'relevance', label: 'Relevancia' },
-    { value: 'distance', label: 'Más cercanos', disabled: true },
+    { value: 'distance', label: 'Más cercanos' },
     { value: 'price-asc', label: 'Menor precio' },
     { value: 'price-desc', label: 'Mayor precio' },
     { value: 'rating-desc', label: 'Mejor calificación' },
 ]
 
-export default function SortControl({ value, onChange }: { value: ProfessionalOrder; onChange: (value: ProfessionalOrder) => void }) {
+/** `nearest`: whether there is a point to be near to; without one "Más cercanos" isn't offered. */
+export default function SortControl({ value, onChange, nearest }: { value: ProfessionalOrder; onChange: (value: ProfessionalOrder) => void; nearest: boolean }) {
     const [open, setOpen] = useState(false)
     const container = useRef<HTMLDivElement>(null)
-    const selected = options.find(option => option.value === value) ?? options[0]
+    const shown = options.filter(option => nearest || option.value !== 'distance')
+    const selected = shown.find(option => option.value === value) ?? shown[0]
 
     useEffect(() => {
         if (!open) return
@@ -36,7 +38,7 @@ export default function SortControl({ value, onChange }: { value: ProfessionalOr
             <span>Ordenar por: <strong>{selected.label}</strong></span><Icon name="chevron-down" />
         </button>
         {open && <div className="sort-control__menu" role="listbox" aria-label="Ordenar profesionales">
-            {options.map(option => <button key={option.value} type="button" role="option" aria-selected={value === option.value} disabled={option.disabled} title={option.disabled ? 'Disponible próximamente' : undefined} onClick={() => { onChange(option.value); setOpen(false) }}>
+            {shown.map(option => <button key={option.value} type="button" role="option" aria-selected={value === option.value} disabled={option.disabled} title={option.disabled ? 'Disponible próximamente' : undefined} onClick={() => { onChange(option.value); setOpen(false) }}>
                 <span>{option.label}</span>{value === option.value && <span aria-hidden="true">✓</span>}
             </button>)}
         </div>}

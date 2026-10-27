@@ -6,6 +6,7 @@ const personal = { name: 'Ana', email: 'ana@example.com', phone: '099123456', av
 const professional = {
     description: 'Realizo instalaciones eléctricas.',
     workingLocation: 'Montevideo',
+    serviceArea: null,
     published: false,
     trades: [{ id: 1, tradeId: 2, tradeName: 'Electricidad', minimumHourlyWage: '1000', maximumHourlyWage: '1500' }],
 }
@@ -25,6 +26,23 @@ test('professional changes include description, location, trades and publication
     assert.equal(professionalChanged({ ...professional, published: true }, professional), true)
     assert.equal(professionalChanged({ ...professional, trades: [] }, professional), true)
     assert.equal(professionalChanged({ ...professional, trades: [{ ...professional.trades[0], maximumHourlyWage: '1800' }] }, professional), true)
+})
+
+test('the service area is a change when its point or radius moves, or when it is chosen for the first time', () => {
+    const area = { latitude: -34.9, longitude: -56.16, radiusKm: 10 }
+    const saved = { ...professional, serviceArea: area }
+    assert.equal(professionalChanged({ ...saved, serviceArea: { ...area } }, saved), false)
+    assert.equal(professionalChanged({ ...saved, serviceArea: { ...area, radiusKm: 12 } }, saved), true)
+    assert.equal(professionalChanged({ ...saved, serviceArea: { ...area, latitude: -34.8 } }, saved), true)
+    assert.equal(professionalChanged({ ...professional, serviceArea: area }, professional), true)
+})
+
+test('a saved service area can be moved but not dropped by typing the zone by hand', () => {
+    const saved = { ...professional, serviceArea: { latitude: -34.9, longitude: -56.16, radiusKm: 10 } }
+    assert.match(validateProfessional({ ...saved, workingLocation: 'Pando', serviceArea: null }, saved), /mapa/)
+    assert.equal(validateProfessional({ ...saved, serviceArea: { latitude: -34.78, longitude: -55.86, radiusKm: 5 } }, saved), '')
+    // Profiles from before it existed still save without one.
+    assert.equal(validateProfessional({ ...professional, workingLocation: 'Pando' }, professional), '')
 })
 
 test('publication requires a description and a trade with valid hourly rates', () => {

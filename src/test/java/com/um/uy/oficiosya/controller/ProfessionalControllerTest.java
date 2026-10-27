@@ -122,11 +122,11 @@ class ProfessionalControllerTest {
         OffsetDateTime from = OffsetDateTime.parse("2030-01-02T10:00:00-03:00");
         OffsetDateTime to = OffsetDateTime.parse("2030-01-03T00:00:00-03:00");
         when(professionalService.searchProfessionals(new ProfessionalSearchFilters(List.of(1L, 2L), new BigDecimal("100"), null, 5.0,
-                "Montevideo", "beto", from, to, ProfessionalSearchFilters.Order.RATING_DESC), pageable)).thenReturn(page);
+                "Montevideo", "beto", from, to, -34.9, -56.1, 5, ProfessionalSearchFilters.Order.RATING_DESC), pageable)).thenReturn(page);
 
         ResponseEntity<Page<ProfessionalPublicResponse>> response = new ProfessionalController(professionalService, jobRequestService)
                 .searchProfessionals(List.of(1L, 2L), new BigDecimal("100"), null, 5.0, "Montevideo", "beto",
-                        from, to, ProfessionalSearchFilters.Order.RATING_DESC, pageable);
+                        from, to, -34.9, -56.1, 5, ProfessionalSearchFilters.Order.RATING_DESC, pageable);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(page, response.getBody());

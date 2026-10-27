@@ -120,7 +120,7 @@ function ProfessionalProfilePage({ professionalId, initialTradeId }: Professiona
                         selectedTradeId={selectedTrade?.tradeId ?? null}
                         onSelect={selectTrade}
                     />
-                    <WorkZone workingLocation={professional.workingLocation} />
+                    <WorkZone workingLocation={professional.workingLocation} serviceArea={professional.serviceArea ?? null} />
                     <WeeklyAvailability
                         schedules={scheduleState.professionalId === professionalId ? scheduleState.schedules : []}
                         loading={scheduleState.professionalId !== professionalId || scheduleState.status === 'loading'}

@@ -134,10 +134,16 @@ public class JobRequestServiceImpl implements JobRequestService {
             throw new AccessDeniedException("La conversación con esta persona está bloqueada");
         }
 
+        if ((request.getLatitude() == null) != (request.getLongitude() == null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La ubicación necesita latitud y longitud");
+        }
+
         JobRequest jobRequest = JobRequest.builder()
                 .client(client)
                 .professional(professional)
                 .location(request.getLocation())
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
                 .paymentAmount(request.getPaymentAmount())
                 .proposedBy(byProfessional ? Role.PROFESSIONAL : Role.CLIENT)
                 .build();

@@ -1,3 +1,5 @@
+import type { ServiceArea } from './Professional.ts'
+
 export interface LoginRequest {
   email: string
   password: string
@@ -14,6 +16,7 @@ export interface RegistrationProfile {
   accountType: AccountType
   location: string | null
   phoneNumber: string | null
+  serviceArea?: ServiceArea | null
 }
 
 /**

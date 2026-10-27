@@ -15,7 +15,7 @@ test('every filter goes as the backend names it', () => {
     const params = searchParams({
         query: ' Ana ',
         tradeIds: [3, 5],
-        filters: { location: ' Cordón ', minimumPrice: 300, maximumPrice: 900, minimumRating: 4.5, availability: { from: '2030-01-02', to: '2030-01-03' } },
+        filters: { location: ' Cordón ', point: { lat: -34.9, lon: -56.18 }, maxDistanceKm: 5, minimumPrice: 300, maximumPrice: 900, minimumRating: 4.5, availability: { from: '2030-01-02', to: '2030-01-03' } },
         order: 'price-desc',
     }, 2, 12, wednesday)
 
@@ -26,13 +26,19 @@ test('every filter goes as the backend names it', () => {
     assert.equal(params.get('maxPrice'), '900')
     assert.equal(params.get('minRating'), '9')
     assert.equal(params.get('location'), 'Cordón')
+    assert.equal(params.get('lat'), '-34.9')
+    assert.equal(params.get('lon'), '-56.18')
+    assert.equal(params.get('maxDistanceKm'), '5')
     // From now (the first day already started) to the end of the last day.
     assert.equal(params.get('availableFrom'), wednesday.toISOString())
     assert.equal(params.get('availableTo'), new Date(2030, 0, 4).toISOString())
     assert.equal(params.get('order'), 'PRICE_DESC')
 })
 
-test('orders the backend lacks ("Más cercanos") go as relevance', () => {
+test('nearest first goes only with a point; without one it is relevance', () => {
     assert.equal(searchParams({ ...nothing, order: 'distance' }, 0, 12, wednesday).get('order'), null)
+    const withPoint = { ...nothing, filters: { ...emptyProfessionalFilters, point: { lat: -34.9, lon: -56.18 } }, order: 'distance' as const }
+    assert.equal(searchParams(withPoint, 0, 12, wednesday).get('order'), 'DISTANCE')
+    assert.equal(searchParams(withPoint, 0, 12, wednesday).get('maxDistanceKm'), null)
     assert.equal(searchParams({ ...nothing, order: 'rating-desc' }, 0, 12, wednesday).get('order'), 'RATING_DESC')
 })

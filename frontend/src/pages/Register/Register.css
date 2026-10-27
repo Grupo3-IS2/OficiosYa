@@ -136,3 +136,6 @@
 .register-google-account button { flex: 0 0 auto; border: 0; padding: 4px 0; background: transparent; color: #087f41; font-size: 13px; font-weight: 750; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .register-form input[readonly] { color: #5b6a7d; cursor: default; }
 .register-google-notice { margin: 12px 0 0; border-radius: 10px; padding: 10px 12px; background: #eefaf3; color: #2f5a42; font-size: 13px; line-height: 1.4; }
+
+.register-hint { margin: 8px 0 14px; color: #5b6a7d; font-size: 13px; line-height: 1.4; }
+.register-form .radius-field { margin-bottom: 14px; }

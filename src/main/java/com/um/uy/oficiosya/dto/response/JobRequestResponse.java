@@ -30,6 +30,13 @@ public class JobRequestResponse {
     private String professionalPhoneNumber;
 
     private String location;
+    /** The location's point, when it was chosen on the map; null otherwise. */
+    private Double latitude;
+    private Double longitude;
+    /** Whether the location falls outside the professional's service area; null when it can't be told. */
+    private Boolean outsideServiceArea;
+    /** The area the professional covers, its centre rounded like on their public profile; null if not set. */
+    private ServiceAreaResponse professionalServiceArea;
     private BigDecimal paymentAmount;
     private PaymentState paymentState;
     private JobStatus status;

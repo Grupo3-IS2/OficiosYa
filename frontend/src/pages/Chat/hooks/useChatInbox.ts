@@ -35,13 +35,13 @@ export function useChatInbox(ownerId: string) {
         return () => { mounted.current = false; window.clearTimeout(initial); unsubscribe(); window.removeEventListener('popstate', navigate) }
     }, [refresh])
 
-    const select = (id: number | null) => {
+    const select = useCallback((id: number | null) => {
         const url = new URL(window.location.href)
         if (id === null) url.searchParams.delete('c')
         else url.searchParams.set('c', String(id))
         window.history.pushState(null, '', url)
         setSelectedId(id)
-    }
+    }, [])
     const replace = useCallback((conversation: Conversation) => {
         // A list requested before a block/unblock must not overwrite the mutation's response.
         generation.current += 1

@@ -14,12 +14,17 @@ export default function ChatSidebar({ conversations, selectedId, onSelect, colla
     const visible = collapsed ? conversations : filterConversations(conversations, query)
     return <aside className={`chat-sidebar${collapsed ? ' chat-sidebar--collapsed' : ''}`} aria-label="Conversaciones">
         <div className="chat-sidebar__brand-row">
-            <a className="chat-icon-button chat-exit" href="/" aria-label="Volver al inicio"><Icon name="arrow-left" /></a>
-            <a className="chat-brand" href="/" aria-label="OficiosYa, volver al inicio"><Icon name="wrench" /><span>OficiosYa</span></a>
-            <button className="chat-icon-button chat-collapse" type="button" onClick={onToggle}
-                aria-label={collapsed ? 'Expandir conversaciones' : 'Contraer conversaciones'} aria-expanded={!collapsed}>
-                <Icon name="chevron-down" />
-            </button>
+            {collapsed ? <button className="chat-sidebar-toggle chat-logo-tile" type="button" onClick={onToggle}
+                aria-label="Expandir conversaciones" title="Expandir conversaciones" aria-expanded={false}>
+                <span className="chat-sidebar-toggle__logo"><Icon name="wrench" /></span>
+                <span className="chat-sidebar-toggle__arrow"><Icon name="chevron-down" /></span>
+            </button> : <>
+                <a className="chat-brand" href="/" aria-label="OficiosYa, volver al inicio">
+                    <span className="chat-logo-tile"><Icon name="wrench" /></span><span>OficiosYa</span>
+                </a>
+                <button className="chat-icon-button chat-collapse" type="button" onClick={onToggle}
+                    aria-label="Contraer conversaciones" aria-expanded={true}><Icon name="chevron-down" /></button>
+            </>}
         </div>
         {!collapsed && <label className="chat-search"><Icon name="search" /><input type="search" value={query}
             onChange={event => setQuery(event.target.value)} placeholder="Buscar conversaciones" aria-label="Buscar conversaciones" /></label>}
@@ -35,6 +40,9 @@ export default function ChatSidebar({ conversations, selectedId, onSelect, colla
                 selected={conversation.id === selectedId} onSelect={() => onSelect(conversation.id)} collapsed={collapsed}
                 professional={profiles[conversation.otherParticipant.id]} />)}</ul>
         </div>
+        <footer className="chat-sidebar__footer">
+            <a className="chat-home chat-logo-tile" href="/" aria-label="Volver al inicio" title="Volver al inicio"><Icon name="home" /></a>
+        </footer>
     </aside>
 }
 

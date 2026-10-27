@@ -10,6 +10,17 @@ import './ChatPage.css'
 export default function ChatPage() {
     const me = getCurrentUser()?.id ?? ''
     const inbox = useChatInbox(me)
+    const { selectedId, select } = inbox
+    useEffect(() => {
+        if (selectedId === null) return
+        const escape = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing || document.querySelector('dialog[open]')) return
+            event.preventDefault()
+            select(null)
+        }
+        window.addEventListener('keydown', escape)
+        return () => window.removeEventListener('keydown', escape)
+    }, [selectedId, select])
     const [collapsed, setCollapsed] = useState(false)
     const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 700px)').matches)
     const [viewport, setViewport] = useState<{ height: number, top: number } | undefined>(undefined)
@@ -35,7 +46,8 @@ export default function ChatPage() {
     const sidebarCollapsed = collapsed && !mobile
     const profiles = useChatProfiles(me, inbox.conversations.map(conversation => conversation.otherParticipant.id))
     return <main style={viewport ? { position: 'fixed', top: viewport.top, left: 0, width: '100%', height: viewport.height } : undefined} className={`chat-page${sidebarCollapsed ? ' chat-page--collapsed' : ''}${inbox.selectedId ? ' chat-page--selected' : ''}`}>
-        <ChatSidebar conversations={inbox.conversations} selectedId={inbox.selectedId} onSelect={inbox.select} collapsed={sidebarCollapsed}
+        <ChatSidebar conversations={inbox.conversations} selectedId={inbox.selectedId}
+            onSelect={id => select(id === selectedId ? null : id)} collapsed={sidebarCollapsed}
             onToggle={() => setCollapsed(value => !value)} profiles={profiles} loading={inbox.loading} error={inbox.error} onRetry={() => void inbox.refresh()} />
         {inbox.selectedId ? <ConversationPanel key={inbox.selectedId} id={inbox.selectedId} conversation={inbox.selected}
             professional={inbox.selected ? profiles[inbox.selected.otherParticipant.id] : null} me={me}

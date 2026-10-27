@@ -15,7 +15,7 @@ export default function ConversationHeader({ conversation, professional, canRequ
         if (!open) return
         menu.current?.querySelector<HTMLButtonElement | HTMLAnchorElement>('[role="menuitem"]')?.focus()
         const close = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) setOpen(false) }
-        const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); trigger.current?.focus() } }
+        const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); setOpen(false); trigger.current?.focus() } }
         document.addEventListener('pointerdown', close)
         document.addEventListener('keydown', escape)
         return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', escape) }

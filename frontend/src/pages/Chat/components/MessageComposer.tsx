@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Icon from '../../../components/Icon/Icon'
 import { sendAttempt, type SendAttempt } from '../chatDelivery'
 
@@ -11,6 +11,12 @@ export default function MessageComposer({ disabled, onSend }: Readonly<{
     const failed = useRef<SendAttempt | null>(null)
     const inFlight = useRef(false)
     const input = useRef<HTMLTextAreaElement>(null)
+    const focusWhenReady = useRef(true)
+    useEffect(() => {
+        if (disabled || !focusWhenReady.current) return
+        input.current?.focus()
+        focusWhenReady.current = false
+    }, [disabled])
     useLayoutEffect(() => {
         if (!input.current) return
         input.current.style.height = 'auto'

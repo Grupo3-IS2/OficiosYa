@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.service.interfaces;
 
+import com.um.uy.oficiosya.dto.request.PasswordResetRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
@@ -58,6 +59,22 @@ public interface ClientService {
      * unlink Google). The owner is told by email.
      */
     ClientResponse completePasswordSetup(PasswordSetupRequest request, UUID id);
+    /**
+     * First step of a forgotten password, from the login page: mails a code to {@code email} if it
+     * belongs to an account with a password, and does nothing otherwise. Runs in the background and
+     * never fails to the caller, so neither the answer nor its timing says whether the account exists.
+     */
+    void startPasswordReset(String email);
+
+    /** The answer to {@link #startPasswordReset}: the same for every email. */
+    PendingVerificationResponse passwordResetPending(String email);
+
+    /**
+     * Second step: with that code, the account gets the new password and its owner is told by email.
+     * Answers the account's id, so the caller can end every session it had.
+     */
+    UUID completePasswordReset(PasswordResetRequest request);
+
     ClientResponse changeProfileImage(MultipartFile image, UUID id);
 
     /** Back to no photo: the stored image is deleted too. */

@@ -73,6 +73,7 @@ services:
       VERIFICATION_RESEND_COOLDOWN_SECONDS: ${VERIFICATION_RESEND_COOLDOWN_SECONDS:-60}
       # Per client IP, per minute, on the endpoints that mail or check a code.
       RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-10}
+      RATE_LIMIT_LOGIN_PER_MINUTE: ${RATE_LIMIT_LOGIN_PER_MINUTE:-30}
       # Hours of notice needed to cancel or reschedule an accepted job.
       JOB_MIN_NOTICE_HOURS: ${JOB_MIN_NOTICE_HOURS:-24}
       # Encrypts the chat messages at rest. Required: without it the stored messages couldn't be read back.

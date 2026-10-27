@@ -8,6 +8,7 @@ import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
 import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.request.LoginRequest;
+import com.um.uy.oficiosya.dto.request.PasswordResetRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
@@ -17,6 +18,7 @@ import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.exception.GlobalExceptionHandler;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
+import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.GoogleAuthService;
 import com.um.uy.oficiosya.service.interfaces.RegistrationService;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +65,8 @@ class AuthControllerTest {
     @Mock
     private GoogleAuthService googleAuthService;
     @Mock
+    private ClientService clientService;
+    @Mock
     private RequestRateLimiter rateLimiter;
 
     private MockMvc mvc;
@@ -76,7 +80,7 @@ class AuthControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         mvc = MockMvcBuilders
-                .standaloneSetup(new AuthController(authService, registrationService, googleAuthService, rateLimiter,
+                .standaloneSetup(new AuthController(authService, registrationService, googleAuthService, clientService, rateLimiter,
                         new RefreshTokenCookie(true, 7)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -85,6 +89,46 @@ class AuthControllerTest {
 
     private static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder json(String path, String body) {
         return post(BASE + path).contentType(MediaType.APPLICATION_JSON).content(body);
+    }
+
+    // --- forgotten password ---
+
+    @Test
+    void passwordReset_startsInTheBackgroundAndAnswers202WhateverTheEmail() throws Exception {
+        when(clientService.passwordResetPending("ana@example.com")).thenReturn(pending);
+
+        mvc.perform(json("/password-reset", """
+                        {"email":" Ana@Example.com "}"""))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.email").value("ana@example.com"))
+                .andExpect(jsonPath("$.codeLength").value(6));
+
+        verify(rateLimiter).check(any(), eq("password-reset"));
+        verify(clientService).startPasswordReset("ana@example.com");
+    }
+
+    @Test
+    void passwordResetConfirm_endsEverySessionAndLogsNobodyIn() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(clientService.completePasswordReset(any(PasswordResetRequest.class))).thenReturn(id);
+
+        mvc.perform(json("/password-reset/confirm", """
+                        {"email":"ana@example.com","code":"123456","newPassword":"ClaveNueva2026!","newPasswordConfirmation":"ClaveNueva2026!"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        verify(authService).endSessions(id);
+    }
+
+    @Test
+    void passwordResetConfirm_withAWeakPassword_is400AndTouchesNothing() throws Exception {
+        mvc.perform(json("/password-reset/confirm", """
+                        {"email":"ana@example.com","code":"123456","newPassword":"abc","newPasswordConfirmation":"abc"}"""))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(clientService);
+        verify(authService, never()).endSessions(any());
     }
 
     // --- registration ---
@@ -245,6 +289,18 @@ class AuthControllerTest {
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
 
         verify(authService, never()).startSession(any());
+    }
+
+    @Test
+    void login_pastThePerClientLimit_is429AndChecksNothing() throws Exception {
+        doThrow(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Hiciste demasiados intentos"))
+                .when(rateLimiter).check(any(), eq("login"));
+
+        mvc.perform(json("/login", """
+                        {"email":"ana@example.com","password":"ClaveSegura2026!"}"""))
+                .andExpect(status().isTooManyRequests());
+
+        verify(authService, never()).login(any());
     }
 
     // --- refresh and logout ---

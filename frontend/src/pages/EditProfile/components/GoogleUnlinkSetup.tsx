@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Button from '../../../components/Button/Button'
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_HINT } from '../../../services/passwordPolicy'
 import { completePasswordSetup, startPasswordSetup, unlinkGoogle } from '../../../services/userService'
 import MailedCodeField, { useMailedCode } from './MailedCodeField'
 
@@ -65,9 +66,9 @@ export default function GoogleUnlinkSetup({ email, onDone }: Readonly<{
         <div className="profile-password-grid">
             <div className="profile-field">
                 <label htmlFor="password-setup-new">Nueva contraseña</label>
-                <input id="password-setup-new" type="password" autoComplete="new-password" minLength={8} value={password} disabled={busy}
+                <input id="password-setup-new" type="password" autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} maxLength={MAX_PASSWORD_LENGTH} value={password} disabled={busy}
                     aria-describedby="password-setup-rules" onChange={event => setPassword(event.target.value)} />
-                <small id="password-setup-rules">Usa al menos 8 caracteres, con mayúscula, minúscula, número y símbolo.</small>
+                <small id="password-setup-rules">{PASSWORD_HINT}</small>
             </div>
             <div className="profile-field">
                 <label htmlFor="password-setup-confirm">Confirmar contraseña</label>

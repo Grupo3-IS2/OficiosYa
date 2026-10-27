@@ -293,6 +293,28 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.error).toMatch(/password|contraseña|validaci|bad request|at least|uppercase|lowercase|number|special|mayúsc|minúsc|número|símbolo/i);
   });
 
+  test('API: registro rechaza una contraseña de 14 caracteres', async ({ request }) => {
+    const response = await postJson(request, `${API_BASE}/api/v1/auth/register-client`, {
+      name: 'Cliente Clave Corta',
+      email: uniqueEmail('cliente.clave.corta'),
+      password: 'catorce letras'
+    });
+
+    expect(response.status()).toBe(400);
+    expect((await response.json()).details.password).toMatch(/15 caracteres/);
+  });
+
+  test('API: registro rechaza una contraseña común o filtrada', async ({ request }) => {
+    const response = await postJson(request, `${API_BASE}/api/v1/auth/register-client`, {
+      name: 'Cliente Clave Comun',
+      email: uniqueEmail('cliente.clave.comun'),
+      password: '123456789012345'
+    });
+
+    expect(response.status()).toBe(400);
+    expect((await response.json()).details.password).toMatch(/muy común/);
+  });
+
   test('SCRUM-10: Inicio de sesión con credenciales válidas', async ({ request }) => {
     const payload = {
       name: 'Cliente QA Login',
@@ -463,11 +485,11 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.message).toMatch(/correo es válido|código de verificación/i);
   });
 
-  test('API: contraseña con longitud mínima exacta (8) es válida cuando cumple requisitos', async ({ request }) => {
+  test('API: contraseña con longitud mínima exacta (15) es válida sin reglas de composición', async ({ request }) => {
     const response = await registerClient(request, {
       name: 'Cliente Longitud Exacta',
       email: uniqueEmail('cliente.minlength.exacta'),
-      password: 'Aa1!bcde'
+      password: 'frase de quince'
     });
 
     expect(response.status()).toBe(200);
@@ -480,7 +502,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const response = await registerClient(request, {
       name: 'Cliente Espacios Pass',
       email: uniqueEmail('cliente.password.spaces'),
-      password: '  Aa1!bcde  '
+      password: '  frase de quince  '
     });
 
     expect(response.status()).toBe(200);
@@ -871,7 +893,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
       data: {
         oldPassword: 'ClaveSegura2026!',
         newPassword: 'NuevaClaveSegura2026!',
-        newPasswordConfirmation: 'OtraClave2026!'
+        newPasswordConfirmation: 'OtraClaveSegura2026!'
       }
     });
 

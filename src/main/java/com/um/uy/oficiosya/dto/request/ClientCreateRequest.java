@@ -22,7 +22,7 @@ public class ClientCreateRequest {
 
     @NotBlank(message = "La contraseña es obligatoria")
     @Password
-    @Schema(minLength = 8, description = "Al menos 8 caracteres, con mayúscula, minúscula, número y carácter especial")
+    @Schema(minLength = 15, maxLength = 128, description = "Entre 15 y 128 caracteres, que no sea una contraseña común o filtrada")
     private String password;
 
     private String email;

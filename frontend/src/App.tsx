@@ -1,5 +1,6 @@
 import Home from './pages/Home/Home'
 import Login from './pages/Login/Login'
+import ForgotPassword from './pages/Login/ForgotPassword'
 import Register from './pages/Register/Register'
 import EditProfilePage from './pages/EditProfile/EditProfilePage'
 import RequireAuth from './components/RequireAuth/RequireAuth'
@@ -55,6 +56,10 @@ function App() {
 
     if (currentPath === '/login') {
         return <Login />
+    }
+
+    if (currentPath === '/recuperar-contrasena') {
+        return <ForgotPassword />
     }
 
     if (currentPath === '/register') {

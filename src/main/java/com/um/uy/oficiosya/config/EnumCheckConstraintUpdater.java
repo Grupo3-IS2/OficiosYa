@@ -20,7 +20,7 @@ public class EnumCheckConstraintUpdater implements CommandLineRunner {
     static final String STATUS_VALUES =
             "'PROPOSED', 'ACCEPTED', 'RESCHEDULE_REQUESTED', 'REJECTED', 'CANCELLED', 'COMPLETED'";
     static final String PAYMENT_STATE_VALUES = "'PENDING', 'RETAINED', 'PAID', 'REFUNDED'";
-    static final String PURPOSE_VALUES = "'REGISTER', 'EMAIL_CHANGE', 'PASSWORD_SETUP', 'ACCOUNT_DELETION'";
+    static final String PURPOSE_VALUES = "'REGISTER', 'EMAIL_CHANGE', 'PASSWORD_SETUP', 'ACCOUNT_DELETION', 'PASSWORD_RESET'";
 
     private static final String EXPIRED_TO_CANCELLED =
             "UPDATE job_request SET status = 'CANCELLED' WHERE status = 'EXPIRED'";

@@ -268,7 +268,7 @@ class ClientControllerTest {
         when(authService.restartSessions(userId)).thenReturn("fresh-refresh");
 
         mvc.perform(signedIn(put(BASE + "/password/setup"), """
-                        {"code":"123456","newPassword":"Nueva!Clave1","newPasswordConfirmation":"Nueva!Clave1"}"""))
+                        {"code":"123456","newPassword":"NuevaClaveSegura1","newPasswordConfirmation":"NuevaClaveSegura1"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("nueva@example.com"))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("oficiosya_refresh=fresh-refresh")));

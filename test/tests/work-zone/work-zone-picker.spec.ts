@@ -394,7 +394,7 @@ test.describe('Elegir la zona en el mapa al registrarse', () => {
 
     // A wider radius steps the map back so the whole circle fits.
     await radius.fill('30');
-    await expect(page.locator('.radius-field output')).toHaveText('30 km');
+    await expect(page.locator('.radius-field__selection strong')).toHaveText('30 km');
     await expect.poll(() => currentZoom(picker(page))).toBeLessThan(close);
 
     await page.locator('#register-name').fill('Profesional Radio');

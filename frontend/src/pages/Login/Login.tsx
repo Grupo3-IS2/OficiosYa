@@ -10,7 +10,7 @@ import { isGoogleEnabled } from '../../services/googleIdentity'
 import LinkGoogleModal from './LinkGoogleModal'
 import './Login.css'
 
-function Brand() {
+export function Brand() {
     return (
         <a className="login-brand" href="/" aria-label="OficiosYa inicio">
             <span>
@@ -37,6 +37,9 @@ function Login() {
     const [credentialToLink, setCredentialToLink] = useState<string | null>(null)
     const [sessionExpired] = useState(
         () => new URLSearchParams(window.location.search).get('expired') === '1',
+    )
+    const [passwordReset] = useState(
+        () => new URLSearchParams(window.location.search).get('reset') === '1',
     )
 
     const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
@@ -112,6 +115,12 @@ function Login() {
                     </output>
                 )}
 
+                {passwordReset && (
+                    <output className="login-notice login-notice--success">
+                        Cambiaste tu contraseña. Iniciá sesión con la nueva.
+                    </output>
+                )}
+
                 <form className="login-form" onSubmit={handleSubmit}>
                     <label htmlFor="email">Correo electrónico</label>
                     <div className="login-input-wrap">
@@ -149,7 +158,7 @@ function Login() {
                         </button>
                     </div>
 
-                    <a className="forgot-password" href="#forgot-password">
+                    <a className="forgot-password" href="/recuperar-contrasena">
                         ¿Olvidaste tu contraseña?
                     </a>
 

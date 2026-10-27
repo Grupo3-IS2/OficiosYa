@@ -6,6 +6,7 @@ import {
   mailsTo,
   otherCode,
   startClientRegistration,
+  verifyEmail,
   waitForVerificationCode
 } from '../support/registration';
 import { blockGoogleIdentity } from '../support/ui';
@@ -201,7 +202,9 @@ test.describe('Cambio de correo con código', () => {
     const code = await waitForVerificationCode(request, newEmail);
 
     // Somebody else registers that address before the code is entered.
-    const taken = await completeRegistration(request, await startClientRegistration(request, { name: 'Cliente Se Adelanta', email: newEmail, password: PASSWORD }), newEmail);
+    expect((await startClientRegistration(request, { name: 'Cliente Se Adelanta', email: newEmail, password: PASSWORD })).status()).toBe(202);
+    // The change's email is already in that inbox: the registration code is the second one.
+    const taken = await verifyEmail(request, newEmail, await waitForVerificationCode(request, newEmail, 2));
     expect(taken.status()).toBe(200);
 
     const response = await verifyChange(request, account, newEmail, code);

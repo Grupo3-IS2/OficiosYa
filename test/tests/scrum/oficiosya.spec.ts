@@ -20,21 +20,8 @@ async function postJson(request: APIRequestContext, url: string, payload: unknow
 }
 
 async function completePendingVerification(request: APIRequestContext, email: string) {
-  const inboxResponse = await request.get('http://localhost:8025/api/v1/messages?limit=50');
-  expect(inboxResponse.status()).toBe(200);
-
-  const inbox = await inboxResponse.json();
-  const messages = Array.isArray(inbox?.messages) ? inbox.messages : [];
-  const message = [...messages].reverse().find((item: any) => {
-    const recipients = Array.isArray(item?.To) ? item.To : [];
-    return recipients.some((recipient: any) => recipient?.Address?.toLowerCase() === email.toLowerCase());
-  });
-
-  expect(message).toBeTruthy();
-
-  const snippet = message?.Snippet ?? message?.Text ?? '';
-  const match = snippet.match(/\b\d{6}\b/);
-  expect(match).toBeTruthy();
+  // Waits for the mail: with parallel workers it can land after the 202, or past a fixed-size inbox page
+  const code = await waitForVerificationCode(request, email);
 
   const verifyResponse = await request.post(`${API_BASE}/api/v1/auth/verify-email`, {
     headers: {
@@ -42,7 +29,7 @@ async function completePendingVerification(request: APIRequestContext, email: st
     },
     data: JSON.stringify({
       email,
-      code: match![0]
+      code
     })
   });
 
@@ -959,7 +946,7 @@ test.describe('OficiosYa - QA suite expandida', () => {
     expect(body.error).toMatch(/igual|actual|contraseña|bad request/i);
   });
 
-  test('API: cambiar email a uno ya registrado falla', async ({ request }) => {
+  test('API: cambiar email a uno ya registrado no lo cambia ni revela que existe', async ({ request }) => {
     const first = {
       name: 'Cliente Email Conflict Uno',
       email: uniqueEmail('cliente.email.conflict1'),
@@ -989,9 +976,13 @@ test.describe('OficiosYa - QA suite expandida', () => {
       }
     });
 
-    expect(response.status()).toBe(409);
+    // A taken address answers like a free one, so the form can't reveal who has an account
+    expect(response.status()).toBe(202);
     const body = await response.json();
-    expect(body.error).toMatch(/ya existe|already exists|duplicate|email|conflict/i);
+    expect(body.token).toBeUndefined();
+
+    const profile = await getAuthenticatedUser(request, secondAuth.token);
+    expect((await profile.json()).email).toBe(second.email.toLowerCase());
   });
 
   test('API: perfil sin autenticación devuelve 401 al intentar actualizar', async ({ request }) => {
@@ -1189,42 +1180,6 @@ test.describe('OficiosYa - QA suite expandida', () => {
     const body = await response.json();
     expect(body.status).toBe(401);
     expect(body.error).toMatch(/token|autenticación|expir|inválido/i);
-  });
-
-  test('API: manejo de errores 409 por conflicto de email devuelve JSON estándar', async ({ request }) => {
-    const first = {
-      name: 'Cliente Error Conflict Uno',
-      email: uniqueEmail('cliente.error.conflict1'),
-      password: 'ClaveSegura2026!'
-    };
-    const second = {
-      name: 'Cliente Error Conflict Dos',
-      email: uniqueEmail('cliente.error.conflict2'),
-      password: 'ClaveSegura2026!'
-    };
-
-    const firstCreated = await registerClient(request, first);
-    expect(firstCreated.status()).toBe(200);
-    const firstAuth = await firstCreated.json();
-
-    const secondCreated = await registerClient(request, second);
-    expect(secondCreated.status()).toBe(200);
-    const secondAuth = await secondCreated.json();
-
-    const response = await request.put(`${API_BASE}/api/v1/users/me/email`, {
-      headers: {
-        Authorization: `Bearer ${secondAuth.token}`
-      },
-      data: {
-        newEmail: first.email,
-        currentPassword: second.password
-      }
-    });
-
-    expect(response.status()).toBe(409);
-    const body = await response.json();
-    expect(body.status).toBe(409);
-    expect(body.error).toMatch(/ya existe|already exists|duplicate|email|conflict/i);
   });
 
   test.fixme('API: manejo de errores 500 interno del servidor devuelve JSON estándar', async ({ request }) => {

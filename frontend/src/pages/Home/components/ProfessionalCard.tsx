@@ -61,7 +61,7 @@ function ProfessionalCard({ professional, selectedTradeIds = [], schedules }: Pr
                 </span>}
                 <Button
                     type="button"
-                    onClick={() => { window.location.href = isOwnProfile ? '/profile/edit' : profilePath }}
+                    onClick={() => { window.location.href = isOwnProfile ? `/profesionales/${encodeURIComponent(professional.id)}` : profilePath }}
                 >
                     {isOwnProfile ? 'Ir a panel profesional' : 'Ver perfil'}
                 </Button>

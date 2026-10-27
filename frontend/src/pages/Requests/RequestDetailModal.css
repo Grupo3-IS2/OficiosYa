@@ -109,6 +109,7 @@
 .request-response__field textarea { resize: vertical; }
 .request-response__field input:focus-visible, .request-response__field textarea:focus-visible { outline: 2px solid #07984c; outline-offset: 1px; }
 .request-callout .request-response__error { grid-column: 1 / -1; margin: 0; color: #b42318; }
+.request-callout .request-response__recommended { grid-column: 1 / -1; margin: 0; color: #4f5e64; }
 .request-callout .request-response__reject { background: #c64e56; }
 .request-callout .request-detail-reject { color: #b42318; background: #fdeeee; }
 .request-callout .request-response__reject:hover { box-shadow: 0 8px 18px rgb(198 78 86 / 22%); }

@@ -258,10 +258,15 @@ class JobRequestServiceImplTest {
         request.setStartTimestamp(start);
         request.setEndTimestamp(start.plusHours(2));
 
+        job.setProposedStart(start.minusDays(1));
+        job.setProposedEnd(start.minusDays(1).plusHours(2));
+
         JobRequestResponse response = service.acceptJobRequest(10L, request, professionalId);
 
         verify(scheduleService).createJobSchedule(job, start, start.plusHours(2));
         assertEquals(JobStatus.ACCEPTED, response.getStatus());
+        // The professional's timeframe wins over the one the client asked for, which is no longer pending
+        assertNull(job.getProposedStart());
     }
 
     @Test
@@ -935,6 +940,47 @@ class JobRequestServiceImplTest {
         assertEquals(Role.CLIENT, response.getProposedBy());
         assertEquals(6, response.getConfirmationPin().length());
         verify(events).publishEvent(any(JobRequestEvents.JobProposed.class));
+    }
+
+    @Test
+    void createJobRequest_byAClient_keepsTheTimeframeTheyAskedFor() {
+        when(clientRepository.findByPublicId(clientId)).thenReturn(Optional.of(client));
+        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        when(tradeRepository.findById(3L)).thenReturn(Optional.of(Trade.builder().id(3L).name("Plomería").build()));
+        when(passwordEncoder.encode(anyString())).thenReturn("pin-hash");
+        JobRequestCreateRequest request = createRequest(3L);
+        OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+        request.setStartTimestamp(start);
+        request.setEndTimestamp(start.plusHours(2));
+
+        JobRequestResponse response = service.createJobRequest(request, clientId);
+
+        assertEquals(start, response.getProposedStart());
+        assertEquals(start.plusHours(2), response.getProposedEnd());
+        // Only a wish: the professional's agenda is checked when they accept
+        verify(scheduleService, never()).checkJobSlotAvailable(any(), any(), any());
+    }
+
+    @Test
+    void createJobRequest_byAClient_withAnInvalidTimeframe_isABadRequest() {
+        when(clientRepository.findByPublicId(clientId)).thenReturn(Optional.of(client));
+        when(professionalRepository.findByPublicId(professionalId)).thenReturn(Optional.of(professional));
+        OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+        JobRequestCreateRequest onlyStart = createRequest(3L);
+        onlyStart.setStartTimestamp(start);
+        JobRequestCreateRequest inverted = createRequest(3L);
+        inverted.setStartTimestamp(start);
+        inverted.setEndTimestamp(start.minusHours(1));
+        JobRequestCreateRequest past = createRequest(3L);
+        past.setStartTimestamp(OffsetDateTime.now().minusDays(1));
+        past.setEndTimestamp(OffsetDateTime.now().minusDays(1).plusHours(2));
+
+        for (JobRequestCreateRequest request : List.of(onlyStart, inverted, past)) {
+            ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                    () -> service.createJobRequest(request, clientId));
+            assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
+        }
+        verify(jobRequestRepository, never()).save(any());
     }
 
     @Test

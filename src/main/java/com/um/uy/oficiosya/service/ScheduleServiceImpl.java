@@ -194,14 +194,12 @@ public class ScheduleServiceImpl implements ScheduleService {
         requireIntervalSlotFree(jobRequest.getProfessional().getPublicId(), start, end, ownBlockId);
     }
 
+    /** A job goes in the professional's free time: only jobs and reserved blocks get in its way, not availability. */
     private void requireIntervalSlotFree(UUID professionalId, OffsetDateTime start, OffsetDateTime end, Long excludeId) {
-        if (scheduleRepository.existsOverlapping(professionalId, start, end, excludeId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
-        }
         List<Schedule> candidates = scheduleRepository.findActiveCandidates(professionalId, start, end, excludeId);
         if (candidates != null) {
             for (Schedule existing : candidates) {
-                if (existing.overlaps(start, end)) {
+                if (existing.getType() != ScheduleType.URGENT_AVAILABLE && existing.overlaps(start, end)) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
                 }
             }

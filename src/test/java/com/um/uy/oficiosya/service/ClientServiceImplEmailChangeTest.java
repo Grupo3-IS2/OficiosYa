@@ -153,14 +153,16 @@ class ClientServiceImplEmailChangeTest {
     }
 
     @Test
-    void startEmailChange_toAnAddressThatHasAnAccount_isRejectedAndSendsNothing() {
+    void startEmailChange_toAnAddressThatHasAnAccount_answersTheSameAndSendsNothing() {
+        PendingVerificationResponse free = service.startEmailChange(change(NEW_EMAIL, PASSWORD), user.getPublicId());
         when(clientRepository.existsByEmailIgnoreCase(NEW_EMAIL)).thenReturn(true);
-        var request = change(NEW_EMAIL, PASSWORD);
-        var userId = user.getPublicId();
 
-        assertThrows(ClientAlreadyExists.class, () -> service.startEmailChange(request, userId));
+        PendingVerificationResponse taken = service.startEmailChange(change(NEW_EMAIL, PASSWORD), user.getPublicId());
 
-        verify(emailVerificationService, never()).sendCode(anyString(), any(), any(), any());
+        assertEquals(free, taken);
+        // Only the first call sent a code; the taken address gets one that is mailed to nobody
+        verify(emailVerificationService).sendCode(anyString(), any(), any(), any());
+        verify(emailVerificationService).holdCode(NEW_EMAIL, VerificationPurpose.EMAIL_CHANGE, user.getPublicId());
     }
 
     // --- verify ---

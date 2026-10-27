@@ -3,8 +3,12 @@ import type { SubmitEvent } from 'react'
 import Button from '../../components/Button/Button'
 import Icon from '../../components/Icon/Icon'
 import { acceptJobRequest, rejectJobRequest } from '../../services/jobRequestService'
+import { getProfessionalSchedule } from '../../services/scheduleService'
 import type { JobRequest } from '../../types/JobRequest'
-import { REASON_MAX_LENGTH, acceptanceTimeframe, optionalReason, type RequestOutcome } from './requestResponse'
+import OutsideAvailabilityModal from './OutsideAvailabilityModal'
+import { rescheduleDraftFrom } from './rescheduleForm'
+import { timeframeText } from './rescheduleTimeframe'
+import { REASON_MAX_LENGTH, acceptanceTimeframe, optionalReason, withinAvailability, type RequestOutcome } from './requestResponse'
 
 type Mode = 'choosing' | 'accepting' | 'rejecting'
 
@@ -23,10 +27,13 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
     onBusyChange: (busy: boolean) => void
 }>) {
     const [mode, setMode] = useState<Mode>(initialMode ?? 'choosing')
-    const [draft, setDraft] = useState({ date: '', startTime: '', endTime: '' })
+    // Starts from the timeframe the client asked for: the professional confirms it or changes it
+    const [draft, setDraft] = useState(() => rescheduleDraftFrom(request.proposedStart, request.proposedEnd))
     const [reason, setReason] = useState('')
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState('')
+    // A timeframe outside the professional's availability, waiting for the user to confirm it
+    const [unavailable, setUnavailable] = useState<{ start: Date; end: Date } | null>(null)
 
     function switchTo(next: Mode) {
         setError('')
@@ -47,13 +54,23 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
         }
     }
 
-    function accept(event: SubmitEvent<HTMLFormElement>) {
+    async function accept(event: SubmitEvent<HTMLFormElement>) {
         event.preventDefault()
         const timeframe = acceptanceTimeframe(draft)
         if ('error' in timeframe) {
             setError(timeframe.error)
             return
         }
+        setError('')
+        // shortcut: an agenda that can't be loaded skips the warning; the backend still rejects real clashes
+        const available = await getProfessionalSchedule(request.professionalId, timeframe.start, timeframe.end)
+            .then(schedules => withinAvailability(schedules, timeframe.start, timeframe.end), () => true)
+        if (available) book(timeframe)
+        else setUnavailable(timeframe)
+    }
+
+    function book(timeframe: { start: Date; end: Date }) {
+        setUnavailable(null)
         void send(() => acceptJobRequest(request.id, timeframe.start, timeframe.end), 'accepted')
     }
 
@@ -67,6 +84,10 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
         void send(() => rejectJobRequest(request.id, result.reason), 'rejected')
     }
 
+    const recommended = request.proposedStart && request.proposedEnd
+        ? <p className="request-response__recommended">Horario recomendado por {request.clientName}: <strong>{timeframeText(request.proposedStart, request.proposedEnd)}</strong></p>
+        : null
+
     return <section className="request-callout request-callout--urgent request-response" aria-labelledby="request-response-title" aria-busy={busy}>
         <div className="request-callout__heading">
             <Icon name="calendar" />
@@ -78,14 +99,16 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
 
         {mode === 'choosing' && <>
             <p>Si la aceptás, elegí cuándo vas a hacer el trabajo: queda reservado en tu agenda.</p>
+            {recommended}
             <div className="request-response__actions">
                 <Button type="button" variant="ghost" className="request-detail-reject" onClick={() => switchTo('rejecting')}>Rechazar</Button>
                 <Button type="button" onClick={() => switchTo('accepting')}>Aceptar</Button>
             </div>
         </>}
 
-        {mode === 'accepting' && <form className="request-response__form" onSubmit={accept}>
+        {mode === 'accepting' && <form className="request-response__form" onSubmit={event => { void accept(event) }}>
             <p>¿Cuándo vas a hacer el trabajo? {request.clientName} lo va a ver en su solicitud.</p>
+            {recommended}
             <label className="request-response__field request-response__field--wide">
                 Fecha
                 <input type="date" required autoFocus value={draft.date} disabled={busy}
@@ -107,6 +130,7 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
                 <Button type="submit" disabled={busy}>{busy ? 'Aceptando…' : 'Confirmar y aceptar'}</Button>
             </div>
         </form>}
+        {unavailable && <OutsideAvailabilityModal onConfirm={() => book(unavailable)} onCancel={() => setUnavailable(null)} />}
 
         {mode === 'rejecting' && <form className="request-response__form" onSubmit={reject}>
             <label className="request-response__field request-response__field--wide">

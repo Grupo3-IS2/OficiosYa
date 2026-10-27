@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { REASON_MAX_LENGTH, acceptanceTimeframe, optionalReason } from '../src/pages/Requests/requestResponse.ts'
+import { REASON_MAX_LENGTH, acceptanceTimeframe, optionalReason, withinAvailability } from '../src/pages/Requests/requestResponse.ts'
+import type { Schedule } from '../src/types/Schedule.ts'
 
 const now = new Date('2026-10-13T12:00:00')
 
@@ -40,5 +41,24 @@ describe('the reason of a rejection or a cancellation', () => {
     it('refuses a reason over the backend limit', () => {
         assert.deepEqual(optionalReason('a'.repeat(REASON_MAX_LENGTH)), { reason: 'a'.repeat(REASON_MAX_LENGTH) })
         assert.ok('error' in optionalReason('a'.repeat(REASON_MAX_LENGTH + 1)))
+    })
+})
+
+describe('the professional\'s availability', () => {
+    const block = (type: Schedule['type'], start: string, end: string): Schedule =>
+        ({ id: 1, professionalId: 'p', jobRequestId: null, type, startTimestamp: start, endTimestamp: end })
+    const start = new Date('2026-10-15T10:00')
+    const end = new Date('2026-10-15T12:00')
+
+    it('covers a timeframe inside an availability block', () => {
+        assert.equal(withinAvailability([block('URGENT_AVAILABLE', '2026-10-15T09:00', '2026-10-15T12:00')], start, end), true)
+    })
+
+    it('does not cover a timeframe that runs past the block', () => {
+        assert.equal(withinAvailability([block('URGENT_AVAILABLE', '2026-10-15T09:00', '2026-10-15T11:00')], start, end), false)
+    })
+
+    it('only counts availability, not busy blocks', () => {
+        assert.equal(withinAvailability([block('USER_RESERVED', '2026-10-15T09:00', '2026-10-15T13:00')], start, end), false)
     })
 })

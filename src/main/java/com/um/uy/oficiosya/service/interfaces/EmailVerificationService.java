@@ -33,6 +33,12 @@ public interface EmailVerificationService {
     void sendCode(String email, VerificationPurpose purpose, UUID userId, String payload);
 
     /**
+     * Like {@link #sendCode}, but the code is mailed to nobody: for an address that already has an
+     * account, so the cooldown and the code check answer just as they would for a free one.
+     */
+    void holdCode(String email, VerificationPurpose purpose, UUID userId);
+
+    /**
      * Checks {@code code} against the pending one for {@code (email, purpose)}. On success the
      * code is consumed (single use) and what it was issued for is returned. On failure throws
      * a 400 (wrong code, none pending, expired, or attempts exhausted); either way the caller

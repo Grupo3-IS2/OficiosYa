@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -72,6 +73,17 @@ class EmailVerificationServiceImplTest {
         assertEquals(USER_ID, saved.getUserId());
         assertEquals(PAYLOAD, saved.getPayload());
         assertNotEquals(codeCaptor.getValue(), saved.getCodeHash());
+    }
+
+    @Test
+    void holdCode_storesACodeButMailsNothing() {
+        when(repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(EMAIL, VerificationPurpose.REGISTER))
+                .thenReturn(Optional.empty());
+
+        service.holdCode(EMAIL, VerificationPurpose.REGISTER, null);
+
+        verify(repository).save(any(VerificationCode.class));
+        verify(emailSenderService, never()).sendVerificationCode(anyString(), anyString(), any());
     }
 
     @Test

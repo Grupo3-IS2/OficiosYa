@@ -331,29 +331,48 @@ class ScheduleServiceImplTest {
         verify(scheduleRepository, never()).save(any());
     }
 
-    @Test
-    void createJobSchedule_overlapping_isAConflict() {
-        JobRequest job = JobRequest.builder().professional(professional).build();
-        when(scheduleRepository.existsOverlapping(eq(professionalId), any(), any(), anyLong())).thenReturn(true);
-
-        assertThrows(ResponseStatusException.class, () -> service.createJobSchedule(job, start, end));
-    }
-
-    @Test
-    void createJobSchedule_overlappingRecurringCandidate_isAConflict() {
-        JobRequest job = JobRequest.builder().professional(professional).build();
+    private Schedule recurringBlock(ScheduleType type) {
         Schedule recurring = Schedule.builder()
                 .professional(professional)
-                .type(ScheduleType.URGENT_AVAILABLE)
+                .type(type)
                 .startTimestamp(start)
                 .endTimestamp(end)
                 .rrule("FREQ=DAILY;COUNT=3")
                 .build();
         recurring.validateAndNormalizeRecurrence();
-        when(scheduleRepository.findActiveCandidates(eq(professionalId), eq(start), eq(end), eq(0L)))
-                .thenReturn(List.of(recurring));
+        return recurring;
+    }
+
+    private void agendaHas(Schedule existing) {
+        when(scheduleRepository.findActiveCandidates(eq(professionalId), any(), any(), anyLong()))
+                .thenReturn(List.of(existing));
+    }
+
+    @Test
+    void createJobSchedule_overlappingAnotherJob_isAConflict() {
+        JobRequest job = JobRequest.builder().professional(professional).build();
+        agendaHas(Schedule.builder().id(3L).professional(professional)
+                .type(ScheduleType.SCHEDULED_JOB).startTimestamp(start).endTimestamp(end).build());
 
         assertThrows(ResponseStatusException.class, () -> service.createJobSchedule(job, start, end));
+    }
+
+    @Test
+    void createJobSchedule_overlappingRecurringReservedBlock_isAConflict() {
+        JobRequest job = JobRequest.builder().professional(professional).build();
+        agendaHas(recurringBlock(ScheduleType.USER_RESERVED));
+
+        assertThrows(ResponseStatusException.class, () -> service.createJobSchedule(job, start, end));
+    }
+
+    @Test
+    void createJobSchedule_insideTheProfessionalsAvailability_isBooked() {
+        JobRequest job = JobRequest.builder().id(9L).professional(professional).build();
+        agendaHas(recurringBlock(ScheduleType.URGENT_AVAILABLE));
+
+        ScheduleResponse response = service.createJobSchedule(job, start, end);
+
+        assertEquals(ScheduleType.SCHEDULED_JOB, response.getType());
     }
 
     @Test
@@ -380,7 +399,7 @@ class ScheduleServiceImplTest {
         ScheduleResponse response = service.moveJobSchedule(job, newStart, newStart.plusHours(2));
 
         verify(professionalRepository).findByPublicIdForUpdate(professionalId);
-        verify(scheduleRepository).existsOverlapping(professionalId, newStart, newStart.plusHours(2), 7L);
+        verify(scheduleRepository).findActiveCandidates(professionalId, newStart, newStart.plusHours(2), 7L);
         assertEquals(newStart, response.getStartTimestamp());
         assertEquals(newStart, job.getSchedules().getFirst().getStartTimestamp());
     }
@@ -388,9 +407,10 @@ class ScheduleServiceImplTest {
     @Test
     void moveJobSchedule_overlapping_isAConflict() {
         JobRequest job = acceptedJob();
-        when(scheduleRepository.existsOverlapping(eq(professionalId), any(), any(), eq(7L))).thenReturn(true);
         OffsetDateTime newStart = start.plusDays(1);
         OffsetDateTime newEnd = newStart.plusHours(2);
+        agendaHas(Schedule.builder().id(3L).professional(professional)
+                .type(ScheduleType.USER_RESERVED).startTimestamp(newStart).endTimestamp(newEnd).build());
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
                 () -> service.moveJobSchedule(job, newStart, newEnd));
@@ -409,10 +429,12 @@ class ScheduleServiceImplTest {
     @Test
     void checkJobSlotAvailable_proposalWithoutABlock_checksTheWholeAgenda() {
         JobRequest job = JobRequest.builder().professional(professional).build();
-        when(scheduleRepository.existsOverlapping(professional.getPublicId(), start, end, 0L)).thenReturn(true);
+        agendaHas(Schedule.builder().id(3L).professional(professional)
+                .type(ScheduleType.SCHEDULED_JOB).startTimestamp(start).endTimestamp(end).build());
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
                 () -> service.checkJobSlotAvailable(job, start, end));
+        verify(scheduleRepository).findActiveCandidates(professionalId, start, end, 0L);
         assertEquals(HttpStatus.CONFLICT, e.getStatusCode());
     }
 

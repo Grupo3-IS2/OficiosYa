@@ -124,19 +124,27 @@ public class ClientServiceImpl implements ClientService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nuevo email es igual al actual");
         }
 
-        if (clientRepository.existsByEmailIgnoreCase(newEmail)) {
-            throw new ClientAlreadyExists("Ya existe un usuario con el email " + newEmail);
-        }
+        boolean taken = clientRepository.existsByEmailIgnoreCase(newEmail);
 
         if (!verificationEnabled) {
+            // Without a code step there is no pending answer that hides the account: the change fails instead
+            if (taken) {
+                throw new ClientAlreadyExists("Ya existe un usuario con el email " + newEmail);
+            }
             user.setEmail(newEmail);
             clientRepository.save(user);
             return PendingVerificationResponse.builder().email(newEmail).verificationRequired(false).build();
         }
 
-        emailVerificationService.sendCode(newEmail, VerificationPurpose.EMAIL_CHANGE, user.getPublicId(), null);
+        // A taken address answers the same, so the form can't be used to find out who has an account
+        sendOrHoldEmailChangeCode(user, newEmail, taken);
 
         return pendingResponse(newEmail, EMAIL_CHANGE_SENT);
+    }
+
+    private void sendOrHoldEmailChangeCode(Client user, String newEmail, boolean taken) {
+        if (taken) emailVerificationService.holdCode(newEmail, VerificationPurpose.EMAIL_CHANGE, user.getPublicId());
+        else emailVerificationService.sendCode(newEmail, VerificationPurpose.EMAIL_CHANGE, user.getPublicId(), null);
     }
 
     /**
@@ -179,7 +187,7 @@ public class ClientServiceImpl implements ClientService {
         // codes to any address.
         requirePendingChangeOf(user, newEmail);
 
-        emailVerificationService.sendCode(newEmail, VerificationPurpose.EMAIL_CHANGE, user.getPublicId(), null);
+        sendOrHoldEmailChangeCode(user, newEmail, clientRepository.existsByEmailIgnoreCase(newEmail));
 
         return pendingResponse(newEmail, EMAIL_CHANGE_SENT);
     }

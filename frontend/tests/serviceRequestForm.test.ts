@@ -10,6 +10,9 @@ import {
 function validForm(): ServiceRequestFormValue {
     return {
         location: 'Av. Italia 1234',
+        date: '2030-05-06',
+        startTime: '09:00',
+        endTime: '11:00',
         paymentAmount: '2500',
         tasks: [{ id: 1, tradeId: 4, description: 'Reparar la pérdida de agua.' }],
     }
@@ -37,6 +40,9 @@ test('accepts zero because the backend contract is positive-or-zero', () => {
 test('rejects missing fields, a negative amount and incomplete tasks', () => {
     const errors = validateServiceRequest({
         location: '   ',
+        date: '',
+        startTime: '',
+        endTime: '',
         paymentAmount: '-1',
         tasks: [{ id: 1, tradeId: 0, description: '  ' }],
     })
@@ -53,4 +59,20 @@ test('requires at least one task', () => {
 
     assert.equal(errors.tasks, 'Agregá al menos una tarea.')
     assert.equal(hasServiceRequestErrors(errors), true)
+})
+
+test('requires a future timeframe that ends after it starts', () => {
+    const now = new Date('2030-05-06T10:00')
+
+    assert.equal(validateServiceRequest({ ...validForm(), startTime: '12:00', endTime: '11:00' }, now).timeframe,
+        'La hora de fin tiene que ser posterior a la de inicio.')
+    assert.equal(validateServiceRequest(validForm(), now).timeframe, 'El horario tiene que ser en el futuro.')
+})
+
+test('the recommended timeframe is optional, but a half-filled one is not', () => {
+    const blank = validateServiceRequest({ ...validForm(), date: '', startTime: '', endTime: '' })
+    assert.equal(blank.timeframe, undefined)
+    assert.equal(hasServiceRequestErrors(blank), false)
+
+    assert.equal(validateServiceRequest({ ...validForm(), endTime: '' }).timeframe, 'Elegí la fecha y el horario.')
 })

@@ -12,6 +12,7 @@ import type { ExpertiseTrade, Professional } from '../../../types/Professional'
 import {
     hasServiceRequestErrors,
     initialTradeId,
+    requestedTimeframe,
     validateServiceRequest,
     type ServiceRequestFormValue,
 } from '../serviceRequestForm'
@@ -34,6 +35,9 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
     )
     const [value, setValue] = useState<ServiceRequestFormValue>({
         location: '',
+        date: '',
+        startTime: '',
+        endTime: '',
         paymentAmount: '',
         tasks: [{ id: 1, tradeId: defaultTradeId, description: '' }],
     })
@@ -99,11 +103,15 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
         setSubmissionError('')
         if (hasServiceRequestErrors(errors)) return
 
+        const timeframe = requestedTimeframe(value)
+        if (timeframe && 'error' in timeframe) return
+
         submissionInFlight.current = true
         setSubmitting(true)
         try {
             const response = await createJobRequest({
                 professionalId: professional.id,
+                ...(timeframe && { startTimestamp: timeframe.start.toISOString(), endTimestamp: timeframe.end.toISOString() }),
                 location: value.location.trim(),
                 ...(point && { latitude: point.lat, longitude: point.lon }),
                 paymentAmount: Number(value.paymentAmount),
@@ -216,6 +224,28 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
                                 Este lugar queda fuera de la zona que cubre {professional.name} (hasta {area.radiusKm} km). Podés enviar la solicitud igual, pero puede que no llegue hasta ahí.
                             </p>}
                         </div>
+
+                        <fieldset className="service-request-field service-request-when"
+                            aria-describedby={showErrors && errors.timeframe ? 'service-request-when-error' : undefined}>
+                            <legend>Horario recomendado (opcional)</legend>
+                            <p className="service-request-when__hint">Si tenés un horario en mente, el profesional lo va a ver como sugerencia.</p>
+                            <label className="service-request-when__date">
+                                Fecha
+                                <input type="date" value={value.date} aria-invalid={showErrors && Boolean(errors.timeframe)}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setValue(current => ({ ...current, date: event.target.value }))} />
+                            </label>
+                            <label>
+                                Desde
+                                <input type="time" step={900} value={value.startTime} aria-invalid={showErrors && Boolean(errors.timeframe)}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setValue(current => ({ ...current, startTime: event.target.value }))} />
+                            </label>
+                            <label>
+                                Hasta
+                                <input type="time" step={900} value={value.endTime} aria-invalid={showErrors && Boolean(errors.timeframe)}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setValue(current => ({ ...current, endTime: event.target.value }))} />
+                            </label>
+                            {showErrors && errors.timeframe && <small id="service-request-when-error" className="service-request-error">{errors.timeframe}</small>}
+                        </fieldset>
 
                         <label className="service-request-field" htmlFor="service-request-amount">
                             <span>Monto del servicio <em>*</em></span>

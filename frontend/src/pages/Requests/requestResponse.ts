@@ -1,5 +1,6 @@
 import { rescheduleTimeframe, type RescheduleDraft } from './rescheduleForm.ts'
 import type { JobRequest } from '../../types/JobRequest.ts'
+import type { Schedule } from '../../types/Schedule.ts'
 
 /** The backend's limit for the reason of a rejection or a cancellation. */
 export const REASON_MAX_LENGTH = 500
@@ -7,6 +8,12 @@ export const REASON_MAX_LENGTH = 500
 /** The timeframe the professional books when accepting; the same rules as a reschedule, with nothing agreed yet. */
 export function acceptanceTimeframe(draft: RescheduleDraft, now = new Date()): { start: Date; end: Date } | { error: string } {
     return rescheduleTimeframe(draft, {}, now)
+}
+
+/** Whether one of the professional's availability blocks covers the whole timeframe. */
+export function withinAvailability(schedules: Schedule[], start: Date, end: Date): boolean {
+    return schedules.some(schedule => schedule.type === 'URGENT_AVAILABLE'
+        && new Date(schedule.startTimestamp) <= start && new Date(schedule.endTimestamp) >= end)
 }
 
 /** The reason of a rejection or a cancellation is optional: blank is no reason at all. */

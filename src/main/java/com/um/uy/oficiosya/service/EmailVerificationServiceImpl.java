@@ -75,6 +75,19 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     @Transactional
     public void sendCode(String email, VerificationPurpose purpose, UUID userId, String payload) {
         String normalizedEmail = normalize(email);
+        String code = issue(normalizedEmail, purpose, userId, payload);
+        emailSenderService.sendVerificationCode(normalizedEmail, code, purpose);
+        log.info("Verification code sent to {} for {}", normalizedEmail, purpose);
+    }
+
+    @Override
+    @Transactional
+    public void holdCode(String email, VerificationPurpose purpose, UUID userId) {
+        issue(normalize(email), purpose, userId, null);
+    }
+
+    /** Stores a new code for the pair after the resend cooldown, and returns it in plain text. */
+    private String issue(String normalizedEmail, VerificationPurpose purpose, UUID userId, String payload) {
 
         repository.findTopByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(normalizedEmail, purpose)
                 .ifPresent(previous -> {
@@ -103,9 +116,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
                 .build();
 
         repository.save(verificationCode);
-
-        emailSenderService.sendVerificationCode(normalizedEmail, code, purpose);
-        log.info("Verification code sent to {} for {}", normalizedEmail, purpose);
+        return code;
     }
 
     /**

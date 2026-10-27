@@ -1,4 +1,4 @@
-import { getToken } from './session.ts'
+import { expireSession, getToken } from './session.ts'
 import { isTokenFresh, renewSession } from './sessionRenewal.ts'
 
 /**
@@ -15,6 +15,8 @@ const listeners = new Set<Listener>()
 let socket: WebSocket | null = null
 let retry: number | undefined
 let connectedBefore = false
+// The last refused token was already renewed once: a second refusal ends the session
+let renewedAfterRefusal = false
 
 function emit(event: ChatEvent) {
   listeners.forEach(listener => listener(event))
@@ -40,11 +42,17 @@ async function connect() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/chat`)
   socket = ws
   ws.onopen = () => ws.send(frame('CONNECT', { 'accept-version': '1.2', host: location.host, 'heart-beat': '0,0', Authorization: `Bearer ${token}` }))
+  let connected = false
+  let refused = false
   ws.onmessage = event => {
     for (const raw of String(event.data).split('\0')) {
       const [head, ...body] = raw.replace(/^\n+/, '').split('\n\n')
       const [command, ...headers] = head.split('\n')
-      if (command === 'CONNECTED') {
+      if (command === 'ERROR' && !connected) {
+        refused = true
+      } else if (command === 'CONNECTED') {
+        connected = true
+        renewedAfterRefusal = false
         ws.send(frame('SUBSCRIBE', { id: 'messages', destination: '/user/queue/messages' }))
         ws.send(frame('SUBSCRIBE', { id: 'jobs', destination: '/user/queue/job-updates' }))
         if (connectedBefore) emit('resync')
@@ -62,8 +70,20 @@ async function connect() {
     // Closed on purpose (nobody listens any more) when it isn't the current socket
     if (socket !== ws) return
     socket = null
-    retry = window.setTimeout(() => void connect(), RECONNECT_MS)
+    if (refused) void recover(token)
+    else retry = window.setTimeout(() => void connect(), RECONNECT_MS)
   }
+}
+
+/**
+ * The backend refused the token before its time (revoked, or signed with keys it no longer has):
+ * renew it once, as the API does on a 401, and send the user to log in if that fails too.
+ */
+async function recover(token: string) {
+  const outcome = renewedAfterRefusal ? 'expired' : await renewSession(token)
+  renewedAfterRefusal = outcome === 'refreshed'
+  if (outcome === 'expired') expireSession()
+  else retry = window.setTimeout(() => void connect(), RECONNECT_MS)
 }
 
 /**

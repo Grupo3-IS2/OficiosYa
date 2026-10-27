@@ -44,7 +44,7 @@ public class JobRequestResponse {
 
     /** Which side proposed it (CLIENT or PROFESSIONAL): the other side accepts or rejects it. */
     private Role proposedBy;
-    /** The timeframe the professional offered, while their proposal waits for the client; null otherwise. */
+    /** The timeframe the proposing side asked for, while the proposal waits for an answer; null otherwise. */
     private OffsetDateTime proposedStart;
     private OffsetDateTime proposedEnd;
 

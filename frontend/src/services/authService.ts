@@ -141,6 +141,27 @@ export async function resendCode(email: string): Promise<PendingVerification> {
   })
 }
 
+/** Same answer whether the email has an account or not; asking again is the resend. */
+export async function startPasswordReset(email: string): Promise<PendingVerification> {
+  return apiRequest<PendingVerification>('/auth/password-reset', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+/** Doesn't log in: every session of the account ends, and the new password is used from the login. */
+export async function completePasswordReset(
+  email: string,
+  code: string,
+  newPassword: string,
+  newPasswordConfirmation: string,
+): Promise<void> {
+  await apiRequest('/auth/password-reset/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, newPassword, newPasswordConfirmation }),
+  })
+}
+
 export async function verifyToken(): Promise<TokenResponse> {
   return apiRequest<TokenResponse>('/auth/verify')
 }

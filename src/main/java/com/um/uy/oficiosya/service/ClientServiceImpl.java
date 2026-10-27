@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.service;
 
+import com.um.uy.oficiosya.dto.request.PasswordResetRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
 import com.um.uy.oficiosya.dto.request.VerifyEmailRequest;
@@ -26,8 +27,10 @@ import com.um.uy.oficiosya.service.interfaces.EmailSenderService;
 import com.um.uy.oficiosya.service.interfaces.EmailVerificationService;
 import com.um.uy.oficiosya.service.interfaces.ProfileImageStorage;
 import com.um.uy.oficiosya.service.interfaces.ClientService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +42,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class ClientServiceImpl implements ClientService {
 
     private static final String USER_NOT_FOUND = "Usuario no encontrado.";
@@ -307,6 +311,60 @@ public class ClientServiceImpl implements ClientService {
                 """.formatted(user.getName()));
 
         return response;
+    }
+
+    @Override
+    @Async
+    public void startPasswordReset(String email) {
+        try {
+            clientRepository.findByEmailIgnoreCase(email)
+                    // A Google account has no password to forget; a deleted one has an undeliverable address
+                    .filter(user -> user.getAuthProvider() == AuthProvider.LOCAL)
+                    .ifPresent(user -> emailVerificationService.sendCode(
+                            user.getEmail(), VerificationPurpose.PASSWORD_RESET, user.getPublicId(), null));
+        } catch (ResponseStatusException e) {
+            // Inside the resend cooldown (429) or the mail server down (503): telling the caller would say the account exists
+            log.info("Password reset code not sent: {}", e.getReason());
+        }
+    }
+
+    @Override
+    public PendingVerificationResponse passwordResetPending(String email) {
+        return pendingResponse(email, "Si hay una cuenta con ese correo, te enviamos un código. Ingresalo junto con tu nueva contraseña.");
+    }
+
+    /** {@code noRollbackFor}: as in {@link #verifyEmailChange}, a wrong code must still count as an attempt. */
+    @Override
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public UUID completePasswordReset(PasswordResetRequest request) {
+        if (!request.getNewPassword().equals(request.getNewPasswordConfirmation())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La confirmación de la contraseña no coincide");
+        }
+
+        // An email without an account has no code either: it fails here exactly like a wrong code
+        emailVerificationService.verifyCode(request.getEmail(), VerificationPurpose.PASSWORD_RESET, request.getCode().trim());
+
+        Client user = clientRepository.findByEmailIgnoreCase(request.getEmail())
+                .filter(found -> found.getAuthProvider() == AuthProvider.LOCAL)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Código incorrecto o vencido"));
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        clientRepository.save(user);
+
+        emailSenderService.sendNotification(user.getEmail(), "Se cambió la contraseña de tu cuenta de OficiosYa",
+                """
+                Hola %s:
+
+                La contraseña de tu cuenta de OficiosYa se cambió con un código enviado a este correo, y
+                se cerró la sesión en todos tus dispositivos.
+
+                Si no fuiste vos, pedí un código nuevo desde "¿Olvidaste tu contraseña?" en el inicio de
+                sesión y elegí otra contraseña.
+
+                Equipo de OficiosYa
+                """.formatted(user.getName()));
+
+        return user.getPublicId();
     }
 
     /** Only an account created with Google, that still has no password of its own, sets one up. */

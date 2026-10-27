@@ -68,7 +68,7 @@ class ServiceAreaRequestValidationTest {
     @Test
     void theRequestsValidateTheNestedAreaButDoNotRequireIt() {
         ProfessionalCreateRequest withoutArea = ProfessionalCreateRequest.builder().name("Beto Gómez")
-                .email("beto@example.com").password("Clave!2026").phoneNumber("099123456")
+                .email("beto@example.com").password("ClaveSegura2026!").phoneNumber("099123456")
                 .workingLocation("Pocitos").build();
         Set<String> withoutAreaErrors = invalidFields(withoutArea);
         assertTrue(withoutAreaErrors.stream().noneMatch(field -> field.startsWith("serviceArea")), withoutAreaErrors.toString());

@@ -67,6 +67,7 @@ public class EmailSenderServiceImpl implements EmailSenderService {
             case EMAIL_CHANGE -> "Confirmá tu nuevo correo de OficiosYa";
             case PASSWORD_SETUP -> "Creá tu contraseña de OficiosYa";
             case ACCOUNT_DELETION -> "Confirmá que querés eliminar tu cuenta de OficiosYa";
+            case PASSWORD_RESET -> "Restablecé tu contraseña de OficiosYa";
         };
     }
 
@@ -75,12 +76,14 @@ public class EmailSenderServiceImpl implements EmailSenderService {
             case REGISTER -> "para activar tu cuenta";
             case EMAIL_CHANGE -> "para confirmar tu nuevo correo";
             case PASSWORD_SETUP -> "para crear la contraseña de tu cuenta";
-            case ACCOUNT_DELETION -> "para eliminar tu cuenta (si no lo pediste vos, ignorá este correo)";
+            case ACCOUNT_DELETION -> "para eliminar tu cuenta";
+            case PASSWORD_RESET -> "para elegir una contraseña nueva";
         };
 
         return """
                 Tu código de verificación %s es: %s
-
+                Si no lo pediste vos, ignorá este correo.
+                
                 Equipo de OficiosYa
                 """.formatted(action, code);
     }

@@ -9,6 +9,7 @@ import { googleRegister, register } from '../../services/authService'
 import { profileFromCredential, takeGoogleSignup } from '../../services/googleCredential'
 import { isGoogleEnabled } from '../../services/googleIdentity'
 import type { AccountType, PendingVerification } from '../../types/Auth'
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '../../services/passwordPolicy'
 import { joinSpanish, missingToRegister } from './registerRequirements'
 import VerifyEmailStep from './VerifyEmailStep'
 import './Register.css'
@@ -325,9 +326,10 @@ function Register() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  minLength={8}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  maxLength={MAX_PASSWORD_LENGTH}
                   required
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres`}
                 />
                 <button
                   type="button"
@@ -346,7 +348,8 @@ function Register() {
                   type={showConfirmation ? 'text' : 'password'}
                   value={confirmation}
                   onChange={(event) => setConfirmation(event.target.value)}
-                  minLength={8}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  maxLength={MAX_PASSWORD_LENGTH}
                   required
                   placeholder="Repetí tu contraseña"
                 />

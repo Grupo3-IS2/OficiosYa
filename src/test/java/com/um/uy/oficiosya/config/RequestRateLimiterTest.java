@@ -34,7 +34,7 @@ class RequestRateLimiterTest {
         }
     };
 
-    private final RequestRateLimiter limiter = new RequestRateLimiter(3, clock);
+    private final RequestRateLimiter limiter = new RequestRateLimiter(3, 5, clock);
 
     private MockHttpServletRequest from(String remoteAddr) {
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -79,8 +79,19 @@ class RequestRateLimiterTest {
     }
 
     @Test
+    void theLoginBucket_hasItsOwnLimit() {
+        MockHttpServletRequest request = from("10.0.0.7");
+
+        for (int i = 0; i < 5; i++) {
+            assertDoesNotThrow(() -> limiter.check(request, RequestRateLimiter.LOGIN_BUCKET));
+        }
+
+        assertThrows(ResponseStatusException.class, () -> limiter.check(request, RequestRateLimiter.LOGIN_BUCKET));
+    }
+
+    @Test
     void theConstructorSpringUses_countsWithTheSystemClock() {
-        RequestRateLimiter real = new RequestRateLimiter(2);
+        RequestRateLimiter real = new RequestRateLimiter(2, 5);
         MockHttpServletRequest request = from("10.0.0.9");
 
         real.check(request, "registration");

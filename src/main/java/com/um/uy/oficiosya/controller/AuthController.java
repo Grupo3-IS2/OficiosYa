@@ -8,6 +8,7 @@ import com.um.uy.oficiosya.dto.request.GoogleLinkRequest;
 import com.um.uy.oficiosya.dto.request.GoogleProfessionalRegisterRequest;
 import com.um.uy.oficiosya.dto.request.GoogleRegisterRequest;
 import com.um.uy.oficiosya.dto.request.LoginRequest;
+import com.um.uy.oficiosya.dto.request.PasswordResetRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalCreateRequest;
 import com.um.uy.oficiosya.dto.request.ResendCodeRequest;
 import com.um.uy.oficiosya.dto.request.ClientCreateRequest;
@@ -17,6 +18,7 @@ import com.um.uy.oficiosya.dto.response.MessageResponse;
 import com.um.uy.oficiosya.dto.response.PendingVerificationResponse;
 import com.um.uy.oficiosya.dto.response.TokenResponse;
 import com.um.uy.oficiosya.service.interfaces.AuthService;
+import com.um.uy.oficiosya.service.interfaces.ClientService;
 import com.um.uy.oficiosya.service.interfaces.GoogleAuthService;
 import com.um.uy.oficiosya.service.interfaces.RegistrationService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,28 +46,35 @@ public class AuthController {
     /** Same idea for Google sign-in, where {@code /google/link} is also a password check. */
     private static final String GOOGLE_BUCKET = "google";
 
+    /** Asking for a reset code and using it: the code's own attempt limit holds per email, this per client. */
+    private static final String PASSWORD_RESET_BUCKET = "password-reset";
+
     private final AuthService authService;
 
     private final RegistrationService registrationService;
 
     private final GoogleAuthService googleAuthService;
 
+    private final ClientService clientService;
+
     private final RequestRateLimiter rateLimiter;
 
     private final RefreshTokenCookie refreshTokenCookie;
 
     public AuthController(AuthService authService, RegistrationService registrationService,
-                          GoogleAuthService googleAuthService, RequestRateLimiter rateLimiter,
-                          RefreshTokenCookie refreshTokenCookie) {
+                          GoogleAuthService googleAuthService, ClientService clientService,
+                          RequestRateLimiter rateLimiter, RefreshTokenCookie refreshTokenCookie) {
         this.authService = authService;
         this.registrationService = registrationService;
         this.googleAuthService = googleAuthService;
+        this.clientService = clientService;
         this.rateLimiter = rateLimiter;
         this.refreshTokenCookie = refreshTokenCookie;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest dto){
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest dto, HttpServletRequest request){
+        rateLimiter.check(request, RequestRateLimiter.LOGIN_BUCKET);
         return this.withSession(authService.login(dto));
     }
 
@@ -98,6 +107,30 @@ public class AuthController {
             @Valid @RequestBody ResendCodeRequest dto, HttpServletRequest request){
         rateLimiter.check(request, REGISTRATION_BUCKET);
         return ResponseEntity.accepted().body(registrationService.resendCode(dto));
+    }
+
+    /**
+     * "Forgot my password": always the same 202, whether the email has an account or not. The code
+     * is mailed in the background, so how long it takes doesn't tell either. Asking again is the resend.
+     */
+    @PostMapping("/password-reset")
+    public ResponseEntity<PendingVerificationResponse> startPasswordReset(
+            @Valid @RequestBody ResendCodeRequest dto, HttpServletRequest request){
+        rateLimiter.check(request, PASSWORD_RESET_BUCKET);
+        clientService.startPasswordReset(dto.getEmail());
+        return ResponseEntity.accepted().body(clientService.passwordResetPending(dto.getEmail()));
+    }
+
+    /**
+     * The mailed code and the new password. Every session of the account ends, on every device, and
+     * nobody is logged in: whoever reset it signs in with the new password.
+     */
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<MessageResponse> completePasswordReset(
+            @Valid @RequestBody PasswordResetRequest dto, HttpServletRequest request){
+        rateLimiter.check(request, PASSWORD_RESET_BUCKET);
+        authService.endSessions(clientService.completePasswordReset(dto));
+        return ResponseEntity.ok(new MessageResponse("Listo, cambiaste tu contraseña. Ya podés iniciar sesión con ella."));
     }
 
     /**

@@ -1,0 +1,52 @@
+.schedule-edit { width: min(460px, calc(100% - 24px)); max-height: calc(100% - 24px); margin: auto; padding: 0; border: 1px solid #dce5df; border-radius: 12px; background: #fff; color: #132238; }
+.schedule-edit::backdrop { background: rgb(24 38 48 / 60%); }
+.schedule-edit__body { display: grid; gap: 16px; padding: 20px 22px 18px; }
+.schedule-edit__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.schedule-edit__header h2 { margin: 0; font-size: 21px; letter-spacing: -.5px; }
+.schedule-edit__header p { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 3px 0 0; color: #5f6b65; font-size: 15px; }
+.schedule-edit__header p::first-letter { text-transform: uppercase; }
+.schedule-edit__badge { padding: 2px 9px; border-radius: 999px; background: #e3f4ea; color: #116e3d; font-size: 12px; font-weight: 700; }
+.schedule-edit__close { width: 34px; height: 34px; flex: none; border: 0; border-radius: 50%; background: #f1f4f2; color: #4f5e64; font-size: 22px; line-height: 1; cursor: pointer; }
+.schedule-edit__close:hover { background: #e4e9e6; }
+
+.schedule-switch { display: grid; grid-template-columns: 44px 1fr; align-items: start; gap: 12px; padding: 12px 14px; border: 1px solid #e2e9e7; border-radius: 9px; cursor: pointer; }
+.schedule-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.schedule-switch__track { position: relative; width: 44px; height: 24px; margin-top: 1px; border-radius: 999px; background: #c9d1cd; transition: background .15s; }
+.schedule-switch__track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 20%); transition: transform .15s; }
+.schedule-switch input:checked + .schedule-switch__track { background: #0ba756; }
+.schedule-switch input:checked + .schedule-switch__track::after { transform: translateX(20px); }
+.schedule-switch input:focus-visible + .schedule-switch__track { outline: 2px solid #07984c; outline-offset: 2px; }
+.schedule-switch__text { display: grid; gap: 2px; }
+.schedule-switch__text strong { font-size: 15px; }
+.schedule-switch__text small { color: #68758a; font-size: 13px; line-height: 1.4; }
+.schedule-switch.is-disabled { cursor: default; opacity: .5; }
+
+.schedule-edit__hours { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 6px 10px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.schedule-edit__hours legend { margin-bottom: 6px; padding: 0; font-size: 15px; font-weight: 700; }
+.schedule-edit__hours label { display: grid; gap: 5px; color: #5f6b65; font-size: 13px; }
+.schedule-edit__hours input { width: 100%; height: 43px; padding: 8px 10px; border: 1px solid #cdd2cf; border-radius: 6px; background: #fff; color: #252925; font: inherit; font-size: 16px; }
+.schedule-edit__hours input:focus-visible { outline: 2px solid #07984c; outline-offset: 1px; }
+.schedule-edit__hours > span { padding-bottom: 11px; color: #8a948f; }
+.schedule-edit__hours small { grid-column: 1 / -1; color: #68758a; font-size: 13px; }
+.schedule-edit__hours small.is-error { color: #b42318; }
+.schedule-edit__hours:disabled { opacity: .5; }
+
+.schedule-edit__error { margin: 0; padding: 10px 12px; border-radius: 7px; background: #fff4f1; color: #b42318; font-size: 14px; }
+.schedule-edit__actions { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
+.schedule-edit__actions .button { border-radius: 8px; }
+.schedule-edit__actions .button:disabled { opacity: .5; cursor: default; transform: none; box-shadow: none; }
+.schedule-edit__secondary { border: 0; background: transparent; color: #4f5e64; font: inherit; font-weight: 600; cursor: pointer; }
+
+.schedule-edit__danger { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid #eef2f0; }
+.schedule-edit__danger strong { color: #6b3a35; font-size: 14px; }
+.schedule-edit__danger div { display: flex; flex-wrap: wrap; gap: 8px; }
+.schedule-edit__danger button { padding: 8px 14px; border: 1px solid #f0d4cf; border-radius: 7px; background: #fff8f6; color: #b42318; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.schedule-edit__danger button::first-letter { text-transform: uppercase; }
+.schedule-edit__danger button:hover { border-color: #e3a79c; background: #fff0ed; }
+.schedule-edit button:disabled { cursor: wait; }
+
+@media (max-width: 480px) {
+    .schedule-edit__body { padding: 18px 16px 16px; }
+    .schedule-edit__actions { flex-direction: column-reverse; align-items: stretch; }
+    .schedule-edit__danger div { flex-direction: column; }
+}

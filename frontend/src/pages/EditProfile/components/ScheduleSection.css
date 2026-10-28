@@ -10,7 +10,14 @@
 .schedule-editor__now-sample { display: inline-block; width: 22px; border-top: 2px dashed #07984c; }
 
 .schedule-editor__calendar { position: relative; }
-.schedule-editor__loading { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; margin: 0; background: rgb(255 255 255 / 75%); color: #5f6b65; font-size: 14px; }
+.schedule-editor__loading { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border-radius: 8px; background: #fff; color: #5f6b65; font-size: 14px; opacity: 0; visibility: hidden; transition: opacity .25s ease, visibility 0s linear .25s; }
+.schedule-editor__loading.is-visible { opacity: 1; visibility: visible; transition: none; }
+.schedule-editor__spinner { width: 32px; height: 32px; border: 3px solid #dff2e6; border-top-color: #07984c; border-radius: 50%; animation: schedule-spin .8s linear infinite; }
+@keyframes schedule-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    .schedule-editor__loading { transition: none; }
+    .schedule-editor__spinner { animation-duration: 2.4s; }
+}
 
 .schedule-editor .fc {
     --fc-border-color: #e2e9e7;
@@ -32,6 +39,8 @@
 .schedule-editor .fc .fc-toolbar-title { color: #252925; font-size: 18px; font-weight: 700; text-transform: capitalize; }
 .schedule-editor .fc .fc-button { border-radius: 6px; box-shadow: none; font-weight: 600; text-transform: capitalize; }
 .schedule-editor .fc .fc-button:focus-visible { outline: 2px solid #07984c; outline-offset: 2px; }
+.schedule-editor .fc .fc-addBlock-button { min-width: 38px; border-color: #07984c; background: #0ba756; color: #fff; font-size: 20px; line-height: 1; padding: 4px 10px 6px; }
+.schedule-editor .fc .fc-addBlock-button:hover { border-color: #087f41; background: #07984c; color: #fff; }
 .schedule-editor .fc .fc-button-primary:disabled { border-color: #e2e9e7; background: #f6f8f7; color: #9aa59f; }
 .schedule-editor .fc .fc-col-header-cell-cushion { padding: 6px 2px; color: #3c4a42; text-transform: capitalize; text-decoration: none; }
 .schedule-editor .fc .fc-timegrid-slot-label-cushion { color: #79847e; font-size: 12px; }

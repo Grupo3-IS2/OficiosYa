@@ -24,21 +24,15 @@ const plurals: Record<DayOfWeek, string> = {
     SUNDAY: 'domingos',
 }
 
-/** The whole availability block a piece belongs to: jobs and time off may have cut it in several pieces. */
-export function wholeBlock(schedule: Schedule): TimeRange {
-    return {
-        start: new Date(schedule.blockStartTimestamp ?? schedule.startTimestamp),
-        end: new Date(schedule.blockEndTimestamp ?? schedule.endTimestamp),
-    }
+export function rangeOf(schedule: Schedule): TimeRange {
+    return { start: new Date(schedule.startTimestamp), end: new Date(schedule.endTimestamp) }
 }
 
-/** One-off availability, once per block even when it comes in pieces. */
+/** One-off availability: repeating blocks are never stretched by a one-off one. */
 function storedAvailability(schedules: Schedule[]): (TimeRange & { id: number })[] {
-    const blocks = new Map<number, TimeRange & { id: number }>()
-    schedules.forEach(schedule => {
-        if (schedule.type === 'URGENT_AVAILABLE' && schedule.id !== null) blocks.set(schedule.id, { id: schedule.id, ...wholeBlock(schedule) })
-    })
-    return [...blocks.values()]
+    return schedules
+        .filter(schedule => schedule.type === 'URGENT_AVAILABLE' && schedule.rrule === null)
+        .map(schedule => ({ id: schedule.id, ...rangeOf(schedule) }))
 }
 
 export function planCreation(range: TimeRange, schedules: Schedule[]): CreationPlan {
@@ -53,36 +47,20 @@ export function planCreation(range: TimeRange, schedules: Schedule[]): CreationP
     return { kind: 'create', start: range.start, end: range.end }
 }
 
+/** Days since the epoch of a local date, so a change of time (DST) doesn't move it. */
+function dayNumber(date: Date): number {
+    return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000
+}
+
 /**
- * The whole block after one of its pieces was moved or stretched: the edges of the block move as much as the
- * edges of the piece did. The calendar only lets a piece move when it is the whole block, and only lets its end
- * stretch when that end is the end of the block.
+ * Where the first occurrence of a repeating block goes when one of its occurrences changes: as many days later
+ * or earlier as that one moved, at its new hours. The block is stored by its first occurrence.
  */
-export function changedBlock(block: TimeRange, piece: TimeRange, changedPiece: TimeRange): TimeRange {
-    return {
-        start: new Date(block.start.getTime() + changedPiece.start.getTime() - piece.start.getTime()),
-        end: new Date(block.end.getTime() + changedPiece.end.getTime() - piece.end.getTime()),
-    }
-}
-
-/** Parts of the range not covered by any of the others. */
-export function without(range: TimeRange, others: TimeRange[]): TimeRange[] {
-    let pieces = [range]
-    others.forEach(other => {
-        pieces = pieces.flatMap(piece => {
-            if (other.end <= piece.start || other.start >= piece.end) return [piece]
-            return [
-                ...(other.start > piece.start ? [{ start: piece.start, end: other.start }] : []),
-                ...(other.end < piece.end ? [{ start: other.end, end: piece.end }] : []),
-            ]
-        })
-    })
-    return pieces
-}
-
-/** One-off availability blocks, whole, so the usual week can be turned into one-off blocks without clashing. */
-export function oneOffBlocks(schedules: Schedule[]): TimeRange[] {
-    return storedAvailability(schedules).map(({ start, end }) => ({ start, end }))
+export function movedSeries(first: TimeRange, occurrence: TimeRange, changed: TimeRange): TimeRange {
+    const days = dayNumber(changed.start) - dayNumber(occurrence.start)
+    const start = new Date(first.start.getFullYear(), first.start.getMonth(), first.start.getDate() + days,
+        changed.start.getHours(), changed.start.getMinutes())
+    return { start, end: new Date(start.getTime() + changed.end.getTime() - changed.start.getTime()) }
 }
 
 function pad(value: number): string {
@@ -92,6 +70,21 @@ function pad(value: number): string {
 /** "HH:mm" in local time. */
 export function clock(date: Date): string {
     return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+const QUARTER = 15 * 60_000
+const SUGGESTED_HOURS = 4
+
+/**
+ * Hours to offer for a new block on that day: 09:00 to 13:00, or from the next quarter of an hour when that
+ * already passed, for four hours or until midnight. Late at night that is the next day.
+ */
+export function suggestedRange(day: Date, now: Date): TimeRange {
+    const morning = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9)
+    const start = morning > now ? morning : new Date((Math.floor(now.getTime() / QUARTER) + 1) * QUARTER)
+    const midnight = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1)
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate(), start.getHours() + SUGGESTED_HOURS, start.getMinutes())
+    return { start, end: end < midnight ? end : midnight }
 }
 
 /** "YYYY-MM-DD" in local time. */
@@ -123,7 +116,7 @@ export function rangeOn(day: Date, startTime: string, endTime: string): TimeRang
  * The slot of the usual week that repeats a range every week, or null when the range spans more than one
  * day. A range that ends at midnight ends at 00:00.
  */
-export function weeklySlotFor(range: TimeRange): Omit<WeeklyAvailability, 'id'> | null {
+export function weeklySlotFor(range: TimeRange): WeeklyAvailability | null {
     const nextMidnight = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate() + 1)
     const sameDay = range.end.toDateString() === range.start.toDateString()
     if (!sameDay && range.end.getTime() !== nextMidnight.getTime()) return null

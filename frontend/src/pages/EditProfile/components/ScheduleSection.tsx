@@ -7,18 +7,16 @@ import type { DateSelectArg, DatesSetArg, EventChangeArg, EventClickArg, EventCo
 import {
     createAvailability,
     createTimeOff,
-    createWeeklyAvailability,
     deleteAvailability,
-    deleteWeeklyAvailability,
     getProfessionalSchedule,
-    skipWeeklyOccurrence,
+    skipOccurrence,
     updateAvailability,
-    updateWeeklyAvailability,
 } from '../../../services/scheduleService'
 import type { Schedule } from '../../../types/Schedule'
 import { currentWeek } from '../../ProfessionalProfile/scheduleCalendar'
-import { changedBlock, dateKey, dayOfWeekOf, everyDay, oneOffBlocks, planCreation, slotHours, weeklySlotFor, wholeBlock, without } from '../scheduleEditor'
+import { dayOfWeekOf, everyDay, movedSeries, planCreation, rangeOf, slotHours, suggestedRange, weeklySlotFor, withinOneDay } from '../scheduleEditor'
 import type { TimeRange } from '../scheduleEditor'
+import ScheduleAddPanel from './ScheduleAddPanel'
 import ScheduleChoiceModal from './ScheduleChoiceModal'
 import type { ScheduleChoice } from './ScheduleChoiceModal'
 import ScheduleDatePicker from './ScheduleDatePicker'
@@ -31,6 +29,7 @@ type ModalState =
     | { kind: 'choice'; title: string; description: string; choices: ScheduleChoice[] }
     | { kind: 'delete'; description: string; onConfirm: () => void; back?: ModalState }
     | { kind: 'edit'; schedule: Schedule }
+    | { kind: 'add'; range: TimeRange }
 
 const COMPACT_QUERY = '(max-width: 650px)'
 const WEEK_VIEW = 'timeGridWeek'
@@ -42,7 +41,7 @@ const timeFormatter = new Intl.DateTimeFormat('es-UY', { hour: '2-digit', minute
 // FullCalendar recalculates the visible range whenever one of these objects changes, so they must keep their identity
 const plugins = [timeGridPlugin, interactionPlugin]
 const views = { [COMPACT_VIEW]: { type: 'timeGrid', duration: { days: 3 } } }
-const headerToolbar = { left: 'prev,next today pickDate', center: 'title', right: '' }
+const headerToolbar = { left: 'prev,next today pickDate', center: 'title', right: 'addBlock' }
 const hourFormat = { hour: '2-digit', minute: '2-digit', hour12: false } as const
 const dayHeaderFormat = { weekday: 'short', day: 'numeric' } as const
 
@@ -73,20 +72,17 @@ function scheduleLabel({ start, end }: TimeRange): string {
     return `${dateFormatter.format(start)}, de ${timeFormatter.format(start)} a ${timeFormatter.format(end)}`
 }
 
-function capitalized(text: string): string {
-    return text.charAt(0).toUpperCase() + text.slice(1)
-}
-
 function errorMessage(reason: unknown, fallback: string): string {
     return reason instanceof Error ? reason.message : fallback
 }
 
 function eventId(schedule: Schedule): string {
-    return `${schedule.id ?? `weekly-${schedule.weeklyAvailabilityId}`}-${schedule.startTimestamp}`
+    return `${schedule.id}-${schedule.startTimestamp}`
 }
 
-function samePiece(first: TimeRange, second: TimeRange): boolean {
-    return first.start.getTime() === second.start.getTime() && first.end.getTime() === second.end.getTime()
+/** Marks the range as not available. shortcut: if it fails (e.g. it falls on a job), the day just stays empty; it can be added again by selecting it. */
+async function markOff({ start, end }: TimeRange): Promise<void> {
+    await createTimeOff(start, end).catch(() => undefined)
 }
 
 export default function ScheduleSection({ professionalId }: Readonly<{ professionalId: string }>) {
@@ -105,6 +101,13 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
     const [pickerDate, setPickerDate] = useState<Date | null>(null)
     const [customButtons] = useState(() => ({
         pickDate: { text: 'Elegir día', click: () => setPickerDate(calendar.current?.getApi().getDate() ?? new Date()) },
+        addBlock: { text: '+', hint: 'Agregar horario', click: () => {
+            // Opens on the day on screen, or today when the calendar shows the current week
+            const shown = calendar.current?.getApi().getDate() ?? new Date()
+            setError('')
+            setMessage('')
+            setModal({ kind: 'add', range: suggestedRange(shown, new Date()) })
+        } },
     }))
 
     // Moves the line that marks from when blocks can be added
@@ -113,12 +116,12 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
         return () => window.clearInterval(timer)
     }, [])
 
-    // The agenda comes with the usual week included, and every availability cut around jobs and time off
+    // The agenda comes with every occurrence of the repeating blocks in the range
     useEffect(() => {
         if (!visibleRange) return
         const [from, to] = visibleRange.split('|').map(value => new Date(Number(value)))
         let active = true
-        void getProfessionalSchedule(professionalId, from, to)
+        void getProfessionalSchedule(professionalId, from, to, true)
             .then(response => { if (active) setSchedules(response) })
             .catch(() => { if (active) setError('No pudimos cargar tus horarios de atención.') })
             .finally(() => { if (active) setLoading(false) })
@@ -143,27 +146,32 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
         return [elapsed, ...schedules.map(schedule => {
             const upcoming = new Date(schedule.endTimestamp).getTime() > now
             const available = schedule.type === 'URGENT_AVAILABLE'
-            const piece = { start: new Date(schedule.startTimestamp), end: new Date(schedule.endTimestamp) }
-            const block = wholeBlock(schedule)
-            // A piece of a block cut by a job can't be moved, and only an end that is the block's end can stretch
             const canChange = available && upcoming && !busy
             return {
                 id: eventId(schedule),
                 title: blockTitles[schedule.type],
                 start: schedule.startTimestamp,
                 end: schedule.endTimestamp,
-                startEditable: canChange && samePiece(piece, block),
-                durationEditable: canChange && piece.end.getTime() === block.end.getTime(),
+                startEditable: canChange,
+                durationEditable: canChange,
                 extendedProps: { schedule },
                 classNames: [
                     available ? 'schedule-event--available' : 'schedule-event--busy',
-                    schedule.weeklyAvailabilityId !== null ? 'schedule-event--weekly' : '',
+                    schedule.rrule !== null ? 'schedule-event--weekly' : '',
                     upcoming && schedule.type !== 'SCHEDULED_JOB' ? 'schedule-event--clickable' : '',
                     upcoming ? '' : 'schedule-event--past',
                 ],
             }
         })]
     }, [schedules, busy, now, validRange])
+
+    /** Another week: covers the calendar until its blocks arrive, instead of showing the last week's ones. */
+    function showRange(range: DatesSetArg) {
+        const next = `${range.start.getTime()}|${range.end.getTime()}`
+        if (next === visibleRange) return
+        setLoading(true)
+        setVisibleRange(next)
+    }
 
     /** Runs a change and reloads the agenda: how availability shows depends on every other block. */
     async function run(action: () => Promise<unknown>, success: string, failure: string, keepOpenOnError = false) {
@@ -192,55 +200,71 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
         }
         // The absorbed block has to go first, otherwise stretching over it counts as an overlap
         const absorbed = plan.absorbedId === null ? null : schedules.find(schedule => schedule.id === plan.absorbedId)
-        if (absorbed?.id) await deleteAvailability(absorbed.id)
+        if (absorbed) await deleteAvailability(absorbed.id)
         try {
             await updateAvailability(plan.id, plan.start, plan.end)
         } catch (reason) {
             if (absorbed) {
-                const { start, end } = wholeBlock(absorbed)
+                const { start, end } = rangeOf(absorbed)
                 await createAvailability(start, end)
             }
             throw reason
         }
     }
 
+    function addTyped(range: TimeRange, repeats: boolean) {
+        const slot = weeklySlotFor(range)
+        void run(async () => {
+            await (repeats ? createAvailability(range.start, range.end, true) : addOneOff(range))
+            calendar.current?.getApi().gotoDate(range.start)
+        }, repeats && slot ? `Listo: vas a figurar disponible ${everyDay(slot.dayOfWeek)} de ${slotHours(slot)}.` : 'Horario agregado.',
+        'No pudimos agregar el horario.', true)
+    }
+
+    /** A selection opens the same form as the + button, with its day and hours. */
     function chooseHowToAdd(selection: DateSelectArg) {
         selection.view.calendar.unselect()
         const range = { start: selection.start, end: selection.end }
-        const slot = weeklySlotFor(range)
-        const choices: ScheduleChoice[] = []
-        if (slot) {
-            choices.push({
-                label: capitalized(everyDay(slot.dayOfWeek)),
-                hint: 'Se repite cada semana. Si algún día no podés, lo marcás como día libre.',
-                onSelect: () => void run(() => createWeeklyAvailability(slot), `Listo: vas a figurar disponible ${everyDay(slot.dayOfWeek)}.`, 'No pudimos agregar el horario semanal.'),
-            })
+        setError('')
+        setMessage('')
+        if (withinOneDay(range)) {
+            setModal({ kind: 'add', range })
+            return
         }
-        choices.push({
-            label: `Solo el ${dateFormatter.format(range.start)}`,
-            hint: 'Un horario puntual, que no se repite.',
-            onSelect: () => void run(() => addOneOff(range), 'Horario agregado.', 'No pudimos agregar el horario.'),
+        // The form holds a single day: a selection over several days can only be a one-off block
+        setModal({
+            kind: 'choice',
+            title: 'Agregar horario',
+            description: `Desde el ${dateFormatter.format(range.start)} a las ${timeFormatter.format(range.start)} hasta el ${dateFormatter.format(range.end)} a las ${timeFormatter.format(range.end)}. No se puede repetir cada semana porque ocupa más de un día.`,
+            choices: [{
+                label: 'Agregar este horario',
+                onSelect: () => void run(() => addOneOff(range), 'Horario agregado.', 'No pudimos agregar el horario.'),
+            }],
         })
-        setModal({ kind: 'choice', title: '¿Se repite todas las semanas?', description: `${scheduleLabel(range)}.`, choices })
     }
 
     /**
      * Puts the change in the state before saving it. Otherwise the next render (busy, saving) hands the calendar
      * the old position and the block jumps back until the agenda reloads. Returns how to undo it.
      */
-    function showChange(schedule: Schedule, changed: TimeRange, block: TimeRange): () => void {
+    function showChange(schedule: Schedule, changed: TimeRange): () => void {
         const previous = schedules
         const key = eventId(schedule)
         setSchedules(current => current.map(other => eventId(other) === key
-            ? {
-                ...other,
-                startTimestamp: changed.start.toISOString(),
-                endTimestamp: changed.end.toISOString(),
-                blockStartTimestamp: block.start.toISOString(),
-                blockEndTimestamp: block.end.toISOString(),
-            }
+            ? { ...other, startTimestamp: changed.start.toISOString(), endTimestamp: changed.end.toISOString() }
             : other))
         return () => setSchedules(previous)
+    }
+
+    /**
+     * Changes every week of a repeating block like this occurrence changed. The block is stored by its first
+     * occurrence, which may be before the weeks on screen: the agenda from the start brings it.
+     */
+    async function changeEveryWeek(occurrence: Schedule, changed: TimeRange) {
+        const agenda = await getProfessionalSchedule(professionalId, undefined, new Date(occurrence.endTimestamp), true)
+        const first = agenda.find(other => other.id === occurrence.id) ?? occurrence
+        const series = movedSeries(rangeOf(first), rangeOf(occurrence), changed)
+        await updateAvailability(occurrence.id, series.start, series.end)
     }
 
     function changeBlock(change: EventChangeArg) {
@@ -250,35 +274,32 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
             change.revert()
             return
         }
-        const piece = { start: new Date(schedule.startTimestamp), end: new Date(schedule.endTimestamp) }
-        const block = changedBlock(wholeBlock(schedule), piece, { start, end })
+        const changed = { start, end }
 
-        if (schedule.weeklyAvailabilityId === null && schedule.id !== null) {
-            const id = schedule.id
-            const undo = showChange(schedule, { start, end }, block)
+        if (schedule.rrule === null) {
+            const undo = showChange(schedule, changed)
             void run(async () => {
                 try {
-                    await updateAvailability(id, block.start, block.end)
+                    await updateAvailability(schedule.id, start, end)
                 } catch (reason) {
                     undo()
                     throw reason
                 }
-            }, `Horario cambiado al ${scheduleLabel(block)}.`, 'No pudimos cambiar el horario.')
+            }, `Horario cambiado al ${scheduleLabel(changed)}.`, 'No pudimos cambiar el horario.')
             return
         }
 
-        // Changing one occurrence of the usual week changes every week; the message says so
-        const weeklyId = schedule.weeklyAvailabilityId
-        const slot = weeklySlotFor(block)
-        if (weeklyId === null || !slot) {
+        // Changing one occurrence of a repeating block changes every week; the message says so
+        const slot = weeklySlotFor(changed)
+        if (!slot) {
             change.revert()
             setError('Un horario que se repite tiene que empezar y terminar el mismo día.')
             return
         }
-        const undo = showChange(schedule, { start, end }, block)
+        const undo = showChange(schedule, changed)
         void run(async () => {
             try {
-                await updateWeeklyAvailability(weeklyId, slot)
+                await changeEveryWeek(schedule, changed)
             } catch (reason) {
                 undo()
                 throw reason
@@ -289,80 +310,64 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
     function openBlock(click: EventClickArg) {
         const schedule = click.event.extendedProps.schedule as Schedule | undefined
         if (!schedule || new Date(schedule.endTimestamp).getTime() <= now || schedule.type === 'SCHEDULED_JOB') return
-        if (schedule.type === 'USER_RESERVED' && schedule.id === null) return
         setError('')
         setMessage('')
         setModal({ kind: 'edit', schedule })
     }
 
-    /** The free pieces of the block the schedule belongs to: jobs may have taken part of it. */
-    function freePieces(schedule: Schedule): TimeRange[] {
-        return schedules
-            .filter(other => schedule.weeklyAvailabilityId !== null
-                ? other.weeklyAvailabilityId === schedule.weeklyAvailabilityId && other.blockStartTimestamp === schedule.blockStartTimestamp
-                : other.type === 'URGENT_AVAILABLE' && other.id === schedule.id)
-            .map(other => ({ start: new Date(other.startTimestamp), end: new Date(other.endTimestamp) }))
-    }
-
     function saveEdit(schedule: Schedule, edit: ScheduleEdit) {
-        const block = wholeBlock(schedule)
+        const block = rangeOf(schedule)
         const day = dateFormatter.format(block.start)
 
+        // Turning it back on leaves it as a one-off block, even when it was a week of a repeating one
         if (schedule.type === 'USER_RESERVED') {
-            const id = schedule.id
-            if (id === null || !edit.active) return
-            void run(() => deleteAvailability(id), 'Horario activado.', 'No pudimos activar el horario.', true)
+            if (!edit.active) return
+            void run(async () => {
+                await deleteAvailability(schedule.id)
+                await createAvailability(block.start, block.end)
+            }, 'Horario activado.', 'No pudimos activar el horario.', true)
             return
         }
 
         if (!edit.active) {
-            const pieces = freePieces(schedule)
-            void run(() => Promise.all(pieces.map(piece => createTimeOff(piece.start, piece.end))),
-                `Desactivado el ${day}. Tocalo para volver a activarlo.`, 'No pudimos desactivar el horario.', true)
+            void run(async () => {
+                if (schedule.rrule === null) await deleteAvailability(schedule.id)
+                else await skipOccurrence(schedule)
+                await markOff(block)
+            }, `Desactivado el ${day}. Tocalo para volver a activarlo.`, 'No pudimos desactivar el horario.', true)
             return
         }
 
         const slot = weeklySlotFor(edit.range)
-        const weeklyId = schedule.weeklyAvailabilityId
-        if (weeklyId !== null) {
+        if (schedule.rrule !== null) {
             if (!edit.repeats) {
-                void run(async () => {
-                    // The one-off blocks already on that day stay as they are
-                    for (const range of without(edit.range, oneOffBlocks(schedules))) await createAvailability(range.start, range.end)
-                    await deleteWeeklyAvailability(weeklyId)
-                }, `Listo: ya no se repite, queda solo el ${day}.`, 'No pudimos guardar los cambios.', true)
+                void run(() => updateAvailability(schedule.id, edit.range.start, edit.range.end, false),
+                    `Listo: ya no se repite, queda solo el ${day}.`, 'No pudimos guardar los cambios.', true)
             } else if (slot) {
-                void run(() => updateWeeklyAvailability(weeklyId, slot),
+                void run(() => changeEveryWeek(schedule, edit.range),
                     `Listo: ahora figurás disponible ${everyDay(slot.dayOfWeek)} de ${slotHours(slot)}.`, 'No pudimos guardar los cambios.', true)
             }
             return
         }
 
-        const id = schedule.id
-        if (id === null) return
         if (edit.repeats && slot) {
-            void run(async () => {
-                await createWeeklyAvailability(slot)
-                await deleteAvailability(id)
-            }, `Listo: vas a figurar disponible ${everyDay(slot.dayOfWeek)} de ${slotHours(slot)}.`, 'No pudimos guardar los cambios.', true)
+            void run(() => updateAvailability(schedule.id, edit.range.start, edit.range.end, true),
+                `Listo: vas a figurar disponible ${everyDay(slot.dayOfWeek)} de ${slotHours(slot)}.`, 'No pudimos guardar los cambios.', true)
         } else {
-            void run(() => updateAvailability(id, edit.range.start, edit.range.end),
+            void run(() => updateAvailability(schedule.id, edit.range.start, edit.range.end),
                 `Horario cambiado al ${scheduleLabel(edit.range)}.`, 'No pudimos guardar los cambios.', true)
         }
     }
 
     /** Deleting asks first; going back returns to the edit panel. */
     function confirmDeletion(schedule: Schedule, onlyThisDay: boolean) {
-        const block = wholeBlock(schedule)
+        const block = rangeOf(schedule)
         const back: ModalState = { kind: 'edit', schedule }
-        const weeklyId = schedule.weeklyAvailabilityId
-        if (weeklyId === null) {
-            const id = schedule.id
-            if (id === null) return
+        if (schedule.rrule === null) {
             setModal({
                 kind: 'delete',
                 description: `Vas a eliminar el horario del ${scheduleLabel(block)}.`,
-                onConfirm: () => void run(() => deleteAvailability(id), 'Horario eliminado.', 'No pudimos eliminar el horario.'),
+                onConfirm: () => void run(() => deleteAvailability(schedule.id), 'Horario eliminado.', 'No pudimos eliminar el horario.'),
                 back,
             })
             return
@@ -372,14 +377,14 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
             ? {
                 kind: 'delete',
                 description: `Vas a eliminar el horario del ${scheduleLabel(block)}. Las demás semanas siguen igual.`,
-                onConfirm: () => void run(() => skipWeeklyOccurrence(weeklyId, dateKey(block.start)),
+                onConfirm: () => void run(() => skipOccurrence(schedule),
                     `Eliminado el ${dateFormatter.format(block.start)}.`, 'No pudimos eliminar el horario.'),
                 back,
             }
             : {
                 kind: 'delete',
                 description: `Vas a eliminar este horario de ${every}. Deja de repetirse en todas las semanas.`,
-                onConfirm: () => void run(() => deleteWeeklyAvailability(weeklyId), 'Horario semanal eliminado.', 'No pudimos eliminar el horario semanal.'),
+                onConfirm: () => void run(() => deleteAvailability(schedule.id), 'Horario semanal eliminado.', 'No pudimos eliminar el horario semanal.'),
                 back,
             })
     }
@@ -427,9 +432,13 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
                 eventChange={changeBlock}
                 eventClick={openBlock}
                 eventContent={eventContent}
-                datesSet={(range: DatesSetArg) => setVisibleRange(`${range.start.getTime()}|${range.end.getTime()}`)}
+                datesSet={showRange}
             />
-            {loading && <p className="schedule-editor__loading" role="status">Cargando horarios...</p>}
+            {/* Always there, so it can fade out instead of the blocks popping in */}
+            <div className={`schedule-editor__loading${loading ? ' is-visible' : ''}`} role="status" aria-hidden={!loading}>
+                <span className="schedule-editor__spinner" aria-hidden="true" />
+                {loading && 'Cargando horarios...'}
+            </div>
         </div>
 
         {error && <p className="profile-error" role="alert">{error}</p>}
@@ -455,6 +464,14 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
             busy={busy}
             onConfirm={modal.onConfirm}
             onCancel={() => setModal(modal.back ?? null)}
+        />}
+        {modal?.kind === 'add' && <ScheduleAddPanel
+            initial={modal.range}
+            now={now}
+            busy={busy}
+            error={error}
+            onSave={addTyped}
+            onClose={() => setModal(null)}
         />}
         {modal?.kind === 'edit' && <ScheduleEditPanel
             key={eventId(modal.schedule)}

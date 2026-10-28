@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../../components/Button/Button'
 import type { Schedule } from '../../../types/Schedule'
-import { clock, dayOfWeekOf, everyDay, rangeOn, withinOneDay, wholeBlock } from '../scheduleEditor'
+import { clock, dayOfWeekOf, everyDay, rangeOf, rangeOn, withinOneDay } from '../scheduleEditor'
 import type { TimeRange } from '../scheduleEditor'
 import './ScheduleEditPanel.css'
 
@@ -15,7 +15,7 @@ export interface ScheduleEdit {
 const dayFormatter = new Intl.DateTimeFormat('es-UY', { weekday: 'long', day: 'numeric', month: 'long' })
 const shortDayFormatter = new Intl.DateTimeFormat('es-UY', { weekday: 'long', day: 'numeric' })
 
-function Switch({ checked, onChange, disabled, label, hint }: Readonly<{
+export function Switch({ checked, onChange, disabled, label, hint }: Readonly<{
     checked: boolean
     onChange: (checked: boolean) => void
     disabled?: boolean
@@ -46,9 +46,9 @@ export default function ScheduleEditPanel({ schedule, busy, error, onSave, onDel
     onClose: () => void
 }>) {
     const dialog = useRef<HTMLDialogElement>(null)
-    const block = wholeBlock(schedule)
+    const block = rangeOf(schedule)
     const isOff = schedule.type === 'USER_RESERVED'
-    const isWeekly = schedule.weeklyAvailabilityId !== null
+    const isWeekly = schedule.rrule !== null
     const oneDay = withinOneDay(block)
     const every = everyDay(dayOfWeekOf(block.start))
 

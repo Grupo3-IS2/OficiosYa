@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { changedBlock, clock, dateKey, everyDay, planCreation, rangeOn, slotHours, weeklySlotFor, without } from '../src/pages/EditProfile/scheduleEditor.ts'
+import { clock, dateKey, everyDay, movedSeries, planCreation, rangeOn, slotHours, suggestedRange, weeklySlotFor } from '../src/pages/EditProfile/scheduleEditor.ts'
 import type { Schedule, ScheduleType } from '../src/types/Schedule.ts'
 
 function block(id: number, start: Date, end: Date, type: ScheduleType = 'URGENT_AVAILABLE'): Schedule {
-    return { id, professionalId: 'pro', jobRequestId: null, type, startTimestamp: start.toISOString(), endTimestamp: end.toISOString(), weeklyAvailabilityId: null, blockStartTimestamp: null, blockEndTimestamp: null }
+    return { id, professionalId: 'pro', jobRequestId: null, type, startTimestamp: start.toISOString(), endTimestamp: end.toISOString(), rrule: null, tzid: null, exdates: null, recurrenceEnd: null }
 }
 
 const at = (day: number, hour: number) => new Date(2030, 4, day, hour)
@@ -35,7 +35,7 @@ test('jobs are never stretched to cover availability', () => {
 })
 
 test('the usual week is never stretched by a one-off block', () => {
-    const fromUsualWeek = { ...block(1, at(6, 9), at(6, 12)), id: null, weeklyAvailabilityId: 4 }
+    const fromUsualWeek = { ...block(1, at(6, 9), at(6, 12)), rrule: 'FREQ=WEEKLY' }
     assert.equal(planCreation({ start: at(6, 12), end: at(6, 14) }, [fromUsualWeek]).kind, 'create')
 })
 
@@ -60,31 +60,32 @@ test('slot hours read as a range, with midnight shown as 24:00', () => {
     assert.equal(everyDay('SATURDAY'), 'todos los sábados')
 })
 
-test('stretching the end of a piece stretches the end of its whole block', () => {
-    const block = { start: at(6, 9), end: at(6, 18) }
-    const piece = { start: at(6, 13), end: at(6, 18) }
-    assert.deepEqual(changedBlock(block, piece, { start: at(6, 13), end: at(6, 20) }), { start: at(6, 9), end: at(6, 20) })
+test('changing one week of a repeating block moves its first occurrence the same way', () => {
+    // First occurrence Monday 6 from 9 to 12; the one of Monday 20 goes to Tuesday 21 from 14 to 18
+    assert.deepEqual(movedSeries({ start: at(6, 9), end: at(6, 12) }, { start: at(20, 9), end: at(20, 12) }, { start: at(21, 14), end: at(21, 18) }),
+        { start: at(7, 14), end: at(7, 18) })
 })
 
-test('moving a whole block moves both of its edges', () => {
-    const block = { start: at(6, 9), end: at(6, 12) }
-    assert.deepEqual(changedBlock(block, block, { start: at(7, 10), end: at(7, 13) }), { start: at(7, 10), end: at(7, 13) })
+test('changing the hours of the first occurrence keeps its day', () => {
+    const first = { start: at(6, 9), end: at(6, 12) }
+    assert.deepEqual(movedSeries(first, first, { start: at(6, 20), end: at(7, 0) }), { start: at(6, 20), end: at(7, 0) })
 })
 
-test('a block cut in pieces is joined with its neighbours by its whole range', () => {
-    // 9 to 18, shown as 9 to 11 and 13 to 18 because of a job
-    const pieces = [
-        { ...block(1, at(6, 9), at(6, 11)), blockStartTimestamp: at(6, 9).toISOString(), blockEndTimestamp: at(6, 18).toISOString() },
-        { ...block(1, at(6, 13), at(6, 18)), blockStartTimestamp: at(6, 9).toISOString(), blockEndTimestamp: at(6, 18).toISOString() },
-    ]
-    assert.deepEqual(planCreation({ start: at(6, 18), end: at(6, 20) }, pieces),
-        { kind: 'extend', id: 1, start: at(6, 9), end: at(6, 20), absorbedId: null })
+test('a new block is offered in the morning while the morning is still ahead', () => {
+    assert.deepEqual(suggestedRange(at(8, 0), at(6, 15)), { start: at(8, 9), end: at(8, 13) })
+    assert.deepEqual(suggestedRange(at(6, 0), new Date(2030, 4, 6, 8, 59)), { start: at(6, 9), end: at(6, 13) })
 })
 
-test('a range without the parts other ranges cover', () => {
-    assert.deepEqual(without({ start: at(6, 9), end: at(6, 18) }, [{ start: at(6, 10), end: at(6, 11) }, { start: at(6, 17), end: at(6, 19) }]),
-        [{ start: at(6, 9), end: at(6, 10) }, { start: at(6, 11), end: at(6, 17) }])
-    assert.deepEqual(without({ start: at(6, 9), end: at(6, 10) }, [{ start: at(6, 8), end: at(6, 11) }]), [])
+test('once the morning passed, a new block is offered from the next quarter of an hour', () => {
+    assert.deepEqual(suggestedRange(at(6, 0), new Date(2030, 4, 6, 14, 7)),
+        { start: new Date(2030, 4, 6, 14, 15), end: new Date(2030, 4, 6, 18, 15) })
+    // Right on a quarter it is already late for it
+    assert.deepEqual(suggestedRange(at(6, 0), at(6, 14)), { start: new Date(2030, 4, 6, 14, 15), end: new Date(2030, 4, 6, 18, 15) })
+})
+
+test('late at night the offer stops at midnight, or moves to the next day', () => {
+    assert.deepEqual(suggestedRange(at(6, 0), new Date(2030, 4, 6, 22, 10)), { start: new Date(2030, 4, 6, 22, 15), end: at(7, 0) })
+    assert.deepEqual(suggestedRange(at(6, 0), new Date(2030, 4, 6, 23, 50)), { start: at(7, 0), end: at(7, 4) })
 })
 
 test('hours typed in the edit panel become a range on that day, with 00:00 as midnight', () => {

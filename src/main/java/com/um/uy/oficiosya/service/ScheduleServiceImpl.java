@@ -206,11 +206,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
     }
 
+    /** Compares every occurrence, so a day taken out of a repeating block (exdate) leaves its slot free. */
     private void requireNoOverlap(UUID professionalId, Schedule candidate, Long excludeId) {
-        if (scheduleRepository.existsOverlapping(
-                professionalId, candidate.getStartTimestamp(), candidate.getEndTimestamp(), excludeId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
-        }
         OffsetDateTime candidateEnd = candidate.getRecurrenceEnd();
         List<Schedule> existingSchedules = scheduleRepository.findActiveCandidates(
                 professionalId, candidate.getStartTimestamp(), candidateEnd, excludeId);

@@ -278,6 +278,32 @@ test('SCRUM-25: a client rates a completed job and the updated rating is visible
   await expect(page.locator('.reviews-section')).toContainText('Excelente servicio.');
 });
 
+test('SCRUM-25: a completed request cannot be rated twice and a concurrent rating is reconciled', async ({ page }) => {
+  const completed = proposedRequest({ status: 'COMPLETED', rating: null, review: null });
+  let reviewAttempts = 0;
+  await page.route('**/api/v1/job-requests/71/review', async route => {
+    reviewAttempts++;
+    await route.fulfill({ status: 409, json: { message: 'La solicitud ya fue calificada' } });
+  });
+  await page.route('**/api/v1/job-requests/71', route => route.fulfill({
+    json: { ...completed, rating: 10, review: 'Valoración existente.' },
+  }));
+  await listRequests(page, clientId, [completed], 'CLIENT');
+  await page.getByRole('button', { name: 'Calificar profesional' }).click();
+  const rating = page.getByRole('dialog', { name: 'Calificá tu experiencia' });
+  await rating.getByRole('radio').last().check();
+  await rating.getByLabel('Contanos tu experiencia').fill('Intento duplicado');
+  await rating.getByRole('button', { name: 'Enviar valoración' }).click();
+  await expect(rating).toContainText('ya fue calificada');
+  await expect(rating).toContainText('La valoración existente no se modificó');
+  expect(reviewAttempts).toBe(1);
+});
+
+test('SCRUM-25: a non-completed request does not offer rating', async ({ page }) => {
+  await listRequests(page, clientId, [proposedRequest({ status: 'ACCEPTED', rating: null, review: null })], 'CLIENT');
+  await expect(page.getByRole('button', { name: 'Calificar profesional' })).toHaveCount(0);
+});
+
 /** A professional who also hired someone: one request to answer and one of their own, both pending. */
 function bothSides() {
   const received = proposedRequest();

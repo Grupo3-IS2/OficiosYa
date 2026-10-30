@@ -76,3 +76,47 @@ test('chat socket authenticates, subscribes, emits events and closes after last 
     globalThis.document = originalDocument
     globalThis.location = originalLocation
 })
+
+test('chat socket reconnects after an unexpected close and emits resync after reconnecting', async () => {
+    const originalStorage = globalThis.localStorage
+    const originalWindow = globalThis.window
+    const originalDocument = globalThis.document
+    const originalLocation = globalThis.location
+    const storage = new MemoryStorage()
+    storage.setItem(TOKEN_KEY, 'header.eyJleHAiOjQxMDAwMDAwMDB9.signature')
+    globalThis.localStorage = storage as unknown as Storage
+    globalThis.location = { protocol: 'http:', host: 'localhost' } as Location
+    globalThis.window = {
+        setTimeout: (callback: () => void) => { callback(); return 1 },
+        clearTimeout: () => {},
+        location: { protocol: 'http:', host: 'localhost' },
+    } as unknown as Window & typeof globalThis
+    globalThis.document = {
+        visibilityState: 'hidden',
+        addEventListener: () => {},
+        removeEventListener: () => {},
+    } as unknown as Document
+    FakeWebSocket.instances = []
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
+
+    const events: string[] = []
+    const unsubscribe = onChatEvent(event => events.push(event))
+    await new Promise(resolve => setImmediate(resolve))
+    const first = FakeWebSocket.instances[0]
+    assert.ok(first)
+    first.onopen?.()
+    first.onmessage?.({ data: 'CONNECTED\n\n\0' })
+    first.onclose?.()
+    await new Promise(resolve => setImmediate(resolve))
+    const second = FakeWebSocket.instances[1]
+    assert.ok(second)
+    second.onopen?.()
+    second.onmessage?.({ data: 'CONNECTED\n\n\0' })
+    assert.deepEqual(events, ['resync'])
+    unsubscribe()
+
+    globalThis.localStorage = originalStorage
+    globalThis.window = originalWindow
+    globalThis.document = originalDocument
+    globalThis.location = originalLocation
+})

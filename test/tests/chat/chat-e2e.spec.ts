@@ -37,7 +37,7 @@ function message(id: number, content: string) {
   };
 }
 
-async function setupChat(page: Page, conversations = [conversation()]) {
+async function setupChat(page: Page, conversations = [conversation()], socket = false) {
   await page.addInitScript(({ token, clientId }) => {
     localStorage.setItem('oficiosya_token', token);
     localStorage.setItem('oficiosya_user', JSON.stringify({
@@ -45,7 +45,11 @@ async function setupChat(page: Page, conversations = [conversation()]) {
     }));
   }, { token: fakeJwt(), clientId });
   await mockSessionVerification(page);
-  await mockChat(page);
+  if (socket) {
+    await page.route('**/api/v1/conversations/unread-count', route => route.fulfill({ json: { count: 0 } }));
+  } else {
+    await mockChat(page);
+  }
   // The header asks for the user's requests; unmocked, the real backend's 401 ends the session.
   await page.route('**/api/v1/job-requests/mine', route => route.fulfill({ json: [] }));
   await page.route('**/api/v1/users/me', route => route.fulfill({ json: {
@@ -117,6 +121,135 @@ test('SCRUM-86: a conversation with unread messages displays the notification ba
   await page.route('**/api/v1/conversations/42/messages?**', route => route.fulfill({ json: [message(1, 'Nuevo mensaje')] }));
   await contact.click();
   await expect(page.getByText('Nuevo mensaje')).toBeVisible();
+});
+
+test('SCRUM-84: a user sends a message and sees the delivered message in the conversation', async ({ page }) => {
+  await setupChat(page, [conversation({ unreadCount: 0 })]);
+  await page.route('**/api/v1/conversations/42/messages?**', route => route.fulfill({ json: [] }));
+
+  let sentPayload: { content?: string; clientMessageId?: string } | null = null;
+  await page.route('**/api/v1/conversations/42/messages', async route => {
+    expect(route.request().method()).toBe('POST');
+    sentPayload = route.request().postDataJSON();
+    await route.fulfill({ json: {
+      id: 7,
+      conversationId: 42,
+      type: 'TEXT',
+      senderId: clientId,
+      content: sentPayload.content,
+      clientMessageId: sentPayload.clientMessageId,
+      jobRequestId: null,
+      job: null,
+      createdAt: '2026-10-30T12:00:00Z',
+    } });
+  });
+
+  await page.goto('/chat?c=42');
+  const composer = page.getByRole('textbox', { name: 'Mensaje', exact: true });
+  await composer.fill('Hola, ¿coordinamos el horario?');
+  await page.getByRole('button', { name: 'Enviar mensaje', exact: true }).click();
+
+  await expect(page.getByText('Hola, ¿coordinamos el horario?', { exact: true })).toBeVisible();
+  await expect(composer).toHaveValue('');
+  expect(sentPayload?.content).toBe('Hola, ¿coordinamos el horario?');
+  expect(sentPayload?.clientMessageId).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('SCRUM-84: blank messages are not sent and a failed send can be retried once', async ({ page }) => {
+  await setupChat(page, [conversation({ unreadCount: 0 })]);
+  await page.route('**/api/v1/conversations/42/messages?**', route => route.fulfill({ json: [] }));
+  let attempts = 0;
+  await page.route('**/api/v1/conversations/42/messages', async route => {
+    attempts++;
+    if (attempts === 1) return route.fulfill({ status: 500, json: { message: 'No se pudo enviar' } });
+    const body = route.request().postDataJSON();
+    return route.fulfill({ json: {
+      id: 8, conversationId: 42, type: 'TEXT', senderId: clientId, content: body.content,
+      clientMessageId: body.clientMessageId, jobRequestId: null, job: null, createdAt: '2026-10-30T12:00:00Z',
+    } });
+  });
+  await page.goto('/chat?c=42');
+  const composer = page.getByRole('textbox', { name: 'Mensaje', exact: true });
+  const send = page.getByRole('button', { name: 'Enviar mensaje', exact: true });
+  await composer.fill('   \n\t');
+  await expect(send).toBeDisabled();
+  await composer.fill('Mensaje reintentable');
+  await send.click();
+  await expect(page.getByRole('alert')).toContainText('No se pudo enviar');
+  await page.getByRole('button', { name: 'Reintentar', exact: true }).click();
+  await expect(page.getByText('Mensaje reintentable', { exact: true })).toBeVisible();
+  expect(attempts).toBe(2);
+});
+
+test('SCRUM-84: a real WebSocket push refreshes and displays the received message', async ({ page }) => {
+  await setupChat(page, [conversation({ unreadCount: 0 })], true);
+  let historyCalls = 0;
+  await page.route('**/api/v1/conversations/42/messages?**', route => {
+    historyCalls++;
+    return route.fulfill({ json: historyCalls === 1 ? [] : [message(9, 'Mensaje recibido por WebSocket')] });
+  });
+  await page.routeWebSocket('**/ws/chat', ws => {
+    ws.onMessage(raw => {
+      const text = String(raw);
+      if (text.startsWith('CONNECT\n')) ws.send('CONNECTED\n\n\0');
+      if (text.includes('destination:/user/queue/messages')) {
+        ws.send(`MESSAGE\ndestination:/user/queue/messages\n\n${JSON.stringify(message(9, 'Mensaje recibido por WebSocket'))}\0`);
+      }
+    });
+  });
+  await page.goto('/chat?c=42');
+  await expect(page.getByText('Mensaje recibido por WebSocket', { exact: true })).toBeVisible();
+});
+
+test('SCRUM-85: conversation and history errors can be retried, and an unknown conversation is not selectable', async ({ page }) => {
+  let inboxAttempts = 0;
+  await setupChat(page, [conversation({ unreadCount: 0 })]);
+  await page.route('**/api/v1/conversations/unread-count', route => route.fulfill({ json: { count: 0 } }));
+  await page.unroute('**/api/v1/conversations');
+  await page.route('**/api/v1/conversations', route => {
+    inboxAttempts++;
+    return inboxAttempts === 1
+      ? route.fulfill({ status: 500, json: { message: 'Error de conversaciones' } })
+      : route.fulfill({ json: [conversation({ unreadCount: 0 })] });
+  });
+  await page.goto('/chat');
+  await expect(page.getByRole('alert')).toContainText('Error de conversaciones');
+  await page.getByRole('button', { name: 'Reintentar', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Lucía Pérez', exact: true })).toBeVisible();
+
+  let historyAttempts = 0;
+  await page.route('**/api/v1/conversations/42/messages?**', route => {
+    historyAttempts++;
+    return historyAttempts === 1
+      ? route.fulfill({ status: 500, json: { message: 'Error de historial' } })
+      : route.fulfill({ json: [] });
+  });
+  await page.getByRole('button', { name: 'Lucía Pérez', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Historial de mensajes' }).getByRole('alert')).toContainText('Error de historial');
+  await page.getByRole('region', { name: 'Historial de mensajes' }).getByRole('button', { name: 'Reintentar' }).click();
+  await expect(page.getByText('La conversación empieza acá')).toBeVisible();
+  await page.route('**/api/v1/conversations/999/messages?**', route => route.fulfill({ status: 404, json: { message: 'Conversación inexistente' } }));
+  await page.goto('/chat?c=999');
+  await expect(page.getByRole('region', { name: 'Historial de mensajes' }).getByRole('alert')).toContainText('Conversación inexistente');
+});
+
+test('SCRUM-86: marking messages read persists after reloading the conversation list', async ({ page }) => {
+  await setupChat(page);
+  let unread = 2;
+  await page.unroute('**/api/v1/conversations');
+  await page.route('**/api/v1/conversations', route => route.fulfill({ json: [conversation({ unreadCount: unread })] }));
+  await page.route('**/api/v1/conversations/42/messages?**', route => route.fulfill({ json: [message(10, 'Pendiente de leer')] }));
+  await page.route('**/api/v1/conversations/42/read', route => {
+    unread = 0;
+    return route.fulfill({ status: 204 });
+  });
+  await page.goto('/chat');
+  await page.getByRole('button', { name: /Lucía Pérez, 2 mensajes sin leer/ }).click();
+  await expect(page.getByText('Pendiente de leer', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Lucía Pérez', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Lucía Pérez', exact: true })).toBeVisible();
+  await expect(page.locator('.chat-unread')).toHaveCount(0);
 });
 
 test('selecting a contact focuses the composer after loading; clicking it again closes the conversation', async ({ page }) => {

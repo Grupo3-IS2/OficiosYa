@@ -3,8 +3,18 @@ import { fakeJwt, mockChat } from '../support/ui';
 
 const professionalId = 'recurrence-professional-id';
 
-test('SCRUM-87: saving a weekday recurrence creates one availability per weekday', async ({ page }) => {
-  const created: { startTimestamp: string; endTimestamp: string }[] = [];
+/** Next Monday, in the browser's time zone (the same as this process). */
+function nextMonday(): Date {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate() + ((8 - today.getDay()) % 7 || 7));
+}
+
+function dateInput(day: Date): string {
+  return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+}
+
+async function openSchedule(page: Page) {
+  const created: Record<string, unknown>[] = [];
   await page.addInitScript(({ token, professionalId }) => {
     localStorage.setItem('oficiosya_token', token);
     localStorage.setItem('oficiosya_user', JSON.stringify({
@@ -27,28 +37,52 @@ test('SCRUM-87: saving a weekday recurrence creates one availability per weekday
   } }));
   await page.route('**/api/v1/schedules?**', route => route.fulfill({ json: [] }));
   await page.route('**/api/v1/schedules', async route => {
-    if (route.request().method() === 'POST') {
-      const body = route.request().postDataJSON();
-      created.push(body);
-      return route.fulfill({ status: 201, json: {
-        id: created.length, type: 'URGENT_AVAILABLE',
-        startTimestamp: body.startTimestamp, endTimestamp: body.endTimestamp,
-      } });
-    }
-    return route.fulfill({ json: [] });
+    const body = route.request().postDataJSON();
+    created.push(body);
+    return route.fulfill({ status: 201, json: {
+      id: created.length, professionalId, jobRequestId: null, type: body.type,
+      startTimestamp: body.startTimestamp, endTimestamp: body.endTimestamp,
+      rrule: body.rrule ?? null, tzid: body.tzid ?? null, exdates: [], recurrenceEnd: null,
+    } });
   });
   await page.goto('/profile/edit');
-  await page.getByRole('heading', { name: 'Horarios de atención' }).scrollIntoViewIfNeeded();
-
   const section = page.getByRole('region', { name: 'Horarios de atención' });
-  await section.getByRole('button', { name: /./ }).first().click();
-  const calendar = page.getByRole('dialog', { name: /.+/ });
-  await calendar.locator('button.is-selected').click();
-  // The time controls are custom clock pickers; the editor defaults to 09:00–18:00.
-  await section.getByLabel('Repetir').selectOption('WEEKDAYS');
-  await section.getByRole('button', { name: 'Agregar horario' }).click();
+  await section.scrollIntoViewIfNeeded();
+  await expect(section.getByRole('status').filter({ hasText: 'Cargando horarios' })).toHaveCount(0);
+  return { section, created };
+}
 
-  await expect(section).toContainText('5 horarios agregados.');
-  expect(created).toHaveLength(5);
-  expect(created.map(item => new Date(item.startTimestamp).getDay()).sort()).toEqual([1, 2, 3, 4, 5]);
+test('SCRUM-87: the + button adds a schedule that repeats every week', async ({ page }) => {
+  const { section, created } = await openSchedule(page);
+  const monday = nextMonday();
+
+  await section.getByTitle('Agregar horario').click();
+  const form = page.getByRole('dialog', { name: 'Agregar horario' });
+  await form.getByLabel('Día').fill(dateInput(monday));
+  await form.getByLabel('Desde').fill('10:00');
+  await form.getByLabel('Hasta').fill('14:00');
+  await form.getByRole('switch', { name: /Se repite todos los lunes/ }).check({ force: true });
+  await form.getByRole('button', { name: 'Agregar', exact: true }).click();
+
+  await expect(section).toContainText('Listo: vas a figurar disponible todos los lunes de 10:00 a 14:00.');
+  expect(created).toHaveLength(1);
+  expect(created[0]).toMatchObject({ type: 'URGENT_AVAILABLE', rrule: 'FREQ=WEEKLY' });
+  expect(new Date(String(created[0].startTimestamp))).toEqual(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), 10));
+  expect(new Date(String(created[0].endTimestamp))).toEqual(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), 14));
+});
+
+test('SCRUM-87: without turning on the repetition, the schedule is only for that day', async ({ page }) => {
+  const { section, created } = await openSchedule(page);
+  const monday = nextMonday();
+
+  await section.getByTitle('Agregar horario').click();
+  const form = page.getByRole('dialog', { name: 'Agregar horario' });
+  await form.getByLabel('Día').fill(dateInput(monday));
+  await form.getByLabel('Desde').fill('10:00');
+  await form.getByLabel('Hasta').fill('14:00');
+  await form.getByRole('button', { name: 'Agregar', exact: true }).click();
+
+  await expect(section).toContainText('Horario agregado.');
+  expect(created).toHaveLength(1);
+  expect(created[0].rrule).toBeUndefined();
 });

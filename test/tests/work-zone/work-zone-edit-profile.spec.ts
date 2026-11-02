@@ -56,6 +56,8 @@ async function openEditProfile(page: Page, saved: string, searchAnswer: unknown)
   const mocks: Mocks = { searches: [], suggests: [], patches: [], tiles: [] };
 
   await mockVerifiedSession(page, { name: 'Juan Gomez', email: 'pro.zona@qa.test', role: 'PROFESSIONAL' });
+  // A professional's agenda is loaded with the session: unmocked, the fake token gets a 401 and logs out
+  await page.route('**/api/v1/schedules?**', (route) => route.fulfill({ json: [] }));
   // Registered after the general one, so this is the one that answers.
   await page.route('**/api/v1/users/me', (route) => route.fulfill({
     status: 200,

@@ -435,6 +435,24 @@ class ScheduleTest {
     // --- EXDATE & iCalendar Parsing / Serialization ---
 
     @Test
+    void normalizing_keepsTheSameExdatesList() {
+        // On an update Hibernate owns this list: replacing it while flushing would lose the exdates
+        List<OffsetDateTime> exdates = new ArrayList<>(List.of(BASE_START, BASE_START.withOffsetSameInstant(ZoneOffset.ofHours(-3))));
+        Schedule s = Schedule.builder().type(ScheduleType.URGENT_AVAILABLE).startTimestamp(BASE_START).endTimestamp(BASE_END)
+                .rrule("FREQ=DAILY").exdates(exdates).build();
+
+        s.validateAndNormalizeRecurrence();
+
+        assertTrue(s.getExdates() == exdates);
+        assertEquals(1, exdates.size());
+
+        Schedule immutable = Schedule.builder().type(ScheduleType.URGENT_AVAILABLE).startTimestamp(BASE_START).endTimestamp(BASE_END)
+                .rrule("FREQ=DAILY").exdates(List.of(BASE_START, BASE_START)).build();
+        assertDoesNotThrow(immutable::validateAndNormalizeRecurrence);
+        assertEquals(1, immutable.getExdates().size());
+    }
+
+    @Test
     void exdate_nullAndInstantHandling() {
         Schedule s = new Schedule();
         assertThrows(IllegalArgumentException.class, () -> s.addExdate(null));

@@ -1,9 +1,9 @@
+import { lazy, Suspense } from 'react'
 import Icon from '../../components/Icon/Icon'
 import PersonalDataSection from './components/PersonalDataSection'
 import SecuritySection from './components/SecuritySection'
 import GoogleAccountSection from './components/GoogleAccountSection'
 import ProfessionalProfileSection from './components/ProfessionalProfileSection'
-import ScheduleSection from './components/ScheduleSection'
 import BecomeProfessionalCard from './components/BecomeProfessionalCard'
 import TermsSection from './components/TermsSection'
 import DeleteAccountSection from './components/DeleteAccountSection'
@@ -11,6 +11,9 @@ import UnsavedChangesModal from './components/UnsavedChangesModal'
 import useProfileEditor from './useProfileEditor'
 import useUnsavedNavigation from './useUnsavedNavigation'
 import './EditProfile.css'
+
+// The calendar library is heavy and only professionals need it
+const ScheduleSection = lazy(() => import('./components/ScheduleSection'))
 
 export default function EditProfilePage({ isProfessional }: { isProfessional?: boolean }) {
     const editor = useProfileEditor(isProfessional)
@@ -39,7 +42,7 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                     {editor.isProfessional
                         ? <>
                             <ProfessionalProfileSection value={editor.professional} onChange={editor.setProfessional} onSave={() => editor.saveSection('professional')} message={editor.messages.professional} error={editor.errorSection === 'professional' ? editor.error : ''} trades={editor.trades} tradesLoading={editor.tradesLoading} tradesError={editor.tradesError} />
-                            {editor.user && <ScheduleSection professionalId={editor.user.id} />}
+                            {editor.user && <Suspense fallback={null}><ScheduleSection professionalId={editor.user.id} /></Suspense>}
                         </>
                         : <BecomeProfessionalCard />}
                 </fieldset>

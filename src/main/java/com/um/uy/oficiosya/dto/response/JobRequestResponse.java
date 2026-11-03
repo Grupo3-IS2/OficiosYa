@@ -39,6 +39,10 @@ public class JobRequestResponse {
     private ServiceAreaResponse professionalServiceArea;
     private BigDecimal paymentAmount;
     private PaymentState paymentState;
+    /** OficiosYa's commission, once PAID; the professional gets paymentAmount minus this. */
+    private BigDecimal platformFee;
+    /** When the professional was transferred their share; null until then. */
+    private OffsetDateTime payoutAt;
     private JobStatus status;
     private List<TaskResponse> tasks;
 

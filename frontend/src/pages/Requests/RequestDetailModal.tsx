@@ -9,8 +9,9 @@ import { getCurrentUser } from '../../services/authService'
 import type { JobRequest, JobStatus, PaymentState } from '../../types/JobRequest'
 import CancelRequestSection from './CancelRequestSection'
 import CompleteRequestSection from './CompleteRequestSection'
+import PaymentRequestSection from './PaymentRequestSection'
 import RequestResponseSection, { type ResponseMode } from './RequestResponseSection'
-import { canCompleteRequest, type Decision, type RequestOutcome } from './requestResponse'
+import { awaitsPayment, canCompleteRequest, type Decision, type RequestOutcome } from './requestResponse'
 import { answersReschedule, outsideServiceAreaNote, rescheduleRequester } from './requestList'
 import { timeframeText } from './rescheduleTimeframe'
 import { canRateRequest } from './ratingForm'
@@ -158,6 +159,7 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
             </header>
 
             <div className="request-detail-modal__body" ref={bodyRef}>
+                {awaitsPayment(request) && !cancelling && <PaymentRequestSection request={request} isClient={isClient} />}
                 {canComplete && !cancelling && <CompleteRequestSection
                     request={request} onCompleted={onAnswered} onBusyChange={setAnswering}
                 />}

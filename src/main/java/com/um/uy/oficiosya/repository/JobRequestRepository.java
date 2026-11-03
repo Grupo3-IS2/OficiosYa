@@ -2,12 +2,14 @@ package com.um.uy.oficiosya.repository;
 
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
+import com.um.uy.oficiosya.entity.PaymentState;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -89,4 +91,16 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
             """)
     List<JobRequest> findBetween(@Param("userId") Long userId, @Param("otherUserId") Long otherUserId);
 
+    /** Accepted jobs still unpaid whose agreed start is before the given time. */
+    @Query("""
+            SELECT DISTINCT j FROM JobRequest j JOIN j.schedules s
+            WHERE j.status IN (com.um.uy.oficiosya.entity.JobStatus.ACCEPTED, com.um.uy.oficiosya.entity.JobStatus.RESCHEDULE_REQUESTED)
+            AND j.paymentState = com.um.uy.oficiosya.entity.PaymentState.PENDING
+            AND s.type = com.um.uy.oficiosya.entity.ScheduleType.SCHEDULED_JOB
+            AND s.startTimestamp < :before
+            """)
+    List<JobRequest> findUnpaidStartingBefore(@Param("before") OffsetDateTime before);
+
+    /** Jobs whose payment was released by the PIN but whose professional wasn't transferred yet, oldest first. */
+    List<JobRequest> findByPaymentStateAndPayoutAtIsNullOrderByUpdatedAtAsc(PaymentState paymentState);
 }

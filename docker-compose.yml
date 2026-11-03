@@ -84,6 +84,11 @@ services:
       # Per user: chat messages per minute, and new conversations per day.
       RATE_LIMIT_CHAT_PER_MINUTE: ${RATE_LIMIT_CHAT_PER_MINUTE:-30}
       RATE_LIMIT_CHAT_NEW_CONVERSATIONS_PER_DAY: ${RATE_LIMIT_CHAT_NEW_CONVERSATIONS_PER_DAY:-20}
+      # Mercado Pago. An empty access token turns payments off (see MercadoPagoGateway).
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
+      MP_NOTIFICATION_URL: ${MP_NOTIFICATION_URL:-}
+      PAYMENT_COMMISSION_PERCENT: ${PAYMENT_COMMISSION_PERCENT:-15}
     volumes:
       # The .pem files must be readable by uid 1001 (the "spring" user).
       - ./keys:/app/keys:ro

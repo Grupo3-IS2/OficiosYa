@@ -6,7 +6,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -46,7 +46,7 @@ public class JobRequestCreateRequest {
     private Double longitude;
 
     @NotNull(message = "El monto a pagar es obligatorio")
-    @PositiveOrZero(message = "El monto a pagar no puede ser negativo")
+    @Positive(message = "El monto a pagar tiene que ser mayor a cero")
     private BigDecimal paymentAmount;
 
     @NotEmpty(message = "Debés incluir al menos una tarea")

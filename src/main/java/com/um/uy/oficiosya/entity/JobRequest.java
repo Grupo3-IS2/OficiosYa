@@ -84,6 +84,17 @@ public class JobRequest {
     @Column(nullable = false, length = 32)
     private PaymentState paymentState = PaymentState.PENDING;
 
+    /** The Mercado Pago payment holding the money; set once it is RETAINED, refunded from it on cancel. */
+    @Column(length = 64)
+    private String mpPaymentId;
+
+    /** OficiosYa's commission, taken when the PIN releases the payment (PAID); the professional gets the rest. */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal platformFee;
+
+    /** When an admin transferred the professional their share; null while a PAID job waits for it. */
+    private OffsetDateTime payoutAt;
+
     @Builder.Default
     @NotNull
     @Enumerated(EnumType.STRING)

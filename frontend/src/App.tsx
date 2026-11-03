@@ -8,6 +8,8 @@ import ProfessionalProfilePage from './pages/ProfessionalProfile/ProfessionalPro
 import RequestsPage from './pages/Requests/RequestsPage'
 import TermsPage from './pages/Terms/TermsPage'
 import ChatPage from './pages/Chat/ChatPage'
+import PayoutsPage from './pages/Admin/PayoutsPage'
+import BalancePage from './pages/Balance/BalancePage'
 
 function App() {
     const currentPath = window.location.pathname
@@ -50,6 +52,22 @@ function App() {
         return (
             <RequireAuth>
                 <ChatPage />
+            </RequireAuth>
+        )
+    }
+
+    if (currentPath === '/admin/transferencias') {
+        return (
+            <RequireAuth>
+                <PayoutsPage />
+            </RequireAuth>
+        )
+    }
+
+    if (currentPath === '/mi-balance') {
+        return (
+            <RequireAuth>
+                <BalancePage />
             </RequireAuth>
         )
     }

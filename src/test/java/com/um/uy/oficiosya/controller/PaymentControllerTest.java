@@ -41,11 +41,11 @@ class PaymentControllerTest {
     void aSignedPaymentNotification_isHandled() throws Exception {
         when(paymentGateway.isValidNotification("ts=1,v1=ab", "req-1", "123")).thenReturn(true);
 
-        mvc.perform(post(WEBHOOK).param("type", "payment").param("data.id", "123")
+        mvc.perform(post(WEBHOOK).param("type", "payment").param("data.id", "123").param("job", "10")
                         .header("x-signature", "ts=1,v1=ab").header("x-request-id", "req-1"))
                 .andExpect(status().isOk());
 
-        verify(paymentService).handlePaymentNotification("123");
+        verify(paymentService).handlePaymentNotification("123", 10L);
     }
 
     @Test
@@ -53,7 +53,7 @@ class PaymentControllerTest {
         mvc.perform(post(WEBHOOK).param("type", "payment").param("data.id", "123"))
                 .andExpect(status().isUnauthorized());
 
-        verify(paymentService, never()).handlePaymentNotification(any());
+        verify(paymentService, never()).handlePaymentNotification(any(), any());
     }
 
     @Test
@@ -64,6 +64,6 @@ class PaymentControllerTest {
                         .header("x-signature", "ts=1,v1=ab").header("x-request-id", "req-1"))
                 .andExpect(status().isOk());
 
-        verify(paymentService, never()).handlePaymentNotification(any());
+        verify(paymentService, never()).handlePaymentNotification(any(), any());
     }
 }

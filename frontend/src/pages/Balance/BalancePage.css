@@ -1,0 +1,18 @@
+.balance-page { min-height: 100vh; background: #f8fcfa; color: #101f68; }
+.balance-page > .site-header { border-radius: 0 0 24px 24px; }
+.balance-page__content { width: min(1240px, calc(100% - 64px)); margin: 0 auto; padding: 34px 0 52px; }
+.balance-page h1 { margin: 0 0 8px; font-size: clamp(34px, 3.2vw, 46px); line-height: 1.08; letter-spacing: -1.4px; }
+.balance-page__intro { color: #4f5e7c; }
+.balance-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 12px 0 24px; }
+.balance-filters label { display: grid; gap: 4px; color: #4f5e7c; font-size: 13px; font-weight: 600; }
+.balance-filters input { min-height: 40px; border: 1px solid #cdd2cf; border-radius: 8px; padding: 6px 10px; color: #101f68; font: inherit; }
+.balance-page__error { color: #b42318; }
+/* The month's totals, between its heading and its jobs */
+.balance-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; margin: 0; border-top: 1px solid #dfe7e6; background: #dfe7e6; }
+.balance-summary div { padding: 12px 21px; background: #fff; }
+.balance-summary dt { color: #4f5e7c; font-size: 13px; }
+.balance-summary dd { margin: 2px 0 0; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.balance-summary__net dt, .balance-summary__net dd { color: #078f4a; }
+.balance-summary__pending dd { color: #b54708; }
+.balance-job__fee { margin-top: 4px; color: #737da4; font-size: 13px; }
+@media (max-width: 760px) { .balance-page__content { width: calc(100% - 32px); } }

@@ -24,6 +24,9 @@ export interface ProfessionalResponse extends UserResponse {
   workingLocation: string
   serviceArea: ServiceArea | null
   description: string | null
+  payoutAccount: string | null
+  /** A Mercado Pago account linked by logging in to it, not typed. */
+  payoutVerified: boolean
   published: boolean
   expertiseTrades: ExpertiseTrade[]
 }
@@ -45,6 +48,7 @@ export interface ProfessionalUpdateRequest extends UserUpdateRequest {
   workingLocation?: string
   serviceArea?: ServiceArea
   description?: string
+  payoutAccount?: string
 }
 
 export interface PasswordUpdateRequest {
@@ -150,6 +154,18 @@ export function updateUser(request: UserUpdateRequest): Promise<UserResponse> {
     method: 'PATCH',
     body: JSON.stringify(request),
   })
+}
+
+/** Whether the professional can link Mercado Pago by logging in; otherwise its account is typed. */
+export async function isMercadoPagoLinkAvailable(): Promise<boolean> {
+  const { available } = await apiRequest<{ available: boolean }>('/professionals/me/mercado-pago')
+  return available
+}
+
+/** Where to send the browser to log in to Mercado Pago and link the account the professional is paid into. */
+export async function startMercadoPagoLink(): Promise<string> {
+  const { authorizationUrl } = await apiRequest<{ authorizationUrl: string }>('/professionals/me/mercado-pago', { method: 'POST' })
+  return authorizationUrl
 }
 
 export function updateProfessional(request: ProfessionalUpdateRequest): Promise<ProfessionalResponse> {

@@ -1,4 +1,4 @@
-import type { CreatedJobRequest, CreateJobRequestPayload, JobRequest } from '../types/JobRequest'
+import type { CreatedJobRequest, CreateJobRequestPayload, JobRequest, JobStatus } from '../types/JobRequest'
 import { apiRequest } from './api'
 import { publishRatingChange } from './ratingEvents'
 
@@ -9,8 +9,8 @@ export function createJobRequest(payload: CreateJobRequestPayload): Promise<Crea
     })
 }
 
-export function getMyJobRequests(): Promise<JobRequest[]> {
-    return apiRequest<JobRequest[]>('/job-requests/mine')
+export function getMyJobRequests(status?: JobStatus): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>(status ? `/job-requests/mine?status=${status}` : '/job-requests/mine')
 }
 
 export function getJobRequest(id: number): Promise<JobRequest> {
@@ -30,6 +30,21 @@ export async function reviewJobRequest(id: number, payload: { rating: number; re
 export async function startPayment(id: number): Promise<string> {
     const { initPoint } = await apiRequest<{ initPoint: string }>(`/job-requests/${id}/payment`, { method: 'POST' })
     return initPoint
+}
+
+/** Admin: paid jobs whose professional still has to be transferred their share by hand. */
+export function getPendingPayouts(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/payouts')
+}
+
+/** Admin: transfers already made to professionals, newest first. */
+export function getPayoutHistory(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/payouts/history')
+}
+
+/** Admin: records that the transfer to the professional was made. */
+export function markPaidOut(id: number): Promise<JobRequest> {
+    return apiRequest<JobRequest>(`/admin/payouts/${id}`, { method: 'POST' })
 }
 
 /** Only the job's professional can confirm the client's PIN and complete the work. */

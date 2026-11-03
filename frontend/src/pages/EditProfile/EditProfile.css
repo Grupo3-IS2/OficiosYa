@@ -27,7 +27,7 @@
 .profile-field input { height: 43px; }
 .profile-field input:disabled { border-color: #d8dcda; background: #f1f3f2; color: #747b77; cursor: not-allowed; opacity: 1; }
 .edit-profile-page :is(input, textarea, select, button, a):focus-visible { outline: 2px solid #07984c; outline-offset: 3px; }
-.profile-actions { display: flex; justify-content: flex-end; }
+.profile-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .profile-password { position: relative; }
 .profile-password input { padding-right: 48px; }
 .profile-password button { position: absolute; right: 9px; top: 0; height: 43px; width: 36px; border: 0; background: transparent; display: grid; place-items: center; }
@@ -167,8 +167,8 @@
     .schedule-editor__list-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
     .schedule-editor__bulk-actions { align-items: flex-start; flex-direction: column; }
 }
-:is(.profile-actions, .mailed-code) .button--ghost { background: #fff; border: 1px solid #0ba756; color: #07984c; }
-:is(.profile-actions, .mailed-code) .button--ghost:hover { background: #effaf3; }
+:is(.profile-actions, .mailed-code, .payout-card) .button--ghost { background: #fff; border: 1px solid #0ba756; color: #07984c; }
+:is(.profile-actions, .mailed-code, .payout-card) .button--ghost:hover { background: #effaf3; }
 .email-change__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 4px; }
 .email-change__actions > button:not(.button) { padding: 6px 0; border: 0; background: none; color: #078747; font: inherit; font-size: 15px; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .email-change__actions > button:not(.button):disabled { color: #829091; font-weight: 400; text-decoration: none; cursor: default; }
@@ -207,3 +207,41 @@
 .email-modal__body { padding: 20px; }
 .email-modal .profile-error { margin: 0 0 16px; }
 .personal-fields .profile-availability { margin: 4px 0 0; }
+
+/* Cobros: where the professional is paid, picked as cards */
+.payout-methods, .payout-banks { border: 0; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+.payout-methods { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.payout-banks { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 640px) { .payout-banks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.payout-methods legend, .payout-banks legend { margin-bottom: 8px; font-size: 15px; }
+.payout-method, .payout-bank { position: relative; display: flex; align-items: center; gap: 12px; border: 1px solid #cdd2cf; border-radius: 9px; background: #fff; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
+.payout-method { padding: 14px 16px; }
+.payout-bank { justify-content: center; min-height: 64px; padding: 10px 12px; font-weight: 600; text-align: center; }
+.payout-bank img { display: block; max-width: 100%; max-height: 40px; object-fit: contain; }
+.payout-method svg, .payout-method img { flex-shrink: 0; width: 28px; height: 28px; color: #07984c; object-fit: contain; }
+.payout-method span { display: grid; gap: 2px; }
+.payout-method small { color: #5f6863; font-size: 13px; }
+.payout-method input, .payout-bank input { position: absolute; opacity: 0; pointer-events: none; }
+.payout-method:hover, .payout-bank:hover { border-color: #0ba756; }
+.payout-method.is-selected, .payout-bank.is-selected { border-color: #0ba756; background: #effaf4; box-shadow: 0 0 0 1px #0ba756; }
+.payout-method:has(input:focus-visible), .payout-bank:has(input:focus-visible) { outline: 3px solid rgba(11, 167, 86, .3); outline-offset: 2px; }
+.payout-section .profile-field { margin-top: 18px; }
+.payout-card { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 20px; margin-top: 18px; padding: 18px 20px; border: 1px solid #cfeedd; border-radius: 12px; background: #f6fcf9; }
+.payout-card__brand { display: grid; place-items: center; flex-shrink: 0; width: 96px; height: 56px; border: 1px solid #e2e9e7; border-radius: 9px; background: #fff; }
+.payout-card__brand img { max-width: 84px; max-height: 44px; object-fit: contain; }
+.payout-card__brand svg { width: 30px; height: 30px; color: #07984c; }
+.payout-card__details { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 2px 8px; flex: 1; min-width: 200px; margin: 0; }
+.payout-card__details dt { color: #5f6863; font-size: 14px; }
+.payout-card__details dd { margin: 0; }
+.payout-card__provider, .payout-card__account { grid-column: 1 / -1; }
+.payout-card__provider { font-size: 17px; font-weight: 700; }
+.payout-card__account { font-variant-numeric: tabular-nums; letter-spacing: .3px; }
+.payout-card .button { flex-shrink: 0; }
+.payout-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.payout-card__verified { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; padding: 2px 9px; border-radius: 999px; color: #067a3e; background: #dcf5e7; font-size: 12px; font-weight: 700; vertical-align: middle; }
+.payout-card__verified svg { width: 13px; height: 13px; }
+.payout-link { margin-top: 18px; padding: 16px 18px; border: 1px solid #e2e9e7; border-radius: 9px; background: #fafcfb; }
+.payout-link p { margin: 0 0 14px; color: #4f5a54; font-size: 15px; }
+.edit-profile-page .payout-link__button { display: inline-flex; align-items: center; gap: 10px; background: #009ee3; }
+.edit-profile-page .payout-link__button:hover { background: #0089c4; }
+.payout-link__button img { width: 26px; height: 26px; padding: 3px; border-radius: 50%; background: #fff; }

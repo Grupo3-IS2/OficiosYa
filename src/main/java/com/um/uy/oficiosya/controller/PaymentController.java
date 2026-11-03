@@ -46,13 +46,14 @@ public class PaymentController {
     @PostMapping("/api/v1/payments/webhook")
     public ResponseEntity<Void> webhook(@RequestParam(name = "type", required = false) String type,
                                         @RequestParam(name = "data.id", required = false) String dataId,
+                                        @RequestParam(name = "job", required = false) Long jobRequestId,
                                         @RequestHeader(name = "x-signature", required = false) String signature,
                                         @RequestHeader(name = "x-request-id", required = false) String requestId) {
         if (!paymentGateway.isValidNotification(signature, requestId, dataId)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         if ("payment".equals(type)) {
-            paymentService.handlePaymentNotification(dataId);
+            paymentService.handlePaymentNotification(dataId, jobRequestId);
         }
         return ResponseEntity.ok().build();
     }
@@ -62,6 +63,13 @@ public class PaymentController {
     @GetMapping("/api/v1/admin/payouts")
     public ResponseEntity<List<JobRequestResponse>> listPendingPayouts() {
         return ResponseEntity.ok(paymentService.listPendingPayouts());
+    }
+
+    /** Transfers already made to professionals, newest first. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/api/v1/admin/payouts/history")
+    public ResponseEntity<List<JobRequestResponse>> listPayoutHistory() {
+        return ResponseEntity.ok(paymentService.listPayoutHistory());
     }
 
     /** The admin made that transfer, from Mercado Pago, by hand. */

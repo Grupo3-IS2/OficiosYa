@@ -5,8 +5,8 @@ import { startPayment } from '../../services/jobRequestService'
 import type { JobRequest } from '../../types/JobRequest'
 
 /**
- * The client pays the accepted job on Mercado Pago, which brings them back to /mis-solicitudes?request={id};
- * the job turns RETAINED once Mercado Pago confirms it to the backend, not on coming back.
+ * The client pays the accepted job on Mercado Pago in a new tab (this one if pop-ups are blocked), which comes
+ * back to /mis-solicitudes?request={id}; the job turns RETAINED once Mercado Pago confirms it to the backend, not on coming back.
  */
 export default function PaymentRequestSection({ request, isClient }: Readonly<{
     request: JobRequest
@@ -18,9 +18,19 @@ export default function PaymentRequestSection({ request, isClient }: Readonly<{
     async function pay() {
         setBusy(true)
         setError('')
+        // Opened before the await: browsers block pop-ups that don't come straight from the click
+        const tab = window.open('', '_blank')
+        if (tab) tab.opener = null
         try {
-            window.location.assign(await startPayment(request.id))
+            const url = await startPayment(request.id)
+            if (tab) {
+                tab.location.href = url
+                setBusy(false)
+            } else {
+                window.location.assign(url)
+            }
         } catch (failure) {
+            tab?.close()
             setError(failure instanceof Error ? failure.message : 'No pudimos iniciar el pago. Intentá nuevamente.')
             setBusy(false)
         }

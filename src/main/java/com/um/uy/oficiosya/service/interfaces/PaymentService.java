@@ -17,11 +17,15 @@ public interface PaymentService {
     /**
      * What Mercado Pago tells us changed: re-reads the payment and, if approved, holds it on its job.
      * A payment the job can't take (cancelled meanwhile, already paid, wrong amount) is refunded. Safe to repeat.
+     * {@code jobRequestId} is the ?job= the checkout put on the notification URL, null without it.
      */
-    void handlePaymentNotification(String paymentId);
+    void handlePaymentNotification(String paymentId, Long jobRequestId);
 
     /** PAID jobs whose professional wasn't transferred their share yet, oldest first. */
     List<JobRequestResponse> listPendingPayouts();
+
+    /** Transfers already made to professionals, newest first. */
+    List<JobRequestResponse> listPayoutHistory();
 
     /** An admin transferred the professional their share; 400 unless the job waits for that. */
     JobRequestResponse markPaidOut(Long jobRequestId);

@@ -50,7 +50,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional // not read-only: may save the professional's refreshed Mercado Pago token
     public String startPayment(Long jobRequestId, UUID clientId) {
         JobRequest job = find(jobRequestId);
 
@@ -70,14 +70,17 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public void handlePaymentNotification(String paymentId) {
-        PaymentGateway.Payment payment = paymentGateway.getPayment(paymentId);
+    public void handlePaymentNotification(String paymentId, Long jobRequestId) {
+        JobRequest notified = jobRequestId == null ? null : jobRequestRepository.findById(jobRequestId).orElse(null);
+        PaymentGateway.Payment payment = paymentGateway.getPayment(paymentId, notified);
         // Pending, rejected or already refunded: nothing to hold (a refund we made comes back as "refunded")
         if (!payment.isApproved()) return;
 
         JobRequest job = jobOf(payment);
-        if (job == null) {
-            log.warn("Approved payment {} has no job (external_reference {})", paymentId, payment.externalReference());
+        // ?job= isn't signed: the payment, read with that job's token, must say it is for that same job
+        if (job == null || (notified != null && !notified.getId().equals(job.getId()))) {
+            log.warn("Approved payment {} has no job (external_reference {}, notified for {})", paymentId,
+                    payment.externalReference(), jobRequestId);
             return;
         }
         // Mercado Pago repeats notifications
@@ -88,6 +91,7 @@ public class PaymentServiceImpl implements PaymentService {
         if (rightAmount && PAYABLE.contains(job.getStatus()) && job.getPaymentState() == PaymentState.PENDING) {
             job.setPaymentState(PaymentState.RETAINED);
             job.setMpPaymentId(paymentId);
+            job.setPaidAt(OffsetDateTime.now(clock));
             job = jobRequestRepository.save(job);
             events.publishEvent(new JobRequestEvents.JobStatusChanged(job.getId(), JobRequestEvents.Change.PAID,
                     job.getClient().getPublicId()));
@@ -98,15 +102,30 @@ public class PaymentServiceImpl implements PaymentService {
         // Paid twice, paid after it was cancelled, or a different amount: the money isn't ours to keep
         log.warn("Refunding payment {} of job {}: job {} / {}, amount {} {}", paymentId, job.getId(),
                 job.getStatus(), job.getPaymentState(), payment.amount(), payment.currency());
-        paymentGateway.refund(paymentId, job.getId());
+        paymentGateway.refund(paymentId, job);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<JobRequestResponse> listPendingPayouts() {
         return jobRequestRepository.findByPaymentStateAndPayoutAtIsNullOrderByUpdatedAtAsc(PaymentState.PAID).stream()
-                .map(jobRequestMapper::toResponse)
+                .map(this::toPayoutResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<JobRequestResponse> listPayoutHistory() {
+        return jobRequestRepository.findByPayoutAtIsNotNullOrderByPayoutAtDesc().stream()
+                .map(this::toPayoutResponse)
+                .toList();
+    }
+
+    /** With where the professional is paid, which only the admin's payout lists show. */
+    private JobRequestResponse toPayoutResponse(JobRequest job) {
+        JobRequestResponse response = jobRequestMapper.toResponse(job);
+        response.setProfessionalPayoutAccount(job.getProfessional().getPayoutAccount());
+        return response;
     }
 
     @Override

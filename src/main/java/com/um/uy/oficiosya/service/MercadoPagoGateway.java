@@ -3,6 +3,7 @@ package com.um.uy.oficiosya.service;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.um.uy.oficiosya.entity.JobRequest;
+import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.service.interfaces.PaymentGateway;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -28,7 +30,9 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * Checkout Pro on OficiosYa's own Mercado Pago account, through its REST API (three calls, no SDK).
+ * Checkout Pro through Mercado Pago's REST API (no SDK). A job whose professional linked their account (OAuth) is
+ * charged into it with their token, OficiosYa's commission going to MP_ACCESS_TOKEN's account as marketplace_fee;
+ * otherwise OficiosYa's own account collects it all and an admin transfers the professional their share.
  * https://www.mercadopago.com.uy/developers/es/reference
  */
 @Service
@@ -39,6 +43,8 @@ public class MercadoPagoGateway implements PaymentGateway {
     private static final String CURRENCY = "UYU";
 
     private final RestClient http;
+    private final MercadoPagoAccountLink accountLink;
+    private final BigDecimal commissionPercent;
     private final String accessToken;
     private final String webhookSecret;
     private final String siteUrl;
@@ -48,8 +54,10 @@ public class MercadoPagoGateway implements PaymentGateway {
     public MercadoPagoGateway(@Value("${app.payments.access-token:}") String accessToken,
                               @Value("${app.payments.webhook-secret:}") String webhookSecret,
                               @Value("${app.notifications.site-url}") String siteUrl,
-                              @Value("${app.payments.notification-url:}") String notificationUrl) {
-        this(RestClient.builder(), accessToken, webhookSecret, siteUrl, notificationUrl);
+                              @Value("${app.payments.notification-url:}") String notificationUrl,
+                              @Value("${app.payments.commission-percent}") BigDecimal commissionPercent,
+                              MercadoPagoAccountLink accountLink) {
+        this(RestClient.builder(), accessToken, webhookSecret, siteUrl, notificationUrl, commissionPercent, accountLink);
         if (!isEnabled()) {
             log.warn("app.payments.access-token is not set: payments are disabled. Set MP_ACCESS_TOKEN to enable them.");
         } else if (this.webhookSecret.isEmpty()) {
@@ -58,14 +66,17 @@ public class MercadoPagoGateway implements PaymentGateway {
     }
 
     MercadoPagoGateway(RestClient.Builder http, String accessToken, String webhookSecret, String siteUrl,
-                       String notificationUrl) {
+                       String notificationUrl, BigDecimal commissionPercent, MercadoPagoAccountLink accountLink) {
+        this.accountLink = accountLink;
+        this.commissionPercent = commissionPercent;
         this.accessToken = accessToken == null ? "" : accessToken.trim();
         this.webhookSecret = webhookSecret == null ? "" : webhookSecret.trim();
         this.siteUrl = siteUrl;
-        this.notificationUrl = notificationUrl == null ? "" : notificationUrl.trim();
-        this.http = http.baseUrl(API_URL)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + this.accessToken)
-                .build();
+        String notifyAt = notificationUrl == null ? "" : notificationUrl.trim();
+        // Split payments need ?job= on it (see tokenFor), so it is always sent when the site has a public https URL
+        this.notificationUrl = notifyAt.isEmpty() && siteUrl.startsWith("https://")
+                ? siteUrl + "/api/v1/payments/webhook" : notifyAt;
+        this.http = http.baseUrl(API_URL).build();
     }
 
     @Override
@@ -74,8 +85,17 @@ public class MercadoPagoGateway implements PaymentGateway {
     }
 
     @Override
+    public boolean canCollect(Professional professional) {
+        // With linking on, jobs are charged into the professional's own account: they must have linked it
+        if (accountLink.isEnabled()) return professional.getMpAccessToken() != null;
+        return professional.getPayoutAccount() != null && !professional.getPayoutAccount().isBlank();
+    }
+
+    @Override
     public String createCheckout(JobRequest jobRequest) {
         requireEnabled();
+        String sellerToken = accountLink.accessToken(jobRequest.getProfessional());
+        String token = sellerToken == null ? accessToken : sellerToken;
         // The requests page opens the job linked with ?request=
         String backUrl = siteUrl + "/mis-solicitudes?request=" + jobRequest.getId();
 
@@ -87,39 +107,65 @@ public class MercadoPagoGateway implements PaymentGateway {
                 "unit_price", jobRequest.getPaymentAmount(),
                 "currency_id", CURRENCY)));
         preference.put("external_reference", jobRequest.getId().toString());
+        if (sellerToken != null) {
+            preference.put("marketplace_fee", jobRequest.getPaymentAmount().multiply(commissionPercent)
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+        }
         preference.put("back_urls", Map.of("success", backUrl, "failure", backUrl, "pending", backUrl));
         // shortcut: MP rejects auto_return on a non-https back URL, so locally the client clicks "Volver al sitio"
         if (siteUrl.startsWith("https://")) {
             preference.put("auto_return", "approved");
         }
         // Without it MP notifies the URL set in its panel (Tus integraciones → Webhooks)
+        // ?job= says whose account the payment is in, to read it with their token (MP keeps the query, adds data.id)
         if (!notificationUrl.isEmpty()) {
-            preference.put("notification_url", notificationUrl);
+            preference.put("notification_url", notificationUrl + (notificationUrl.contains("?") ? "&" : "?")
+                    + "job=" + jobRequest.getId());
         }
 
         Preference created = call(() -> http.post().uri("/checkout/preferences")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .body(preference).retrieve().body(Preference.class));
         // Test credentials (TEST-...) only work on the sandbox checkout
-        return accessToken.startsWith("TEST-") ? created.sandboxInitPoint() : created.initPoint();
+        return token.startsWith("TEST-") ? created.sandboxInitPoint() : created.initPoint();
     }
 
     @Override
-    public Payment getPayment(String paymentId) {
+    public Payment getPayment(String paymentId, JobRequest jobRequest) {
         requireEnabled();
+        String token = tokenFor(jobRequest);
         MpPayment payment = call(() -> http.get().uri("/v1/payments/{id}", paymentId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .retrieve().body(MpPayment.class));
         return new Payment(String.valueOf(payment.id()), payment.status(), payment.transactionAmount(),
                 payment.currencyId(), payment.externalReference());
     }
 
     @Override
-    public void refund(String paymentId, Long jobRequestId) {
-        requireEnabled();
+    public void refund(String paymentId, JobRequest jobRequest) {
+        // Already refunded from Mercado Pago's panel (their API refuses refunds for test sellers): nothing left to do
+        if ("refunded".equals(getPayment(paymentId, jobRequest).status())) {
+            log.info("Payment {} of job {} was already refunded", paymentId, jobRequest.getId());
+            return;
+        }
+        // A split payment is refunded whole, marketplace_fee included, from the professional's account
+        String token = tokenFor(jobRequest);
         // The same key on a retry makes MP answer with the refund it already made instead of a second one
         call(() -> http.post().uri("/v1/payments/{id}/refunds", paymentId)
-                .header("X-Idempotency-Key", "refund-job-" + jobRequestId + "-" + paymentId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .header("X-Idempotency-Key", "refund-job-" + jobRequest.getId() + "-" + paymentId)
                 .body(Map.of()).retrieve().toBodilessEntity());
-        log.info("Refunded payment {} of job {}", paymentId, jobRequestId);
+        log.info("Refunded payment {} of job {}", paymentId, jobRequest.getId());
+    }
+
+    /**
+     * A payment is in the account of the token that created it: the professional's if they linked one.
+     * shortcut: assumes the professional's link didn't change since the checkout (a job paid before they linked, or
+     * into an account they replaced, is read with the wrong token); store the collector on the job if that happens.
+     */
+    private String tokenFor(JobRequest jobRequest) {
+        String sellerToken = jobRequest == null ? null : accountLink.accessToken(jobRequest.getProfessional());
+        return sellerToken == null ? accessToken : sellerToken;
     }
 
     /**

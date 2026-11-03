@@ -10,6 +10,8 @@ import './ProfileMenu.css'
 
 interface ProfileMenuProps {
     authenticated: boolean
+    isAdmin?: boolean
+    isProfessional?: boolean
     onLogout: () => void
 }
 
@@ -18,7 +20,7 @@ interface MenuPosition {
     left: number
 }
 
-function ProfileMenu({ authenticated, onLogout }: ProfileMenuProps) {
+function ProfileMenu({ authenticated, isAdmin, isProfessional, onLogout }: ProfileMenuProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [position, setPosition] = useState<MenuPosition>({ top: 0, left: 0 })
     const triggerRef = useRef<HTMLButtonElement>(null)
@@ -98,6 +100,18 @@ function ProfileMenu({ authenticated, onLogout }: ProfileMenuProps) {
                     {authenticated && (
                         <a href="/profile/edit" role="menuitem">
                             Editar perfil
+                        </a>
+                    )}
+
+                    {isProfessional && (
+                        <a href="/mi-balance" role="menuitem">
+                            Mi balance
+                        </a>
+                    )}
+
+                    {isAdmin && (
+                        <a href="/admin/transferencias" role="menuitem">
+                            Transferencias
                         </a>
                     )}
 

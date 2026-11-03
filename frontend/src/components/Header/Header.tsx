@@ -102,6 +102,8 @@ function Header() {
                     <div className="profile-menu">
                         <ProfileMenu
                             authenticated
+                            isAdmin={user?.role === 'ADMIN'}
+                            isProfessional={isProfessional}
                             onLogout={handleLogout}
                         />
                     </div>

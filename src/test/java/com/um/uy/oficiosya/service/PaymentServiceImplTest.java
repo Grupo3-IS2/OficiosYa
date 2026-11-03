@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.entity.Client;
+import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
 import com.um.uy.oficiosya.entity.PaymentState;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -70,7 +72,7 @@ class PaymentServiceImplTest {
     }
 
     private void mpSays(String status, String amount, String currency, String reference) {
-        when(paymentGateway.getPayment("123"))
+        when(paymentGateway.getPayment(eq("123"), any()))
                 .thenReturn(new Payment("123", status, new BigDecimal(amount), currency, reference));
     }
 
@@ -112,10 +114,11 @@ class PaymentServiceImplTest {
         JobRequest job = job(JobStatus.ACCEPTED, PaymentState.PENDING);
         mpSays("approved", "1500", "UYU", "10");
 
-        service.handlePaymentNotification("123");
+        service.handlePaymentNotification("123", null);
 
         assertEquals(PaymentState.RETAINED, job.getPaymentState());
         assertEquals("123", job.getMpPaymentId());
+        assertEquals(OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC), job.getPaidAt());
         verify(events).publishEvent(new JobRequestEvents.JobStatusChanged(10L, JobRequestEvents.Change.PAID, clientId));
         verify(paymentGateway, never()).refund(any(), any());
     }
@@ -126,7 +129,7 @@ class PaymentServiceImplTest {
         job.setMpPaymentId("123");
         mpSays("approved", "1500", "UYU", "10");
 
-        service.handlePaymentNotification("123");
+        service.handlePaymentNotification("123", null);
 
         verify(jobRequestRepository, never()).save(any());
         verify(paymentGateway, never()).refund(any(), any());
@@ -137,7 +140,7 @@ class PaymentServiceImplTest {
         JobRequest job = job(JobStatus.ACCEPTED, PaymentState.PENDING);
         mpSays("in_process", "1500", "UYU", "10");
 
-        service.handlePaymentNotification("123");
+        service.handlePaymentNotification("123", null);
 
         assertEquals(PaymentState.PENDING, job.getPaymentState());
         verify(paymentGateway, never()).refund(any(), any());
@@ -149,9 +152,9 @@ class PaymentServiceImplTest {
         job.setMpPaymentId("999");
         mpSays("approved", "1500", "UYU", "10");
 
-        service.handlePaymentNotification("123");
+        service.handlePaymentNotification("123", null);
 
-        verify(paymentGateway).refund("123", 10L);
+        verify(paymentGateway).refund("123", job);
         assertEquals("999", job.getMpPaymentId());
     }
 
@@ -160,9 +163,9 @@ class PaymentServiceImplTest {
         JobRequest job = job(JobStatus.CANCELLED, PaymentState.PENDING);
         mpSays("approved", "1500", "UYU", "10");
 
-        service.handlePaymentNotification("123");
+        service.handlePaymentNotification("123", null);
 
-        verify(paymentGateway).refund("123", 10L);
+        verify(paymentGateway).refund("123", job);
         assertEquals(PaymentState.PENDING, job.getPaymentState());
     }
 
@@ -171,17 +174,42 @@ class PaymentServiceImplTest {
         JobRequest job = job(JobStatus.ACCEPTED, PaymentState.PENDING);
         mpSays("approved", "1", "UYU", "10");
 
-        service.handlePaymentNotification("123");
+        service.handlePaymentNotification("123", null);
 
-        verify(paymentGateway).refund("123", 10L);
+        verify(paymentGateway).refund("123", job);
         assertEquals(PaymentState.PENDING, job.getPaymentState());
+    }
+
+    @Test
+    void aNotificationForAnotherJobThanThePaymentSays_isIgnored() {
+        JobRequest job = job(JobStatus.ACCEPTED, PaymentState.PENDING);
+        JobRequest other = JobRequest.builder().id(11L).professional(professional).build();
+        when(jobRequestRepository.findById(11L)).thenReturn(Optional.of(other));
+        mpSays("approved", "1500", "UYU", "10");
+
+        service.handlePaymentNotification("123", 11L);
+
+        verify(paymentGateway).getPayment("123", other);
+        assertEquals(PaymentState.PENDING, job.getPaymentState());
+        verify(paymentGateway, never()).refund(any(), any());
+    }
+
+    @Test
+    void theNotifiedJob_isWhosePaymentIsRead() {
+        JobRequest job = job(JobStatus.ACCEPTED, PaymentState.PENDING);
+        mpSays("approved", "1500", "UYU", "10");
+
+        service.handlePaymentNotification("123", 10L);
+
+        verify(paymentGateway).getPayment("123", job);
+        assertEquals(PaymentState.RETAINED, job.getPaymentState());
     }
 
     @Test
     void aPaymentWithoutAKnownJob_isIgnored() {
         mpSays("approved", "1500", "UYU", "not-a-job");
 
-        service.handlePaymentNotification("123");
+        service.handlePaymentNotification("123", null);
 
         verify(paymentGateway, never()).refund(any(), any());
     }
@@ -194,7 +222,23 @@ class PaymentServiceImplTest {
         when(jobRequestRepository.findByPaymentStateAndPayoutAtIsNullOrderByUpdatedAtAsc(PaymentState.PAID))
                 .thenReturn(List.of(job));
 
-        assertEquals(1, service.listPendingPayouts().size());
+        professional.setPayoutAccount("BROU 001234567-00001");
+
+        List<JobRequestResponse> payouts = service.listPendingPayouts();
+        assertEquals(1, payouts.size());
+        assertEquals("BROU 001234567-00001", payouts.getFirst().getProfessionalPayoutAccount());
+    }
+
+    @Test
+    void payoutHistory_isTheTransfersMade_withWhereTheyWent() {
+        JobRequest job = job(JobStatus.COMPLETED, PaymentState.PAID);
+        job.setPayoutAt(OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
+        professional.setPayoutAccount("BROU · 001234567-00001 · Beto");
+        when(jobRequestRepository.findByPayoutAtIsNotNullOrderByPayoutAtDesc()).thenReturn(List.of(job));
+
+        List<JobRequestResponse> history = service.listPayoutHistory();
+        assertEquals(1, history.size());
+        assertEquals("BROU · 001234567-00001 · Beto", history.getFirst().getProfessionalPayoutAccount());
     }
 
     @Test

@@ -39,10 +39,15 @@ public class JobRequestResponse {
     private ServiceAreaResponse professionalServiceArea;
     private BigDecimal paymentAmount;
     private PaymentState paymentState;
+    /** Mercado Pago's operation number and when it was confirmed, for the receipt; null until paid. */
+    private String mpPaymentId;
+    private OffsetDateTime paidAt;
     /** OficiosYa's commission, once PAID; the professional gets paymentAmount minus this. */
     private BigDecimal platformFee;
     /** When the professional was transferred their share; null until then. */
     private OffsetDateTime payoutAt;
+    /** Where to transfer the professional; only in the admin's pending payouts. */
+    private String professionalPayoutAccount;
     private JobStatus status;
     private List<TaskResponse> tasks;
 

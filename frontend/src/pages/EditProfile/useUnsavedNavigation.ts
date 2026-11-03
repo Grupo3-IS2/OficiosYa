@@ -44,6 +44,8 @@ export default function useUnsavedNavigation(hasChanges: boolean, busy: boolean)
 
     return {
         isOpen: pendingNavigation !== null,
+        /** Leaves without asking: for a page that brings the user back, like Mercado Pago's login. */
+        leave: (url: string) => { allowExit.current = true; window.location.assign(url) },
         requestNavigation,
         continueNavigation,
         cancelNavigation: () => { if (!busy) setPendingNavigation(null) },

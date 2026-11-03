@@ -235,6 +235,11 @@ public class JobRequestServiceImpl implements JobRequestService {
             jobRequest.setProposedStart(null);
             jobRequest.setProposedEnd(null);
         } else {
+            // The professional accepts: without where to pay them, the job couldn't be charged or paid out
+            if (paymentGateway.isEnabled() && !paymentGateway.canCollect(jobRequest.getProfessional())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Vinculá en tu perfil la cuenta donde querés cobrar antes de aceptar trabajos");
+            }
             if (request == null || request.getStartTimestamp() == null || request.getEndTimestamp() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí el horario del trabajo para aceptarlo");
             }
@@ -291,7 +296,7 @@ public class JobRequestServiceImpl implements JobRequestService {
 
         if (jobRequest.getPaymentState() == PaymentState.RETAINED) {
             // Before the change: if Mercado Pago fails, the job stays as it was instead of cancelled without the refund
-            paymentGateway.refund(jobRequest.getMpPaymentId(), jobRequest.getId());
+            paymentGateway.refund(jobRequest.getMpPaymentId(), jobRequest);
             jobRequest.setPaymentState(PaymentState.REFUNDED);
         }
 
@@ -388,6 +393,10 @@ public class JobRequestServiceImpl implements JobRequestService {
             jobRequest.setPaymentState(PaymentState.PAID);
             jobRequest.setPlatformFee(jobRequest.getPaymentAmount().multiply(commissionPercent)
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+            // Charged into the professional's linked account (split): Mercado Pago already paid them, nothing to transfer
+            if (jobRequest.getProfessional().getMpAccessToken() != null) {
+                jobRequest.setPayoutAt(OffsetDateTime.now(clock));
+            }
         }
 
         jobRequest.setStatus(JobStatus.COMPLETED);

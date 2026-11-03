@@ -148,6 +148,21 @@ class ProfessionalServiceImplTest {
     }
 
     @Test
+    void updateProfessional_aTypedPayoutAccount_isNoLongerTheLinkedMercadoPagoOne() {
+        found();
+        professional.setPayoutAccount("Mercado Pago · ana@correo.com · Ana Pérez");
+        professional.setPayoutMpUserId("123");
+
+        // The same text again (saving the rest of the profile) keeps the link
+        service.updateProfessional(ProfessionalUpdateRequest.builder().payoutAccount("Mercado Pago · ana@correo.com · Ana Pérez").build(), id);
+        assertEquals("123", professional.getPayoutMpUserId());
+
+        service.updateProfessional(ProfessionalUpdateRequest.builder().payoutAccount(" BROU · 001234567-00001 · Ana Pérez ").build(), id);
+        assertEquals("BROU · 001234567-00001 · Ana Pérez", professional.getPayoutAccount());
+        assertNull(professional.getPayoutMpUserId());
+    }
+
+    @Test
     void updateProfessional_withAServiceArea_replacesIt() {
         found();
         ServiceAreaRequest area = new ServiceAreaRequest(-34.9, -56.15, 8);

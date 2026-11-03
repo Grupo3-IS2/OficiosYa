@@ -111,6 +111,16 @@ public class ProfessionalServiceImpl implements ProfessionalService {
             professional.setDescription(professionalRequest.getDescription());
         }
 
+        String payoutAccount = professionalRequest.getPayoutAccount() == null ? "" : professionalRequest.getPayoutAccount().trim();
+        if (!payoutAccount.isEmpty() && !payoutAccount.equals(professional.getPayoutAccount())) {
+            professional.setPayoutAccount(payoutAccount);
+            // Typed, it is no longer the account Mercado Pago confirmed
+            professional.setPayoutMpUserId(null);
+            professional.setMpAccessToken(null);
+            professional.setMpRefreshToken(null);
+            professional.setMpTokenExpiresAt(null);
+        }
+
         if (professionalRequest.getServiceArea() != null) {
             professional.setServiceArea(professionalMapper.toServiceArea(professionalRequest.getServiceArea()));
         }

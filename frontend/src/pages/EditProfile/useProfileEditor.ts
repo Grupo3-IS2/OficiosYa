@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCurrentUser, isAuthenticated, updateStoredUser } from '../../services/authService'
-import { addExpertiseTrade, changePassword, getAuthenticatedUser, getTrades, isProfessionalResponse, removeExpertiseTrade, setProfessionalPublished, updateNotifications, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, removeProfileImage, uploadProfileImage, verifyEmailChange } from '../../services/userService'
+import { addExpertiseTrade, changePassword, getAuthenticatedUser, isMercadoPagoLinkAvailable, getTrades, isProfessionalResponse, removeExpertiseTrade, setProfessionalPublished, updateNotifications, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, removeProfileImage, uploadProfileImage, verifyEmailChange } from '../../services/userService'
 import type { ProfessionalResponse } from '../../services/userService'
 import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, sameServiceArea, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
@@ -8,6 +8,7 @@ import type { PersonalData, ProfessionalData, ProfileSection, SecurityData } fro
 import type { PendingVerification } from '../../types/Auth'
 import type { Trade } from '../../types/Professional'
 import type { AccountAccess } from './components/GoogleAccountSection'
+import { emptyPayout, formatPayout, parsePayout, validatePayout, type PayoutData } from './payoutAccount'
 
 function professionalDataFrom(response: ProfessionalResponse): ProfessionalData {
     return {
@@ -48,6 +49,10 @@ export default function useProfileEditor(professionalOverride?: boolean) {
         published: false,
     })
     const [professional, setProfessional] = useState(savedProfessional)
+    const [savedPayout, setSavedPayout] = useState<PayoutData>(emptyPayout)
+    const [payout, setPayout] = useState<PayoutData>(emptyPayout)
+    const [payoutVerified, setPayoutVerified] = useState(false)
+    const [mercadoPagoLinkAvailable, setMercadoPagoLinkAvailable] = useState(false)
     const [trades, setTrades] = useState<Trade[]>([])
     const [tradesError, setTradesError] = useState('')
     const [tradesLoading, setTradesLoading] = useState(true)
@@ -91,6 +96,12 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 const professionalData = professionalDataFrom(response)
                 setSavedProfessional(professionalData)
                 setProfessional(professionalData)
+                const payoutData = parsePayout(response.payoutAccount)
+                setSavedPayout(payoutData)
+                setPayout(payoutData)
+                setPayoutVerified(response.payoutVerified)
+                // Unknown (e.g. offline) counts as off: the account can still be typed
+                void isMercadoPagoLinkAvailable().then(available => { if (active) setMercadoPagoLinkAvailable(available) }).catch(() => {})
             }
         }).catch(() => {
             if (active) {
@@ -144,6 +155,14 @@ export default function useProfileEditor(professionalOverride?: boolean) {
         personal: personalChanged(personal, savedPersonal),
         security: securityChanged(security),
         professional: isProfessional && professionalChanged(professional, savedProfessional),
+        // Compared as typed, not as saved: an account that doesn't fit its bank's format still has to reach validation
+        payout: isProfessional && JSON.stringify(payout) !== JSON.stringify(savedPayout),
+    }
+
+    function changePayout(value: PayoutData) {
+        setPayout(value)
+        setMessages(previous => ({ ...previous, payout: '' }))
+        if (errorSection === 'payout') setError('')
     }
 
     function changeProfessional(value: ProfessionalData) {
@@ -184,9 +203,25 @@ export default function useProfileEditor(professionalOverride?: boolean) {
                 return false
             }
         }
+        if (sections.includes('payout') && dirty.payout) {
+            const validationError = validatePayout(payout, savedPayout)
+            if (validationError) {
+                setError(validationError)
+                return false
+            }
+        }
         saving.current = true
         setBusy(true)
         try {
+            if (sections.includes('payout') && dirty.payout) {
+                if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de guardar dónde cobrás.')
+                const response = await updateProfessional({ payoutAccount: formatPayout(payout) })
+                const saved = parsePayout(response.payoutAccount)
+                setPayoutVerified(response.payoutVerified)
+                setSavedPayout(saved)
+                setPayout(saved)
+                setMessages(previous => ({ ...previous, payout: 'Datos de cobro actualizados.' }))
+            }
             if (sections.includes('security') && dirty.security) {
                 if (!isAuthenticated()) throw new Error('Inicia sesión nuevamente antes de cambiar tu contraseña.')
                 await changePassword({
@@ -331,7 +366,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
 
     return {
         requestEmailChange, confirmEmailChange,
-        user, isProfessional, personal, setPersonal, selectPhoto, removePhoto, savedPersonalEmail: savedPersonal.email, access, setAccess, professional, setProfessional: changeProfessional, trades, tradesError, tradesLoading, security, setSecurity,
+        user, isProfessional, personal, setPersonal, selectPhoto, removePhoto, savedPersonalEmail: savedPersonal.email, access, setAccess, professional, setProfessional: changeProfessional, payout, savedPayout, payoutVerified, mercadoPagoLinkAvailable, setPayout: changePayout, trades, tradesError, tradesLoading, security, setSecurity,
         busy, loadingProfile, profileLoadFailed, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),
@@ -339,6 +374,7 @@ export default function useProfileEditor(professionalOverride?: boolean) {
         discard: () => {
             setPersonal(savedPersonal)
             setProfessional(savedProfessional)
+            setPayout(savedPayout)
             setSecurity({ current: '', password: '', confirmation: '' })
             setPhoto(null)
             releasePhotoPreview()

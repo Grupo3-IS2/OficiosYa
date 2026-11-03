@@ -31,6 +31,15 @@ export interface JobRequest {
     professionalServiceArea?: ServiceArea | null
     paymentAmount: number
     paymentState?: PaymentState
+    /** Mercado Pago's operation number and when it was confirmed; null until paid. */
+    mpPaymentId?: string | null
+    paidAt?: string | null
+    /** OficiosYa's commission, once the PIN releases the payment; the professional gets the rest. */
+    platformFee?: number | null
+    /** When the professional was transferred their share. */
+    payoutAt?: string | null
+    /** Where to transfer the professional; only in the admin's pending payouts. */
+    professionalPayoutAccount?: string | null
     status: JobStatus
     tasks: JobTask[]
     /** The timeframe the proposing side asked for, while the proposal waits for an answer. */

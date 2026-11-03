@@ -56,6 +56,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -306,6 +307,22 @@ class JobRequestServiceImplTest {
     }
 
     @Test
+    void acceptJobRequest_withPaymentsOn_needsWhereToPayTheProfessional() {
+        job(JobStatus.PROPOSED);
+        when(paymentGateway.isEnabled()).thenReturn(true);
+        JobRequestAcceptRequest request = new JobRequestAcceptRequest();
+        OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+        request.setStartTimestamp(start);
+        request.setEndTimestamp(start.plusHours(2));
+
+        assertThrows(ResponseStatusException.class, () -> service.acceptJobRequest(10L, request, professionalId));
+        verify(scheduleService, never()).createJobSchedule(any(), any(), any());
+
+        when(paymentGateway.canCollect(professional)).thenReturn(true);
+        assertEquals(JobStatus.ACCEPTED, service.acceptJobRequest(10L, request, professionalId).getStatus());
+    }
+
+    @Test
     void acceptJobRequest_unknownJob_isNotFound() {
         when(jobRequestRepository.findById(10L)).thenReturn(Optional.empty());
         JobRequestAcceptRequest request = new JobRequestAcceptRequest();
@@ -411,7 +428,7 @@ class JobRequestServiceImplTest {
         job.setMpPaymentId("pay-1");
 
         assertEquals(PaymentState.REFUNDED, service.cancelJobRequest(10L, null, clientId).getPaymentState());
-        verify(paymentGateway).refund("pay-1", 10L);
+        verify(paymentGateway).refund("pay-1", job);
     }
 
     @Test
@@ -419,7 +436,7 @@ class JobRequestServiceImplTest {
         JobRequest job = scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusDays(3));
         job.setPaymentState(PaymentState.RETAINED);
         job.setMpPaymentId("pay-1");
-        doThrow(new ResponseStatusException(HttpStatus.BAD_GATEWAY)).when(paymentGateway).refund("pay-1", 10L);
+        doThrow(new ResponseStatusException(HttpStatus.BAD_GATEWAY)).when(paymentGateway).refund("pay-1", job);
 
         assertThrows(ResponseStatusException.class, () -> service.cancelJobRequest(10L, null, clientId));
         assertEquals(JobStatus.ACCEPTED, job.getStatus());
@@ -743,6 +760,22 @@ class JobRequestServiceImplTest {
         assertEquals(JobStatus.COMPLETED, response.getStatus());
         assertEquals(PaymentState.PAID, response.getPaymentState());
         assertEquals(new BigDecimal("150.00"), response.getPlatformFee());
+        assertNull(response.getPayoutAt());
+    }
+
+    @Test
+    void completeJobRequest_ofASplitPayment_hasNothingLeftToTransfer() {
+        JobRequest job = job(JobStatus.ACCEPTED);
+        job.setPaymentAmount(BigDecimal.valueOf(1000));
+        job.setPaymentState(PaymentState.RETAINED);
+        professional.setMpAccessToken("encrypted");
+        when(paymentGateway.isEnabled()).thenReturn(true);
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+
+        JobRequestResponse response = service.completeJobRequest(10L, pin("123456"), professionalId);
+
+        assertEquals(PaymentState.PAID, response.getPaymentState());
+        assertNotNull(response.getPayoutAt());
     }
 
     @Test

@@ -103,4 +103,6 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
 
     /** Jobs whose payment was released by the PIN but whose professional wasn't transferred yet, oldest first. */
     List<JobRequest> findByPaymentStateAndPayoutAtIsNullOrderByUpdatedAtAsc(PaymentState paymentState);
+
+    List<JobRequest> findByPayoutAtIsNotNullOrderByPayoutAtDesc();
 }

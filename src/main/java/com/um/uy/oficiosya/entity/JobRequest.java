@@ -88,6 +88,9 @@ public class JobRequest {
     @Column(length = 64)
     private String mpPaymentId;
 
+    /** When Mercado Pago confirmed that payment; null on jobs paid before it was kept. */
+    private OffsetDateTime paidAt;
+
     /** OficiosYa's commission, taken when the PIN releases the payment (PAID); the professional gets the rest. */
     @Column(precision = 12, scale = 2)
     private BigDecimal platformFee;

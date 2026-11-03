@@ -43,7 +43,7 @@ export function validateServiceRequest(value: ServiceRequestFormValue, now = new
     if (!value.location.trim()) errors.location = 'Ingresá la dirección o ubicación.'
     if (timeframe && 'error' in timeframe) errors.timeframe = timeframe.error
     if (!value.paymentAmount.trim()) errors.paymentAmount = 'Ingresá el monto del servicio.'
-    else if (!Number.isFinite(amount) || amount < 0) errors.paymentAmount = 'El monto no puede ser negativo.'
+    else if (!Number.isFinite(amount) || amount <= 0) errors.paymentAmount = 'El monto tiene que ser mayor a cero.'
     if (value.tasks.length === 0) errors.tasks = 'Agregá al menos una tarea.'
 
     errors.taskErrors = value.tasks.map(task => ({

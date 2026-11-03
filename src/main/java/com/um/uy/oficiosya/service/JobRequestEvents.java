@@ -18,7 +18,11 @@ public final class JobRequestEvents {
     }
 
     public enum Change {
-        ACCEPTED, REJECTED, CANCELLED, RESCHEDULE_REQUESTED, RESCHEDULE_ACCEPTED, RESCHEDULE_REJECTED, COMPLETED
+        ACCEPTED, REJECTED, CANCELLED, RESCHEDULE_REQUESTED, RESCHEDULE_ACCEPTED, RESCHEDULE_REJECTED, COMPLETED,
+        /** The client paid: the money is held until the PIN. */
+        PAID,
+        /** Nobody paid by the time it could still be cancelled, so it was cancelled; no actor. */
+        PAYMENT_EXPIRED
     }
 
     /** One side asked to move an accepted job: the other side is told. */

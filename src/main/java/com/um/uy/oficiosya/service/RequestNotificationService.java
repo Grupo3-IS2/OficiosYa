@@ -107,7 +107,6 @@ public class RequestNotificationService {
         JobRequest job = jobRequestRepository.findById(jobRequestId).orElse(null);
         if (job == null) return;
 
-        Client actor = actorOf(job, change, actorId);
         String what = switch (change) {
             case null -> "propuso un trabajo";
             case ACCEPTED -> "aceptó el trabajo";
@@ -116,9 +115,13 @@ public class RequestNotificationService {
             case RESCHEDULE_ACCEPTED -> "aceptó el cambio de horario del trabajo";
             case RESCHEDULE_REJECTED -> "rechazó el cambio de horario del trabajo";
             case COMPLETED -> "marcó como completado el trabajo";
-            case RESCHEDULE_REQUESTED -> null;
+            case PAID -> "pagó el trabajo";
+            case RESCHEDULE_REQUESTED, PAYMENT_EXPIRED -> null;
         };
-        String event = actor.getName() + " " + what;
+        // Nobody did it: the job wasn't paid in time
+        String event = change == JobRequestEvents.Change.PAYMENT_EXPIRED
+                ? "Se canceló por falta de pago el trabajo"
+                : actorOf(job, change, actorId).getName() + " " + what;
 
         // The scheduled block once accepted, otherwise the timeframe the professional offered
         String when = job.getSchedules().stream()

@@ -37,6 +37,11 @@ export function canCompleteRequest(request: Pick<JobRequest, 'professionalId' | 
         && (request.status === 'ACCEPTED' || request.status === 'RESCHEDULE_REQUESTED'))
 }
 
+/** An accepted job the client still has to pay: until then it can't be completed and the contact stays hidden. */
+export function awaitsPayment(request: Pick<JobRequest, 'status' | 'paymentState'>): boolean {
+    return request.paymentState === 'PENDING' && (request.status === 'ACCEPTED' || request.status === 'RESCHEDULE_REQUESTED')
+}
+
 /** PINs are six-digit strings, including leading zeroes; never parse them as numbers. */
 export function completionPin(value: string): { pin: string } | { error: string } {
     const pin = value.trim()

@@ -26,6 +26,12 @@ export async function reviewJobRequest(id: number, payload: { rating: number; re
     return updated
 }
 
+/** The client of an accepted, unpaid job gets the Mercado Pago checkout to send the browser to. */
+export async function startPayment(id: number): Promise<string> {
+    const { initPoint } = await apiRequest<{ initPoint: string }>(`/job-requests/${id}/payment`, { method: 'POST' })
+    return initPoint
+}
+
 /** Only the job's professional can confirm the client's PIN and complete the work. */
 export function completeJobRequest(id: number, pin: string): Promise<JobRequest> {
     return apiRequest<JobRequest>(`/job-requests/${id}/complete`, {

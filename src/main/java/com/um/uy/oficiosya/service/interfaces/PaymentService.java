@@ -5,7 +5,7 @@ import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import java.util.List;
 import java.util.UUID;
 
-/** Payment lifecycle: PENDING → (client pays) RETAINED → (PIN) PAID, or RETAINED → (cancel) REFUNDED. */
+/** Payment lifecycle: PENDING → (client pays) RETAINED → (PIN) PAID, or RETAINED → (cancel, then an admin) REFUNDED. */
 public interface PaymentService {
 
     /**
@@ -29,4 +29,13 @@ public interface PaymentService {
 
     /** An admin transferred the professional their share; 400 unless the job waits for that. */
     JobRequestResponse markPaidOut(Long jobRequestId);
+
+    /** Cancelled jobs whose money is still held, oldest first. */
+    List<JobRequestResponse> listPendingRefunds();
+
+    /** Money already given back to clients, newest first. */
+    List<JobRequestResponse> listRefundHistory();
+
+    /** An admin gave the client their money back, from Mercado Pago; 400 unless the job waits for that. */
+    JobRequestResponse markRefunded(Long jobRequestId);
 }

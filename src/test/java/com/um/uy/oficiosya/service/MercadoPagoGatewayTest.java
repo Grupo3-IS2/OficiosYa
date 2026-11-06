@@ -20,6 +20,7 @@ import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -39,6 +40,7 @@ class MercadoPagoGatewayTest {
     private static final BigDecimal COMMISSION = new BigDecimal("15");
     /** The linked professional's OAuth access token. */
     private static final String SELLER = "seller-token";
+    private static final String PLATFORM = "platform-token";
 
     private final MercadoPagoAccountLink accountLink = mock(MercadoPagoAccountLink.class);
 
@@ -210,9 +212,25 @@ class MercadoPagoGatewayTest {
 
     // --- split payments, into the professional's linked account ---
 
+    /** A job charged into the account the professional still has linked. */
+    private static JobRequest splitJob() {
+        JobRequest job = job();
+        job.getProfessional().setPayoutMpUserId("987");
+        job.setMpCollectorUserId("987");
+        return job;
+    }
+
+    /** With OficiosYa's own token being PLATFORM, to tell which of the two a request used. */
+    private MercadoPagoGateway platformGateway() {
+        RestClient.Builder builder = RestClient.builder();
+        mp = MockRestServiceServer.bindTo(builder).build();
+        return new MercadoPagoGateway(builder, PLATFORM, SECRET, "http://localhost:5173", "", COMMISSION, accountLink);
+    }
+
     @Test
     void createCheckout_forALinkedProfessional_chargesIntoTheirAccount_withTheCommissionAsMarketplaceFee() {
         JobRequest job = job();
+        job.getProfessional().setPayoutMpUserId("987");
         when(accountLink.accessToken(job.getProfessional())).thenReturn(SELLER);
         mp.expect(requestTo(MercadoPagoGateway.API_URL + "/checkout/preferences"))
                 .andExpect(header("Authorization", "Bearer " + SELLER))
@@ -221,11 +239,80 @@ class MercadoPagoGatewayTest {
 
         assertEquals("https://mp/checkout", gateway.createCheckout(job));
         mp.verify();
+        assertEquals("987", job.getMpCollectorUserId());
+    }
+
+    @Test
+    void createCheckout_withoutALinkedAccount_isCollectedByOficiosYa() {
+        JobRequest job = splitJob(); // from a checkout opened before the link was lost
+        MercadoPagoGateway platform = platformGateway();
+        mp.expect(requestTo(MercadoPagoGateway.API_URL + "/checkout/preferences"))
+                .andExpect(header("Authorization", "Bearer " + PLATFORM))
+                .andRespond(withSuccess("{\"init_point\":\"https://mp/checkout\"}", MediaType.APPLICATION_JSON));
+
+        platform.createCheckout(job);
+
+        assertNull(job.getMpCollectorUserId());
+    }
+
+    @Test
+    void aPaymentCollectedByOficiosYa_isReadWithItsToken_evenIfTheProfessionalLinkedSince() {
+        JobRequest job = job();
+        job.getProfessional().setPayoutMpUserId("987");
+        MercadoPagoGateway platform = platformGateway();
+        mp.expect(requestTo(MercadoPagoGateway.API_URL + "/v1/payments/123"))
+                .andExpect(header("Authorization", "Bearer " + PLATFORM))
+                .andRespond(withSuccess("{\"id\":123,\"status\":\"approved\"}", MediaType.APPLICATION_JSON));
+
+        platform.getPayment("123", job);
+        mp.verify();
+    }
+
+    @Test
+    void aPaymentInAnAccountNoLongerLinked_isNeverTriedWithAnotherToken() {
+        JobRequest job = splitJob();
+        job.getProfessional().setPayoutMpUserId("111");
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> gateway.refund("123", job));
+        assertEquals(502, e.getStatusCode().value());
+        assertTrue(e.getReason().contains("volver a vincular"));
+        mp.verify();
+    }
+
+    @Test
+    void aSplitPaymentAfterLinkingWasTurnedOff_isNeverTriedWithoutAToken() {
+        JobRequest job = splitJob();
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> gateway.getPayment("123", job));
+        assertEquals(502, e.getStatusCode().value());
+        mp.verify();
+    }
+
+    @Test
+    void aRevokedToken_saysToLinkAgain() {
+        JobRequest job = splitJob();
+        when(accountLink.accessToken(job.getProfessional())).thenReturn(SELLER);
+        when(accountLink.unlinkIfRevoked(job.getProfessional())).thenReturn(true);
+        mp.expect(requestTo(MercadoPagoGateway.API_URL + "/v1/payments/123")).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> gateway.getPayment("123", job));
+        assertTrue(e.getReason().contains("volver a vincular"));
+    }
+
+    @Test
+    void a401ThatIsntAboutTheToken_isAnOrdinaryFailure() {
+        JobRequest job = splitJob();
+        when(accountLink.accessToken(job.getProfessional())).thenReturn(SELLER);
+        when(accountLink.unlinkIfRevoked(job.getProfessional())).thenReturn(false);
+        mp.expect(requestTo(MercadoPagoGateway.API_URL + "/v1/payments/123")).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> gateway.getPayment("123", job));
+        assertFalse(e.getReason().contains("volver a vincular"));
     }
 
     @Test
     void refund_ofASplitPayment_usesTheProfessionalsToken() {
-        JobRequest job = job();
+        JobRequest job = splitJob();
         when(accountLink.accessToken(job.getProfessional())).thenReturn(SELLER);
         mp.expect(requestTo(MercadoPagoGateway.API_URL + "/v1/payments/123"))
                 .andExpect(header("Authorization", "Bearer " + SELLER))

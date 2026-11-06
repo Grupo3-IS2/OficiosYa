@@ -32,6 +32,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
@@ -47,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -78,11 +80,25 @@ class ProfessionalServiceImplTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
-                expertiseTradeRepository, professionalMapper, passwordEncoder);
+                expertiseTradeRepository, professionalMapper, passwordEncoder, mock(MercadoPagoAccountLink.class));
         professional = Professional.builder().id(1L).publicId(id).name("Beto Gómez").email("beto@example.com")
                 .phoneNumber("099123456").workingLocation("Montevideo").build();
         when(professionalRepository.save(any(Professional.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(professionalMapper.toResponse(any(Professional.class))).thenReturn(mapped);
+    }
+
+    @Test
+    void updateProfessional_aTypedPayoutAccount_isRefusedWhileAnOpenJobDependsOnTheLinkedOne() {
+        MercadoPagoAccountLink accountLink = mock(MercadoPagoAccountLink.class);
+        service = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
+                expertiseTradeRepository, professionalMapper, passwordEncoder, accountLink);
+        found();
+        professional.setPayoutMpUserId("123");
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT)).when(accountLink).requireNoOpenCharges(professional);
+
+        assertThrows(ResponseStatusException.class, () -> service.updateProfessional(
+                ProfessionalUpdateRequest.builder().payoutAccount("BROU · 001234567-00001 · Ana").build(), id));
+        assertEquals("123", professional.getPayoutMpUserId());
     }
 
     private void found() {

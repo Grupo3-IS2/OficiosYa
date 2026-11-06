@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,6 +37,14 @@ public class MercadoPagoLinkController {
     @PostMapping("/api/v1/professionals/me/mercado-pago")
     public ResponseEntity<Map<String, String>> startLink(Authentication authentication) {
         return ResponseEntity.ok(Map.of("authorizationUrl", accountLink.authorizationUrl(AuthenticatedUser.id(authentication))));
+    }
+
+    /** Stops charging into the linked account; 409 while an open job's payment depends on it. */
+    @PreAuthorize("hasRole('PROFESSIONAL')")
+    @DeleteMapping("/api/v1/professionals/me/mercado-pago")
+    public ResponseEntity<Void> unlink(Authentication authentication) {
+        accountLink.unlink(AuthenticatedUser.id(authentication));
+        return ResponseEntity.noContent().build();
     }
 
     /** Mercado Pago brings the browser back here (public: the signed state says who it is for), then to the profile. */

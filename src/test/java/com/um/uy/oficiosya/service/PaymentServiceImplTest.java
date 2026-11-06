@@ -241,6 +241,43 @@ class PaymentServiceImplTest {
         assertEquals("BROU · 001234567-00001 · Beto", history.getFirst().getProfessionalPayoutAccount());
     }
 
+    // --- refunds ---
+
+    @Test
+    void pendingRefunds_areTheCancelledJobsStillHoldingTheMoney() {
+        JobRequest job = job(JobStatus.CANCELLED, PaymentState.RETAINED);
+        when(jobRequestRepository.findByStatusAndPaymentStateOrderByUpdatedAtAsc(JobStatus.CANCELLED, PaymentState.RETAINED))
+                .thenReturn(List.of(job));
+
+        assertEquals(1, service.listPendingRefunds().size());
+    }
+
+    @Test
+    void markRefunded_recordsIt_once_withoutCallingMercadoPago() {
+        job(JobStatus.CANCELLED, PaymentState.RETAINED);
+
+        assertEquals(PaymentState.REFUNDED, service.markRefunded(10L).getPaymentState());
+        assertThrows(ResponseStatusException.class, () -> service.markRefunded(10L));
+
+        verify(paymentGateway, never()).refund(any(), any());
+    }
+
+    @Test
+    void refundHistory_isTheMoneyGivenBack() {
+        JobRequest job = job(JobStatus.CANCELLED, PaymentState.REFUNDED);
+        when(jobRequestRepository.findByPaymentStateOrderByUpdatedAtDesc(PaymentState.REFUNDED)).thenReturn(List.of(job));
+
+        assertEquals(1, service.listRefundHistory().size());
+    }
+
+    @Test
+    void markRefunded_ofAJobStillOpen_isRefused() {
+        JobRequest job = job(JobStatus.ACCEPTED, PaymentState.RETAINED);
+
+        assertThrows(ResponseStatusException.class, () -> service.markRefunded(10L));
+        assertEquals(PaymentState.RETAINED, job.getPaymentState());
+    }
+
     @Test
     void markPaidOut_recordsWhen_once() {
         JobRequest job = job(JobStatus.COMPLETED, PaymentState.PAID);

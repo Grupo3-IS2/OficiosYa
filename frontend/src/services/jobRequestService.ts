@@ -42,6 +42,21 @@ export function getPayoutHistory(): Promise<JobRequest[]> {
     return apiRequest<JobRequest[]>('/admin/payouts/history')
 }
 
+/** Admin: cancelled jobs whose money the client still has to get back, oldest first. */
+export function getPendingRefunds(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/refunds')
+}
+
+/** Admin: money already given back to clients, newest first. */
+export function getRefundHistory(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/refunds/history')
+}
+
+/** Admin: records that the money was given back to the client. */
+export function markRefunded(id: number): Promise<JobRequest> {
+    return apiRequest<JobRequest>(`/admin/refunds/${id}`, { method: 'POST' })
+}
+
 /** Admin: records that the transfer to the professional was made. */
 export function markPaidOut(id: number): Promise<JobRequest> {
     return apiRequest<JobRequest>(`/admin/payouts/${id}`, { method: 'POST' })

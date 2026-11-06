@@ -218,7 +218,7 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                     </div>
                     {request.paymentState && <div>
                         <span>Pago</span>
-                        <strong>{paymentLabels[request.paymentState]}</strong>
+                        <strong>{request.status === 'CANCELLED' && request.paymentState === 'RETAINED' ? 'Devolución pendiente' : paymentLabels[request.paymentState]}</strong>
                     </div>}
                 </section>
 
@@ -236,7 +236,7 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                     </div>
                 </section>}
 
-                {!isClient && (request.paymentState === 'RETAINED' || request.paymentState === 'PAID') && <section className="request-detail-section" aria-labelledby="request-payout-title">
+                {!isClient && request.status !== 'CANCELLED' && (request.paymentState === 'RETAINED' || request.paymentState === 'PAID') && <section className="request-detail-section" aria-labelledby="request-payout-title">
                     <h3 id="request-payout-title">Tu cobro</h3>
                     {request.paymentState === 'PAID' && request.platformFee != null
                         ? <div className="request-detail-summary">

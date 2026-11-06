@@ -15,7 +15,7 @@ import java.util.List;
 
 /**
  * Paying a job with Mercado Pago. The client pays once the job is accepted; Mercado Pago tells the webhook,
- * the job's paymentState becomes RETAINED, and the PIN later releases it (PAID) or a cancel refunds it.
+ * the job's paymentState becomes RETAINED, and the PIN later releases it (PAID) or, once cancelled, an admin refunds it.
  */
 @RestController
 public class PaymentController {
@@ -77,5 +77,26 @@ public class PaymentController {
     @PostMapping("/api/v1/admin/payouts/{id}")
     public ResponseEntity<JobRequestResponse> markPaidOut(@PathVariable Long id) {
         return ResponseEntity.ok(paymentService.markPaidOut(id));
+    }
+
+    /** Cancelled jobs whose money the client still has to get back. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/api/v1/admin/refunds")
+    public ResponseEntity<List<JobRequestResponse>> listPendingRefunds() {
+        return ResponseEntity.ok(paymentService.listPendingRefunds());
+    }
+
+    /** Money already given back to clients, newest first. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/api/v1/admin/refunds/history")
+    public ResponseEntity<List<JobRequestResponse>> listRefundHistory() {
+        return ResponseEntity.ok(paymentService.listRefundHistory());
+    }
+
+    /** The admin gave that money back, from Mercado Pago, by hand. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/api/v1/admin/refunds/{id}")
+    public ResponseEntity<JobRequestResponse> markRefunded(@PathVariable Long id) {
+        return ResponseEntity.ok(paymentService.markRefunded(id));
     }
 }

@@ -421,26 +421,15 @@ class JobRequestServiceImplTest {
     }
 
     @Test
-    void cancelJobRequest_withARetainedPayment_refundsIt() {
-        JobRequest job = scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusDays(3));
-        job.setPaymentState(PaymentState.RETAINED);
-
-        job.setMpPaymentId("pay-1");
-
-        assertEquals(PaymentState.REFUNDED, service.cancelJobRequest(10L, null, clientId).getPaymentState());
-        verify(paymentGateway).refund("pay-1", job);
-    }
-
-    @Test
-    void cancelJobRequest_whenTheRefundFails_leavesTheJobAsItWas() {
+    void cancelJobRequest_withARetainedPayment_leavesItForAnAdminToGiveBack() {
         JobRequest job = scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusDays(3));
         job.setPaymentState(PaymentState.RETAINED);
         job.setMpPaymentId("pay-1");
-        doThrow(new ResponseStatusException(HttpStatus.BAD_GATEWAY)).when(paymentGateway).refund("pay-1", job);
 
-        assertThrows(ResponseStatusException.class, () -> service.cancelJobRequest(10L, null, clientId));
-        assertEquals(JobStatus.ACCEPTED, job.getStatus());
-        assertEquals(PaymentState.RETAINED, job.getPaymentState());
+        assertEquals(PaymentState.RETAINED, service.cancelJobRequest(10L, null, clientId).getPaymentState());
+
+        assertEquals(JobStatus.CANCELLED, job.getStatus());
+        verify(paymentGateway, never()).refund(any(), any());
     }
 
     @Test
@@ -768,7 +757,7 @@ class JobRequestServiceImplTest {
         JobRequest job = job(JobStatus.ACCEPTED);
         job.setPaymentAmount(BigDecimal.valueOf(1000));
         job.setPaymentState(PaymentState.RETAINED);
-        professional.setMpAccessToken("encrypted");
+        job.setMpCollectorUserId("987");
         when(paymentGateway.isEnabled()).thenReturn(true);
         when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
 
@@ -776,6 +765,18 @@ class JobRequestServiceImplTest {
 
         assertEquals(PaymentState.PAID, response.getPaymentState());
         assertNotNull(response.getPayoutAt());
+    }
+
+    @Test
+    void completeJobRequest_collectedByOficiosYa_stillHasToBeTransferred_evenIfTheProfessionalLinkedSince() {
+        JobRequest job = job(JobStatus.ACCEPTED);
+        job.setPaymentAmount(BigDecimal.valueOf(1000));
+        job.setPaymentState(PaymentState.RETAINED);
+        professional.setMpAccessToken("encrypted");
+        when(paymentGateway.isEnabled()).thenReturn(true);
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+
+        assertNull(service.completeJobRequest(10L, pin("123456"), professionalId).getPayoutAt());
     }
 
     @Test

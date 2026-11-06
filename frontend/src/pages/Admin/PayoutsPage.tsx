@@ -3,9 +3,11 @@ import BackNavigation from '../../components/BackNavigation/BackNavigation'
 import Button from '../../components/Button/Button'
 import Header from '../../components/Header/Header'
 import { useSession } from '../../components/SessionProvider/useSession'
-import { getPayoutHistory, getPendingPayouts, markPaidOut } from '../../services/jobRequestService'
+import { getPayoutHistory, getPendingPayouts, getRefundHistory, markPaidOut } from '../../services/jobRequestService'
 import type { JobRequest } from '../../types/JobRequest'
-import { filterPayouts, payoutProfessionals } from './payoutFilter'
+import AllTransfers from './AllTransfers'
+import { byNewest, filterPayouts, payoutProfessionals, professionalShare, transferDate } from './payoutFilter'
+import PendingRefunds from './PendingRefunds'
 import './PayoutsPage.css'
 
 const amountFormatter = new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'UYU' })
@@ -13,9 +15,9 @@ const dateFormatter = new Intl.DateTimeFormat('es-UY', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Montevideo',
 })
 
-type View = 'pending' | 'history'
+type View = 'all' | 'pending' | 'refunds' | 'history'
 
-const professionalShare = (job: JobRequest) => job.paymentAmount - (job.platformFee ?? 0)
+const isRefund = (job: JobRequest) => job.paymentState === 'REFUNDED'
 
 /**
  * Paid jobs whose professional still has to be transferred their share, and the transfers already made. The admin
@@ -24,7 +26,7 @@ const professionalShare = (job: JobRequest) => job.paymentAmount - (job.platform
 export default function PayoutsPage() {
     const { user } = useSession()
     const isAdmin = user?.role === 'ADMIN'
-    const [view, setView] = useState<View>('pending')
+    const [view, setView] = useState<View>('all')
     const [payouts, setPayouts] = useState<JobRequest[] | null>(null)
     const [error, setError] = useState('')
     const [marking, setMarking] = useState<number | null>(null)
@@ -33,9 +35,10 @@ export default function PayoutsPage() {
     const [professionalId, setProfessionalId] = useState('')
 
     useEffect(() => {
-        if (!isAdmin) return
+        if (!isAdmin || view === 'all' || view === 'refunds') return
         let active = true
-        ;(view === 'pending' ? getPendingPayouts() : getPayoutHistory())
+        ;(view === 'pending' ? getPendingPayouts()
+            : Promise.all([getPayoutHistory(), getRefundHistory()]).then(([transfers, refunds]) => byNewest([...transfers, ...refunds])))
             .then(list => { if (active) setPayouts(list) })
             .catch(() => { if (active) setError(view === 'pending' ? 'No pudimos cargar las transferencias pendientes.' : 'No pudimos cargar el historial.') })
         return () => { active = false }
@@ -57,7 +60,7 @@ export default function PayoutsPage() {
     const shown = useMemo(() => payouts && view === 'history' ? filterPayouts(payouts, from, to, professionalId) : payouts,
         [payouts, view, from, to, professionalId])
     const professionals = useMemo(() => payoutProfessionals(payouts ?? []), [payouts])
-    const total = shown?.reduce((sum, job) => sum + Math.round(professionalShare(job) * 100), 0) ?? 0
+    const total = shown?.filter(job => !isRefund(job)).reduce((sum, job) => sum + Math.round(professionalShare(job) * 100), 0) ?? 0
 
     return <div className="payouts-page">
         <Header />
@@ -68,13 +71,11 @@ export default function PayoutsPage() {
                 ? <p role="alert">Solo un administrador puede ver esta página.</p>
                 : <>
                     <div className="payouts-tabs" role="group" aria-label="Qué transferencias ver">
-                        {([['pending', 'Pendientes'], ['history', 'Historial']] as const).map(([value, label]) => <button
+                        {([['all', 'Todas'], ['pending', 'Pendientes'], ['refunds', 'Devoluciones'], ['history', 'Historial']] as const).map(([value, label]) => <button
                             key={value} type="button" className={view === value ? 'is-active' : ''} aria-pressed={view === value}
                             onClick={() => { if (view === value) return; setView(value); setPayouts(null); setError('') }}>{label}</button>)}
                     </div>
-                    <p className="payouts-page__intro">{view === 'pending'
-                        ? 'Trabajos completados cuyo profesional todavía no recibió su parte. Hacé la transferencia y después marcala acá.'
-                        : 'Transferencias ya hechas a profesionales, de la más reciente a la más antigua.'}</p>
+                    {view === 'all' ? <AllTransfers /> : view === 'refunds' ? <PendingRefunds /> : <>
                     {view === 'history' && <div className="payouts-filters">
                         <label>Desde<input type="date" value={from} max={to || undefined} onChange={event => setFrom(event.target.value)} /></label>
                         <label>Hasta<input type="date" value={to} min={from || undefined} onChange={event => setTo(event.target.value)} /></label>
@@ -94,22 +95,24 @@ export default function PayoutsPage() {
                             <thead>
                                 <tr>
                                     {view === 'history' && <th scope="col">Fecha</th>}
+                                    {view === 'history' && <th scope="col">Tipo</th>}
                                     <th scope="col">Solicitud</th>
-                                    <th scope="col">Profesional</th>
-                                    <th scope="col">Cuenta para cobrar</th>
-                                    <th scope="col">{view === 'pending' ? 'A transferir' : 'Transferido'}</th>
+                                    <th scope="col">{view === 'history' ? 'Para' : 'Profesional'}</th>
+                                    <th scope="col">{view === 'history' ? 'Cuenta u operación' : 'Cuenta para cobrar'}</th>
+                                    <th scope="col">{view === 'pending' ? 'A transferir' : 'Monto'}</th>
                                     <th scope="col">Comisión</th>
                                     {view === 'pending' && <th scope="col"><span className="payouts-sr-only">Acción</span></th>}
                                 </tr>
                             </thead>
                             <tbody>
                                 {shown.map(job => <tr key={job.id}>
-                                    {view === 'history' && <td>{job.payoutAt ? dateFormatter.format(new Date(job.payoutAt)) : ''}</td>}
+                                    {view === 'history' && <td>{dateFormatter.format(new Date(transferDate(job) ?? ''))}</td>}
+                                    {view === 'history' && <td>{isRefund(job) ? 'Devolución' : 'Transferencia'}</td>}
                                     <td>#{job.id}</td>
-                                    <td>{job.professionalName}</td>
-                                    <td>{job.professionalPayoutAccount || <em>Sin cuenta: pedísela por chat</em>}</td>
-                                    <td><strong>{amountFormatter.format(professionalShare(job))}</strong></td>
-                                    <td>{amountFormatter.format(job.platformFee ?? 0)}</td>
+                                    <td>{isRefund(job) ? job.clientName : job.professionalName}</td>
+                                    <td>{isRefund(job) ? job.mpPaymentId : job.professionalPayoutAccount || <em>Sin cuenta: pedísela por chat</em>}</td>
+                                    <td><strong>{amountFormatter.format(isRefund(job) ? job.paymentAmount : professionalShare(job))}</strong></td>
+                                    <td>{isRefund(job) ? '—' : amountFormatter.format(job.platformFee ?? 0)}</td>
                                     {view === 'pending' && <td>
                                         <Button type="button" disabled={marking !== null} onClick={() => void markTransferred(job)}>
                                             {marking === job.id ? 'Guardando…' : 'Marcar transferido'}
@@ -118,6 +121,7 @@ export default function PayoutsPage() {
                                 </tr>)}
                             </tbody>
                         </table>
+                    </>}
                     </>}
                 </>}
         </main>

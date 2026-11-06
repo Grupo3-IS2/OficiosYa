@@ -105,4 +105,20 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
     List<JobRequest> findByPaymentStateAndPayoutAtIsNullOrderByUpdatedAtAsc(PaymentState paymentState);
 
     List<JobRequest> findByPayoutAtIsNotNullOrderByPayoutAtDesc();
+
+    /** With CANCELLED and RETAINED: the jobs whose money an admin still has to give back, oldest first. */
+    List<JobRequest> findByStatusAndPaymentStateOrderByUpdatedAtAsc(JobStatus status, PaymentState paymentState);
+
+    List<JobRequest> findByPaymentStateOrderByUpdatedAtDesc(PaymentState paymentState);
+
+    /** The professional's Mercado Pago accounts that open jobs, or refunds still to make, depend on. */
+    @Query("""
+            SELECT DISTINCT j.mpCollectorUserId FROM JobRequest j
+            WHERE j.professional.publicId = :professionalPublicId AND j.mpCollectorUserId IS NOT NULL
+            AND ((j.status IN (com.um.uy.oficiosya.entity.JobStatus.ACCEPTED, com.um.uy.oficiosya.entity.JobStatus.RESCHEDULE_REQUESTED)
+                  AND j.paymentState IN (com.um.uy.oficiosya.entity.PaymentState.PENDING, com.um.uy.oficiosya.entity.PaymentState.RETAINED))
+              OR (j.status = com.um.uy.oficiosya.entity.JobStatus.CANCELLED
+                  AND j.paymentState = com.um.uy.oficiosya.entity.PaymentState.RETAINED))
+            """)
+    List<String> findOpenCollectors(@Param("professionalPublicId") UUID professionalPublicId);
 }

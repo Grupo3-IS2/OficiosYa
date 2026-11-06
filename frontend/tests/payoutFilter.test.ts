@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { JobRequest } from '../src/types/JobRequest.ts'
-import { filterPayouts, payoutProfessionals } from '../src/pages/Admin/payoutFilter.ts'
+import { byNewest, filterPayouts, payoutProfessionals } from '../src/pages/Admin/payoutFilter.ts'
 
 const paid = (id: number, payoutAt: string, professionalId = 'beto', professionalName = 'Beto') =>
     ({ id, payoutAt, professionalId, professionalName }) as JobRequest
@@ -16,6 +16,14 @@ test('transfers are filtered by Montevideo day, both ends included and optional'
     // 02:00 UTC on the 1st is still October 31st in Montevideo
     assert.deepEqual(ids(filterPayouts(payouts, '2026-11-01', '')), [2, 3])
     assert.deepEqual(ids(filterPayouts(payouts, '2026-10-31', '2026-10-31')), [1])
+})
+
+test('refunds count by the day they were given back, and sort with the transfers', () => {
+    const refund = { id: 2, paymentState: 'REFUNDED', updatedAt: '2026-11-06T15:00:00Z', professionalId: 'beto' } as JobRequest
+    const jobs = [paid(1, '2026-11-05T15:00:00Z'), refund, paid(3, '2026-11-07T15:00:00Z')]
+
+    assert.deepEqual(ids(filterPayouts(jobs, '2026-11-06', '2026-11-06')), [2])
+    assert.deepEqual(ids(byNewest(jobs)), [3, 2, 1])
 })
 
 test('transfers can be narrowed to one professional, listed once each by name', () => {

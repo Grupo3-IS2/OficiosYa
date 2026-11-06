@@ -88,6 +88,13 @@ public class JobRequest {
     @Column(length = 64)
     private String mpPaymentId;
 
+    /**
+     * The professional's Mercado Pago account the checkout charges into, as it was when opened; null when it is
+     * OficiosYa's own. Says whose token reads and refunds the payment, and whether an admin still has to transfer it.
+     */
+    @Column(length = 32)
+    private String mpCollectorUserId;
+
     /** When Mercado Pago confirmed that payment; null on jobs paid before it was kept. */
     private OffsetDateTime paidAt;
 

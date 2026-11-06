@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
@@ -41,6 +42,7 @@ public class MercadoPagoGateway implements PaymentGateway {
 
     static final String API_URL = "https://api.mercadopago.com";
     private static final String CURRENCY = "UYU";
+    private static final String RELINK = MercadoPagoAccountLink.RELINK;
 
     private final RestClient http;
     private final MercadoPagoAccountLink accountLink;
@@ -94,7 +96,8 @@ public class MercadoPagoGateway implements PaymentGateway {
     @Override
     public String createCheckout(JobRequest jobRequest) {
         requireEnabled();
-        String sellerToken = accountLink.accessToken(jobRequest.getProfessional());
+        Professional professional = jobRequest.getProfessional();
+        String sellerToken = accountLink.accessToken(professional);
         String token = sellerToken == null ? accessToken : sellerToken;
         // The requests page opens the job linked with ?request=
         String backUrl = siteUrl + "/mis-solicitudes?request=" + jobRequest.getId();
@@ -123,9 +126,12 @@ public class MercadoPagoGateway implements PaymentGateway {
                     + "job=" + jobRequest.getId());
         }
 
-        Preference created = call(() -> http.post().uri("/checkout/preferences")
+        Preference created = call(sellerToken == null ? null : professional, () -> http.post().uri("/checkout/preferences")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .body(preference).retrieve().body(Preference.class));
+        // shortcut: only the latest checkout is remembered, so paying an older one opened on another account
+        // (OficiosYa's, before the professional linked theirs) can't be read; keep one per preference if it happens
+        jobRequest.setMpCollectorUserId(sellerToken == null ? null : professional.getPayoutMpUserId());
         // Test credentials (TEST-...) only work on the sandbox checkout
         return token.startsWith("TEST-") ? created.sandboxInitPoint() : created.initPoint();
     }
@@ -134,7 +140,7 @@ public class MercadoPagoGateway implements PaymentGateway {
     public Payment getPayment(String paymentId, JobRequest jobRequest) {
         requireEnabled();
         String token = tokenFor(jobRequest);
-        MpPayment payment = call(() -> http.get().uri("/v1/payments/{id}", paymentId)
+        MpPayment payment = call(seller(jobRequest), () -> http.get().uri("/v1/payments/{id}", paymentId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .retrieve().body(MpPayment.class));
         return new Payment(String.valueOf(payment.id()), payment.status(), payment.transactionAmount(),
@@ -151,7 +157,7 @@ public class MercadoPagoGateway implements PaymentGateway {
         // A split payment is refunded whole, marketplace_fee included, from the professional's account
         String token = tokenFor(jobRequest);
         // The same key on a retry makes MP answer with the refund it already made instead of a second one
-        call(() -> http.post().uri("/v1/payments/{id}/refunds", paymentId)
+        call(seller(jobRequest), () -> http.post().uri("/v1/payments/{id}/refunds", paymentId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .header("X-Idempotency-Key", "refund-job-" + jobRequest.getId() + "-" + paymentId)
                 .body(Map.of()).retrieve().toBodilessEntity());
@@ -159,13 +165,23 @@ public class MercadoPagoGateway implements PaymentGateway {
     }
 
     /**
-     * A payment is in the account of the token that created it: the professional's if they linked one.
-     * shortcut: assumes the professional's link didn't change since the checkout (a job paid before they linked, or
-     * into an account they replaced, is read with the wrong token); store the collector on the job if that happens.
+     * A payment is in the account of the token that created it, which the job remembers. 502 if the professional
+     * no longer has that account linked: only that account's token can read or refund the payment.
      */
     private String tokenFor(JobRequest jobRequest) {
-        String sellerToken = jobRequest == null ? null : accountLink.accessToken(jobRequest.getProfessional());
-        return sellerToken == null ? accessToken : sellerToken;
+        Professional seller = seller(jobRequest);
+        if (seller == null) return accessToken;
+        if (!jobRequest.getMpCollectorUserId().equals(seller.getPayoutMpUserId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, RELINK);
+        }
+        String sellerToken = accountLink.accessToken(seller);
+        if (sellerToken == null) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, RELINK);
+        return sellerToken;
+    }
+
+    /** The professional whose account the job's payment is in; null if it is OficiosYa's. */
+    private static Professional seller(JobRequest jobRequest) {
+        return jobRequest == null || jobRequest.getMpCollectorUserId() == null ? null : jobRequest.getProfessional();
     }
 
     /**
@@ -211,11 +227,15 @@ public class MercadoPagoGateway implements PaymentGateway {
         }
     }
 
-    private static <T> T call(Supplier<T> request) {
+    /** {@code seller}: the professional whose token the request uses, if any; a 401 may mean they revoked it. */
+    private <T> T call(Professional seller, Supplier<T> request) {
         try {
             return request.get();
         } catch (RestClientException e) {
             log.error("Mercado Pago request failed", e);
+            if (seller != null && e instanceof HttpClientErrorException.Unauthorized && accountLink.unlinkIfRevoked(seller)) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, RELINK);
+            }
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "No pudimos conectarnos con Mercado Pago, intentá de nuevo en unos minutos");
         }

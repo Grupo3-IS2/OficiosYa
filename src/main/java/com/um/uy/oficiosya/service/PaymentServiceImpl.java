@@ -140,6 +140,33 @@ public class PaymentServiceImpl implements PaymentService {
         return jobRequestMapper.toResponse(jobRequestRepository.save(job));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<JobRequestResponse> listPendingRefunds() {
+        return jobRequestRepository.findByStatusAndPaymentStateOrderByUpdatedAtAsc(JobStatus.CANCELLED, PaymentState.RETAINED).stream()
+                .map(jobRequestMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<JobRequestResponse> listRefundHistory() {
+        return jobRequestRepository.findByPaymentStateOrderByUpdatedAtDesc(PaymentState.REFUNDED).stream()
+                .map(jobRequestMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public JobRequestResponse markRefunded(Long jobRequestId) {
+        JobRequest job = find(jobRequestId);
+        if (job.getStatus() != JobStatus.CANCELLED || job.getPaymentState() != PaymentState.RETAINED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este trabajo no tiene una devolución pendiente");
+        }
+        job.setPaymentState(PaymentState.REFUNDED);
+        return jobRequestMapper.toResponse(jobRequestRepository.save(job));
+    }
+
     private JobRequest jobOf(PaymentGateway.Payment payment) {
         try {
             return jobRequestRepository.findById(Long.valueOf(payment.externalReference())).orElse(null);

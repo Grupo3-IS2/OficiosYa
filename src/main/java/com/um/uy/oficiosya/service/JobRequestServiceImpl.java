@@ -294,12 +294,7 @@ public class JobRequestServiceImpl implements JobRequestService {
             scheduleService.releaseJobSchedule(jobRequest);
         }
 
-        if (jobRequest.getPaymentState() == PaymentState.RETAINED) {
-            // Before the change: if Mercado Pago fails, the job stays as it was instead of cancelled without the refund
-            paymentGateway.refund(jobRequest.getMpPaymentId(), jobRequest);
-            jobRequest.setPaymentState(PaymentState.REFUNDED);
-        }
-
+        // A paid job keeps its payment RETAINED: cancelled like that, it waits for an admin to give the money back
         jobRequest.setStatus(JobStatus.CANCELLED);
         jobRequest.setCancelledBy(jobRequest.getClient().getPublicId().equals(requesterId)
                 ? Role.CLIENT : Role.PROFESSIONAL);
@@ -394,7 +389,7 @@ public class JobRequestServiceImpl implements JobRequestService {
             jobRequest.setPlatformFee(jobRequest.getPaymentAmount().multiply(commissionPercent)
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
             // Charged into the professional's linked account (split): Mercado Pago already paid them, nothing to transfer
-            if (jobRequest.getProfessional().getMpAccessToken() != null) {
+            if (jobRequest.getMpCollectorUserId() != null) {
                 jobRequest.setPayoutAt(OffsetDateTime.now(clock));
             }
         }

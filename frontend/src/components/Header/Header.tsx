@@ -15,14 +15,18 @@ function Header() {
     const { status, user } = useSession()
     const authenticated = status === 'authenticated'
     const isProfessional = user?.role === 'PROFESSIONAL'
+    const isAdmin = user?.role === 'ADMIN'
+    // An admin takes no part in jobs: only Transferencias and the profile menu
+    const participant = authenticated && !isAdmin
     const professionalLabel = !authenticated
         ? 'Soy profesional'
         : isProfessional
             ? 'Panel profesional'
             : 'Convertirse en profesional'
     const requestsActive = window.location.pathname === '/mis-solicitudes'
-    const awaiting = useAwaitingAnswers(authenticated)
-    const unreadChats = useUnreadChats(authenticated)
+    const transfersActive = window.location.pathname === '/admin/transferencias'
+    const awaiting = useAwaitingAnswers(participant)
+    const unreadChats = useUnreadChats(participant)
 
     const openProfessionalPanel = isProfessional && user
         ? () => { window.location.href = `/profesionales/${encodeURIComponent(user.id)}` }
@@ -46,7 +50,7 @@ function Header() {
                 <strong>Ya</strong>
             </a>
 
-            {authenticated && (
+            {participant && (
                 <div className="mobile-professional">
                     <Button type="button" onClick={openProfessionalPanel}>{professionalLabel}</Button>
                 </div>
@@ -68,7 +72,7 @@ function Header() {
                 className={isMenuOpen ? 'is-open' : ''}
                 aria-label="Navegación principal"
             >
-                {authenticated && (
+                {participant && (
                     <a
                         className={`nav-item${requestsActive ? ' is-active' : ''}`}
                         href="/mis-solicitudes"
@@ -85,7 +89,7 @@ function Header() {
                     </a>
                 )}
 
-                {authenticated && (
+                {participant && (
                     <a className="nav-item" href="/chat">
                         <span className="nav-item__icon">
                             <Icon name="message" />
@@ -98,11 +102,23 @@ function Header() {
                     </a>
                 )}
 
+                {isAdmin && (
+                    <a
+                        className={`nav-item${transfersActive ? ' is-active' : ''}`}
+                        href="/admin/transferencias"
+                        aria-current={transfersActive ? 'page' : undefined}
+                    >
+                        <span className="nav-item__icon">
+                            <Icon name="money" />
+                        </span>
+                        <span>Transferencias</span>
+                    </a>
+                )}
+
                 {authenticated ? (
                     <div className="profile-menu">
                         <ProfileMenu
                             authenticated
-                            isAdmin={user?.role === 'ADMIN'}
                             isProfessional={isProfessional}
                             onLogout={handleLogout}
                         />
@@ -114,7 +130,7 @@ function Header() {
                     </a>
                 )}
 
-                {authenticated && (
+                {participant && (
                     <Button type="button" onClick={openProfessionalPanel}>
                         <Icon name="user" />
                         <span>{professionalLabel}</span>

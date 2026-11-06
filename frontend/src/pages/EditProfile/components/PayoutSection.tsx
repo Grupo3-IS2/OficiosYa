@@ -41,14 +41,16 @@ function PayoutCard({ payout, verified, onEdit }: Readonly<{ payout: PayoutData;
 }
 
 /** Where OficiosYa transfers the professional what they earn, minus the commission. Needed to accept jobs. */
-export default function PayoutSection({ value, saved, verified, linkAvailable, onChange, onSave, onLink, message, error, profileName }: Readonly<{
+export default function PayoutSection({ value, saved, verified, linkAvailable, onChange, onSave, onLink, onUnlink, message, error, profileName }: Readonly<{
     value: PayoutData; saved: PayoutData; onChange: (value: PayoutData) => void; onSave: () => Promise<boolean>
     /** Whether the saved account is a Mercado Pago one the professional linked by logging in. */
     verified: boolean
     /** Whether Mercado Pago is linked by logging in; otherwise its email or phone is typed, like a bank account. */
     linkAvailable: boolean
-    /** Sends the browser to Mercado Pago to log in; throws the message to show if it can't. */
+    /** Opens Mercado Pago's login in another tab; throws the message to show if it can't. */
     onLink: () => Promise<void>
+    /** Stops charging into the linked account; throws the message to show if it can't. */
+    onUnlink: () => Promise<void>
     message?: string; error?: string
     /** Proposed as the holder: it is usually their own account. */
     profileName: string
@@ -67,8 +69,19 @@ export default function PayoutSection({ value, saved, verified, linkAvailable, o
             await onLink()
         } catch (failure) {
             setLinkError(failure instanceof Error ? failure.message : 'No pudimos abrir Mercado Pago. Intentá nuevamente.')
-            setLinking(false)
         }
+        setLinking(false)
+    }
+    async function unlink() {
+        if (!window.confirm('Sin una cuenta vinculada no vas a poder aceptar trabajos. ¿Querés desvincularla?')) return
+        setLinking(true)
+        setLinkError('')
+        try {
+            await onUnlink()
+        } catch (failure) {
+            setLinkError(failure instanceof Error ? failure.message : 'No pudimos desvincular tu cuenta. Intentá nuevamente.')
+        }
+        setLinking(false)
     }
     const format = value.method === 'BANK' && !value.otherBank ? URUGUAYAN_BANKS.find(bank => bank.name === value.bank) : undefined
     // With linking on, Mercado Pago is linked by logging in, not typed
@@ -132,6 +145,7 @@ export default function PayoutSection({ value, saved, verified, linkAvailable, o
                     <img src={MERCADO_PAGO_LOGO} alt="" />
                     {linking ? 'Abriendo Mercado Pago…' : verified ? 'Vincular otra cuenta' : 'Vincular con Mercado Pago'}
                 </Button>
+                {verified && <Button type="button" variant="ghost" disabled={linking} onClick={() => void unlink()}>Desvincular cuenta</Button>}
                 {linkError && <p className="profile-error" role="alert">{linkError}</p>}
             </div>}
 

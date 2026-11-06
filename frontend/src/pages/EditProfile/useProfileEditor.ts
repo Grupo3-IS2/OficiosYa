@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCurrentUser, isAuthenticated, updateStoredUser } from '../../services/authService'
-import { addExpertiseTrade, changePassword, getAuthenticatedUser, isMercadoPagoLinkAvailable, getTrades, isProfessionalResponse, removeExpertiseTrade, setProfessionalPublished, updateNotifications, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, removeProfileImage, uploadProfileImage, verifyEmailChange } from '../../services/userService'
+import { addExpertiseTrade, changePassword, getAuthenticatedUser, isMercadoPagoLinkAvailable, unlinkMercadoPago, getTrades, isProfessionalResponse, removeExpertiseTrade, setProfessionalPublished, updateNotifications, startEmailChange, updateExpertiseTrade, updateProfessional, updateUser, removeProfileImage, uploadProfileImage, verifyEmailChange } from '../../services/userService'
 import type { ProfessionalResponse } from '../../services/userService'
 import { ApiError } from '../../services/api'
 import { personalChanged, professionalChanged, sameServiceArea, securityChanged, validatePhone, validateProfessional, validateSecurity } from './profileState'
@@ -8,7 +8,7 @@ import type { PersonalData, ProfessionalData, ProfileSection, SecurityData } fro
 import type { PendingVerification } from '../../types/Auth'
 import type { Trade } from '../../types/Professional'
 import type { AccountAccess } from './components/GoogleAccountSection'
-import { emptyPayout, formatPayout, parsePayout, validatePayout, type PayoutData } from './payoutAccount'
+import { MERCADO_PAGO_LINK_CHANNEL, emptyPayout, formatPayout, parsePayout, validatePayout, type PayoutData } from './payoutAccount'
 
 function professionalDataFrom(response: ProfessionalResponse): ProfessionalData {
     return {
@@ -364,9 +364,29 @@ export default function useProfileEditor(professionalOverride?: boolean) {
         applyEmail(response.email)
     }
 
+    useEffect(() => {
+        const channel = new BroadcastChannel(MERCADO_PAGO_LINK_CHANNEL)
+        channel.onmessage = () => {
+            void getAuthenticatedUser().then(response => {
+                if (!isProfessionalResponse(response)) return
+                const saved = parsePayout(response.payoutAccount)
+                setPayoutVerified(response.payoutVerified)
+                setSavedPayout(saved)
+                setPayout(saved)
+            }).catch(() => {})
+        }
+        return () => channel.close()
+    }, [])
+
+    /** The saved account stays as text, but it has to be linked again to take jobs. Throws the message to show if it can't. */
+    async function unlinkPayout(): Promise<void> {
+        await unlinkMercadoPago()
+        setPayoutVerified(false)
+    }
+
     return {
         requestEmailChange, confirmEmailChange,
-        user, isProfessional, personal, setPersonal, selectPhoto, removePhoto, savedPersonalEmail: savedPersonal.email, access, setAccess, professional, setProfessional: changeProfessional, payout, savedPayout, payoutVerified, mercadoPagoLinkAvailable, setPayout: changePayout, trades, tradesError, tradesLoading, security, setSecurity,
+        user, isProfessional, personal, setPersonal, selectPhoto, removePhoto, savedPersonalEmail: savedPersonal.email, access, setAccess, professional, setProfessional: changeProfessional, payout, savedPayout, payoutVerified, unlinkPayout, mercadoPagoLinkAvailable, setPayout: changePayout, trades, tradesError, tradesLoading, security, setSecurity,
         busy, loadingProfile, profileLoadFailed, error, errorSection, messages, dirty, hasChanges: Object.values(dirty).some(Boolean),
         saveSection: (section: ProfileSection) => save([section]),
         savePending: () => save((Object.keys(dirty) as ProfileSection[]).filter(section => dirty[section])),

@@ -168,6 +168,11 @@ export async function startMercadoPagoLink(): Promise<string> {
   return authorizationUrl
 }
 
+/** Stops charging into the linked Mercado Pago account; refused while an open job's payment depends on it. */
+export function unlinkMercadoPago(): Promise<void> {
+  return apiRequest<void>('/professionals/me/mercado-pago', { method: 'DELETE' })
+}
+
 export function updateProfessional(request: ProfessionalUpdateRequest): Promise<ProfessionalResponse> {
   return apiRequest<ProfessionalResponse>('/professionals/me', {
     method: 'PATCH',

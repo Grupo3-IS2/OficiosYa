@@ -3,14 +3,22 @@ package com.um.uy.oficiosya.service;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.um.uy.oficiosya.entity.Professional;
+import com.um.uy.oficiosya.repository.JobRequestRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
+import com.um.uy.oficiosya.service.interfaces.EmailSenderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
@@ -45,17 +53,25 @@ import java.util.stream.Stream;
 @Slf4j
 public class MercadoPagoAccountLink {
 
-    // The generic one: auth.mercadopago.com.uy answers "La aplicación no está preparada para conectarse a Mercado Pago"
-    static final String AUTHORIZATION_URL = "https://auth.mercadopago.com/authorization";
+    static final String AUTHORIZATION_URL = "https://auth.mercadopago.com.uy/authorization";
     /** Mercado Pago's authorization code itself lasts 10 minutes. */
     private static final Duration STATE_TTL = Duration.ofMinutes(15);
     /** Tokens last 180 days; refreshed a day before so a checkout never starts with one about to expire. */
     private static final Duration REFRESH_BEFORE = Duration.ofDays(1);
 
+    static final String RELINK = "El profesional tiene que volver a vincular su cuenta de Mercado Pago";
+
     private static final SecureRandom RANDOM = new SecureRandom();
+
+    /** Mercado Pago stopped accepting the tokens of this account of the professional's. */
+    public record LinkLost(UUID professionalId, String mpUserId) {
+    }
 
     private final RestClient http;
     private final ProfessionalRepository professionalRepository;
+    private final JobRequestRepository jobRequestRepository;
+    private final ApplicationEventPublisher events;
+    private final EmailSenderService emailSender;
     private final Clock clock;
     private final String clientId;
     private final String clientSecret;
@@ -65,20 +81,27 @@ public class MercadoPagoAccountLink {
     private final boolean testTokens;
 
     @Autowired
-    public MercadoPagoAccountLink(ProfessionalRepository professionalRepository, Clock clock,
+    public MercadoPagoAccountLink(ProfessionalRepository professionalRepository, JobRequestRepository jobRequestRepository,
+                                  ApplicationEventPublisher events, EmailSenderService emailSender, Clock clock,
                                   @Value("${app.payments.client-id:}") String clientId,
                                   @Value("${app.payments.client-secret:}") String clientSecret,
                                   @Value("${app.payments.oauth-redirect-url:}") String redirectUrl,
                                   @Value("${app.notifications.site-url}") String siteUrl,
                                   @Value("${app.payments.oauth-test-tokens:false}") boolean testTokens) {
-        this(RestClient.builder(), professionalRepository, clock, clientId, clientSecret, redirectUrl, siteUrl, testTokens);
+        this(RestClient.builder(), professionalRepository, jobRequestRepository, events, emailSender, clock,
+                clientId, clientSecret, redirectUrl, siteUrl, testTokens);
     }
 
-    MercadoPagoAccountLink(RestClient.Builder http, ProfessionalRepository professionalRepository, Clock clock,
+    MercadoPagoAccountLink(RestClient.Builder http, ProfessionalRepository professionalRepository,
+                           JobRequestRepository jobRequestRepository, ApplicationEventPublisher events,
+                           EmailSenderService emailSender, Clock clock,
                            String clientId, String clientSecret, String redirectUrl, String siteUrl, boolean testTokens) {
         this.testTokens = testTokens;
         this.http = http.baseUrl(MercadoPagoGateway.API_URL).build();
         this.professionalRepository = professionalRepository;
+        this.jobRequestRepository = jobRequestRepository;
+        this.events = events;
+        this.emailSender = emailSender;
         this.clock = clock;
         this.clientId = clientId == null ? "" : clientId.trim();
         this.clientSecret = clientSecret == null ? "" : clientSecret.trim();
@@ -132,8 +155,13 @@ public class MercadoPagoAccountLink {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.accessToken())
                     .retrieve().body(Account.class);
             if (account == null || account.id() == null) return profile("error");
+            String accountId = String.valueOf(account.id());
+            // The same account again is how a lost link is repaired, so it is always let through
+            if (jobRequestRepository.findOpenCollectors(professionalId).stream().anyMatch(open -> !open.equals(accountId))) {
+                return profile("busy");
+            }
             professional.setPayoutAccount(account.payoutAccount());
-            professional.setPayoutMpUserId(String.valueOf(account.id()));
+            professional.setPayoutMpUserId(accountId);
             keep(professional, token);
             professionalRepository.save(professional);
             log.info("Professional {} linked Mercado Pago account {}", professionalId, account.id());
@@ -146,11 +174,13 @@ public class MercadoPagoAccountLink {
 
     /**
      * The professional's access token, to charge into their account; null if they didn't link one.
-     * Refreshes it first when it is about to expire. 502 if Mercado Pago won't: they have to link it again.
+     * Refreshes it first when it is about to expire. 502 if Mercado Pago won't: they have to link it again,
+     * and if it says the grant is gone (they revoked it, or it expired) the account stops counting as linked.
      */
     @Transactional
     public String accessToken(Professional professional) {
-        if (professional.getMpAccessToken() == null) return null;
+        // Linking off: OficiosYa collects, and tokens kept from before can't be decrypted without MP_CLIENT_SECRET
+        if (!isEnabled() || professional.getMpAccessToken() == null) return null;
         OffsetDateTime expiresAt = professional.getMpTokenExpiresAt();
         if (expiresAt != null && expiresAt.toInstant().isBefore(clock.instant().plus(REFRESH_BEFORE))) {
             Token token;
@@ -161,17 +191,84 @@ public class MercadoPagoAccountLink {
                         .retrieve().body(Token.class);
             } catch (RestClientException e) {
                 log.error("Refreshing the Mercado Pago token of professional {} failed", professional.getPublicId(), e);
+                if (e instanceof HttpClientErrorException refused && refused.getResponseBodyAsString().contains("invalid_grant")) {
+                    lost(professional);
+                }
                 token = null;
             }
             if (token == null || token.accessToken() == null || token.refreshToken() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                        "El profesional tiene que volver a vincular su cuenta de Mercado Pago");
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, RELINK);
             }
             // Both are replaced: a refresh may rotate the refresh token too
             keep(professional, token);
             professionalRepository.save(professional);
         }
         return decrypt(professional.getMpAccessToken());
+    }
+
+    /**
+     * After a 401 with the professional's token: asks Mercado Pago whether the token itself is dead, because a 401 can
+     * also be about that one request (it refuses test sellers' refunds with "Unauthorized use of live credentials").
+     */
+    public boolean unlinkIfRevoked(Professional professional) {
+        try {
+            http.get().uri("/users/me")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + decrypt(professional.getMpAccessToken()))
+                    .retrieve().toBodilessEntity();
+            return false;
+        } catch (HttpClientErrorException.Unauthorized _) {
+            lost(professional);
+            return true;
+        } catch (RestClientException e) {
+            log.warn("Could not check the Mercado Pago token of professional {}", professional.getPublicId(), e);
+            return false;
+        }
+    }
+
+    private void lost(Professional professional) {
+        events.publishEvent(new LinkLost(professional.getPublicId(), professional.getPayoutMpUserId()));
+    }
+
+    /**
+     * Runs after the transaction that noticed, which fails and rolls back: saved inside it, this would be lost too.
+     * Only if that account is still the linked one: the professional may have linked again meanwhile.
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMPLETION, fallbackExecution = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void forgetLostLink(LinkLost event) {
+        Professional professional = professionalRepository.findByPublicId(event.professionalId()).orElse(null);
+        if (professional == null || event.mpUserId() == null || !event.mpUserId().equals(professional.getPayoutMpUserId())) return;
+        professional.clearMercadoPagoLink();
+        professionalRepository.save(professional);
+        log.warn("Professional {} lost the link to Mercado Pago account {}", event.professionalId(), event.mpUserId());
+        // Not subject to their notification settings: without it they silently stop being able to take jobs
+        emailSender.sendNotification(professional.getEmail(), "Volvé a vincular tu cuenta de Mercado Pago", """
+                Hola %s,
+
+                Mercado Pago dejó de autorizar a OficiosYa en tu cuenta, así que no podés aceptar trabajos nuevos.
+                Volvé a vincularla desde Editar perfil: %s/profile/edit
+
+                Equipo de OficiosYa
+                """.formatted(professional.getName(), siteUrl));
+    }
+
+    /** The professional stops charging into their linked account; their Mercado Pago authorization stays until they revoke it there. */
+    @Transactional
+    public void unlink(UUID professionalId) {
+        Professional professional = professionalRepository.findByPublicId(professionalId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profesional no encontrado."));
+        requireNoOpenCharges(professional);
+        professional.clearMercadoPagoLink();
+        professionalRepository.save(professional);
+    }
+
+    /** 409 while an open job's payment needs the linked account's token, to be read or refunded. */
+    public void requireNoOpenCharges(Professional professional) {
+        if (!jobRequestRepository.findOpenCollectors(professional.getPublicId()).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Tenés trabajos en curso cobrados en esta cuenta de Mercado Pago: terminalos o cancelalos antes de cambiarla");
+        }
     }
 
     private void keep(Professional professional, Token token) {
@@ -213,8 +310,7 @@ public class MercadoPagoAccountLink {
             cipher.init(Cipher.DECRYPT_MODE, tokenKey(), new GCMParameterSpec(128, bytes, 0, 12));
             return new String(cipher.doFinal(bytes, 12, bytes.length - 12), StandardCharsets.UTF_8);
         } catch (GeneralSecurityException | IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "El profesional tiene que volver a vincular su cuenta de Mercado Pago");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, RELINK);
         }
     }
 

@@ -9,6 +9,8 @@ export const URUGUAYAN_BANKS = [
 ] as const
 
 export const MERCADO_PAGO = 'Mercado Pago'
+/** The tab Mercado Pago brings back tells the one the professional left open, so it shows the new account. */
+export const MERCADO_PAGO_LINK_CHANNEL = 'oficiosya_mercado_pago_link'
 const SEPARATOR = ' · '
 
 export interface PayoutData {

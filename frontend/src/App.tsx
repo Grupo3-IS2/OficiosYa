@@ -42,7 +42,7 @@ function App() {
 
     if (currentPath === '/mis-solicitudes') {
         return (
-            <RequireAuth>
+            <RequireAuth notForAdmin>
                 <RequestsPage />
             </RequireAuth>
         )
@@ -50,7 +50,7 @@ function App() {
 
     if (currentPath === '/chat') {
         return (
-            <RequireAuth>
+            <RequireAuth notForAdmin>
                 <ChatPage />
             </RequireAuth>
         )

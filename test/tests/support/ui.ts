@@ -27,6 +27,8 @@ export async function mockHomeApi(page: Page) {
   // Home now checks an existing session before rendering its authenticated controls.
   await mockSessionVerification(page);
   await mockChat(page);
+  // Editar perfil asks for it, for professionals: a real backend answers the fake token with 401, ending the session.
+  await page.route('**/api/v1/professionals/me/mercado-pago', (route) => route.fulfill({ json: { available: false } }));
   // The header asks for the user's requests, to warn on "Mis solicitudes" if one waits for them.
   // Registered first, so a test that mocks its own requests overrides it.
   await page.route('**/api/v1/job-requests/mine', (route) => route.fulfill({

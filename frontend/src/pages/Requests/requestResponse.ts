@@ -10,10 +10,19 @@ export function acceptanceTimeframe(draft: RescheduleDraft, now = new Date()): {
     return rescheduleTimeframe(draft, {}, now)
 }
 
-/** Whether one of the professional's availability blocks covers the whole timeframe. */
+/** Whether the professional's availability blocks cover the whole timeframe, also when it spans blocks back to back. */
 export function withinAvailability(schedules: Schedule[], start: Date, end: Date): boolean {
-    return schedules.some(schedule => schedule.type === 'URGENT_AVAILABLE'
-        && new Date(schedule.startTimestamp) <= start && new Date(schedule.endTimestamp) >= end)
+    const blocks = schedules
+        .filter(schedule => schedule.type === 'URGENT_AVAILABLE')
+        .map(schedule => [Date.parse(schedule.startTimestamp), Date.parse(schedule.endTimestamp)])
+        .sort((first, second) => first[0] - second[0])
+    let covered = start.getTime()
+    for (const [blockStart, blockEnd] of blocks) {
+        if (blockStart > covered) break
+        covered = Math.max(covered, blockEnd)
+        if (covered >= end.getTime()) return true
+    }
+    return false
 }
 
 /** The reason of a rejection or a cancellation is optional: blank is no reason at all. */

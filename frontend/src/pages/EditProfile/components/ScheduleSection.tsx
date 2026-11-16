@@ -19,7 +19,6 @@ import type { TimeRange } from '../scheduleEditor'
 import ScheduleAddPanel from './ScheduleAddPanel'
 import ScheduleChoiceModal from './ScheduleChoiceModal'
 import type { ScheduleChoice } from './ScheduleChoiceModal'
-import ScheduleDatePicker from './ScheduleDatePicker'
 import ScheduleDeleteModal from './ScheduleDeleteModal'
 import ScheduleEditPanel from './ScheduleEditPanel'
 import type { ScheduleEdit } from './ScheduleEditPanel'
@@ -41,7 +40,7 @@ const timeFormatter = new Intl.DateTimeFormat('es-UY', { hour: '2-digit', minute
 // FullCalendar recalculates the visible range whenever one of these objects changes, so they must keep their identity
 const plugins = [timeGridPlugin, interactionPlugin]
 const views = { [COMPACT_VIEW]: { type: 'timeGrid', duration: { days: 3 } } }
-const headerToolbar = { left: 'prev,next today pickDate', center: 'title', right: 'addBlock' }
+const headerToolbar = { left: 'prev,next today', center: 'title', right: 'addBlock' }
 const hourFormat = { hour: '2-digit', minute: '2-digit', hour12: false } as const
 const dayHeaderFormat = { weekday: 'short', day: 'numeric' } as const
 
@@ -98,9 +97,7 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
     const [message, setMessage] = useState('')
     const [modal, setModal] = useState<ModalState | null>(null)
     const [now, setNow] = useState(Date.now)
-    const [pickerDate, setPickerDate] = useState<Date | null>(null)
     const [customButtons] = useState(() => ({
-        pickDate: { text: 'Elegir día', click: () => setPickerDate(calendar.current?.getApi().getDate() ?? new Date()) },
         addBlock: { text: '+', hint: 'Agregar horario', click: () => {
             // Opens on the day on screen, or today when the calendar shows the current week
             const shown = calendar.current?.getApi().getDate() ?? new Date()
@@ -391,13 +388,12 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
 
     return <section className="profile-section schedule-editor" aria-labelledby="schedule-title">
         <h2 id="schedule-title">Horarios de atención</h2>
-        <p className="profile-subtitle">Marcá en el calendario cuándo estás disponible. Los clientes verán estos horarios en tu perfil público.</p>
+        <p className="profile-subtitle">Marcá en el calendario cuándo estás disponible. Los clientes verán estos horarios en tu perfil.</p>
 
         <div className="schedule-editor__legend" aria-hidden="true">
             <span><i className="schedule-editor__swatch schedule-editor__swatch--available" /> Disponible</span>
             <span><i className="schedule-editor__swatch schedule-editor__swatch--weekly">↻</i> Se repite cada semana</span>
             <span><i className="schedule-editor__swatch schedule-editor__swatch--busy" /> Trabajo agendado o desactivado</span>
-            <span><i className="schedule-editor__now-sample" /> Desde acá podés agregar horarios</span>
         </div>
 
         <div className="schedule-editor__calendar" aria-busy={loading || busy}>
@@ -443,15 +439,6 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
 
         {error && <p className="profile-error" role="alert">{error}</p>}
         {message && <output className="profile-feedback">{message}</output>}
-        {pickerDate && <ScheduleDatePicker
-            value={pickerDate}
-            min={new Date(now)}
-            onChange={date => {
-                calendar.current?.getApi().gotoDate(date)
-                setPickerDate(null)
-            }}
-            onClose={() => setPickerDate(null)}
-        />}
         {modal?.kind === 'choice' && <ScheduleChoiceModal
             title={modal.title}
             description={modal.description}

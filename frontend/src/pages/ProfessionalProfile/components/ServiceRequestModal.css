@@ -1,5 +1,5 @@
 .service-request-modal {
-  width: min(540px, calc(100% - 32px));
+  width: min(760px, calc(100% - 32px));
   max-height: min(850px, calc(100dvh - 32px));
   margin: auto;
   padding: 0;

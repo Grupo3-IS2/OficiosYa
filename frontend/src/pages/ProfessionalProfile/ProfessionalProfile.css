@@ -238,13 +238,13 @@
 }
 
 .availability-section { padding-bottom: 38px; }
-.availability-scroll { margin-top: 22px; overflow-x: auto; scrollbar-color: #b8d9c4 transparent; }
+.availability-scroll { max-height: 440px; overflow: auto; scrollbar-color: #b8d9c4 transparent; }
 .availability-empty { margin-top: 18px; color: #6e7c8e; }
 
 .availability-legend {
-  min-width: 850px;
   display: flex;
   justify-content: flex-end;
+  margin-top: 22px;
   gap: 20px;
   margin-bottom: 12px;
   color: #65758a;
@@ -265,7 +265,8 @@
 }
 
 .availability-grid__corner,
-.availability-grid__day { border-bottom: 1px solid #dce6ef; }
+.availability-grid__day { position: sticky; top: 0; z-index: 2; border-bottom: 1px solid #dce6ef; background: #fff; }
+.availability-grid__corner { left: 0; z-index: 3; }
 
 .availability-grid__day {
   display: grid;

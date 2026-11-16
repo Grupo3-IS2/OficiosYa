@@ -58,6 +58,12 @@ describe('the professional\'s availability', () => {
         assert.equal(withinAvailability([block('URGENT_AVAILABLE', '2026-10-15T09:00', '2026-10-15T11:00')], start, end), false)
     })
 
+    it('covers a timeframe spanning blocks back to back, but not one with a gap', () => {
+        const morning = block('URGENT_AVAILABLE', '2026-10-15T09:00', '2026-10-15T11:00')
+        assert.equal(withinAvailability([block('URGENT_AVAILABLE', '2026-10-15T11:00', '2026-10-15T13:00'), morning], start, end), true)
+        assert.equal(withinAvailability([block('URGENT_AVAILABLE', '2026-10-15T11:30', '2026-10-15T13:00'), morning], start, end), false)
+    })
+
     it('only counts availability, not busy blocks', () => {
         assert.equal(withinAvailability([block('USER_RESERVED', '2026-10-15T09:00', '2026-10-15T13:00')], start, end), false)
     })

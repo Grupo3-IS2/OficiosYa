@@ -22,6 +22,8 @@ async function openProfile(page: Page, savedPhone: string, countries: 'ok' | 'do
   await mockVerifiedSession(page, { name: 'Juan Gomez', email: 'pro.tel@qa.test', role: 'PROFESSIONAL' });
   await blockExternalMaps(page);
   await page.route('**/api/v1/users/me', (route) => route.fulfill({ json: professionalBody(savedPhone) }));
+  // A professional's agenda is loaded with the session: unmocked, the fake token gets a 401 and logs out
+  await page.route('**/api/v1/schedules?**', (route) => route.fulfill({ json: [] }));
   await page.route('**/api/v1/professionals/me', async (route) => {
     const body = route.request().postDataJSON() as Record<string, unknown>;
     patches.push(body);

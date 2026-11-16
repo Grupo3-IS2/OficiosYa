@@ -22,10 +22,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -163,12 +165,26 @@ class ScheduleServiceImplTest {
     @Test
     void createSchedule_overlapping_isAConflict() {
         when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
-        when(scheduleRepository.existsOverlapping(professionalId, start, end, 0L)).thenReturn(true);
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start).endTimestamp(end).build());
         ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
                 () -> service.createSchedule(request, professionalId));
         assertEquals(409, e.getStatusCode().value());
+    }
+
+    @Test
+    void createSchedule_onAnExcludedFirstOccurrence_isAllowed() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        Schedule weekly = Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start).endTimestamp(end).rrule("FREQ=WEEKLY")
+                .exdates(new ArrayList<>(List.of(start))).build();
+        weekly.validateAndNormalizeRecurrence();
+        agendaHas(weekly);
+        ScheduleCreateRequest request = createRequest(ScheduleType.USER_RESERVED, start, end);
+
+        assertDoesNotThrow(() -> service.createSchedule(request, professionalId));
     }
 
     @Test
@@ -300,7 +316,8 @@ class ScheduleServiceImplTest {
     @Test
     void updateSchedule_overlapping_isAConflict() {
         block(ScheduleType.USER_RESERVED);
-        when(scheduleRepository.existsOverlapping(professionalId, start, end, 5L)).thenReturn(true);
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start).endTimestamp(end).build());
         ScheduleUpdateRequest request = new ScheduleUpdateRequest();
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,

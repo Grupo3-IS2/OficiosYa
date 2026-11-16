@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import Icon from '../../components/Icon/Icon'
 import PersonalDataSection from './components/PersonalDataSection'
 import SecuritySection from './components/SecuritySection'
 import GoogleAccountSection from './components/GoogleAccountSection'
 import ProfessionalProfileSection from './components/ProfessionalProfileSection'
-import ScheduleSection from './components/ScheduleSection'
 import PayoutSection from './components/PayoutSection'
 import BecomeProfessionalCard from './components/BecomeProfessionalCard'
 import TermsSection from './components/TermsSection'
@@ -16,6 +15,9 @@ import useUnsavedNavigation from './useUnsavedNavigation'
 import { useSession } from '../../components/SessionProvider/useSession'
 import { MERCADO_PAGO_LINK_CHANNEL } from './payoutAccount'
 import './EditProfile.css'
+
+// The calendar library is heavy and only professionals need it
+const ScheduleSection = lazy(() => import('./components/ScheduleSection'))
 
 /** How linking Mercado Pago went, as it comes back in ?mercadopago= */
 const linkOutcomes: Record<string, { message?: string; error?: string }> = {
@@ -82,7 +84,7 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                                 onLink={linkMercadoPago}
                                 onUnlink={editor.unlinkPayout}
                                 message={editor.messages.payout || linkOutcome?.message} error={editor.errorSection === 'payout' ? editor.error : linkOutcome?.error} profileName={editor.personal.name} />
-                            {editor.user && <ScheduleSection professionalId={editor.user.id} />}
+                            {editor.user && <Suspense fallback={null}><ScheduleSection professionalId={editor.user.id} /></Suspense>}
                         </>
                         : !isAdmin && <BecomeProfessionalCard />}
                 </fieldset>

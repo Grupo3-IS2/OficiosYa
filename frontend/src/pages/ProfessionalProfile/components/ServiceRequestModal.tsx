@@ -16,6 +16,7 @@ import {
     validateServiceRequest,
     type ServiceRequestFormValue,
 } from '../serviceRequestForm'
+import BookingCalendar from './BookingCalendar'
 import './ServiceRequestModal.css'
 
 interface ServiceRequestModalProps {
@@ -229,6 +230,11 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
                             aria-describedby={showErrors && errors.timeframe ? 'service-request-when-error' : undefined}>
                             <legend>Horario recomendado (opcional)</legend>
                             <p className="service-request-when__hint">Si tenés un horario en mente, el profesional lo va a ver como sugerencia.</p>
+                            <BookingCalendar
+                                professionalId={professional.id}
+                                value={value}
+                                onChange={timeframe => setValue(current => ({ ...current, ...timeframe }))}
+                            />
                             <label className="service-request-when__date">
                                 Fecha
                                 <input type="date" value={value.date} aria-invalid={showErrors && Boolean(errors.timeframe)}

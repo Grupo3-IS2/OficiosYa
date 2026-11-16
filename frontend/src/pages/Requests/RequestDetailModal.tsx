@@ -9,8 +9,9 @@ import { getCurrentUser } from '../../services/authService'
 import type { JobRequest, JobStatus, PaymentState } from '../../types/JobRequest'
 import CancelRequestSection from './CancelRequestSection'
 import CompleteRequestSection from './CompleteRequestSection'
+import PaymentRequestSection from './PaymentRequestSection'
 import RequestResponseSection, { type ResponseMode } from './RequestResponseSection'
-import { canCompleteRequest, type Decision, type RequestOutcome } from './requestResponse'
+import { awaitsPayment, canCompleteRequest, type Decision, type RequestOutcome } from './requestResponse'
 import { answersReschedule, outsideServiceAreaNote, rescheduleRequester } from './requestList'
 import { timeframeText } from './rescheduleTimeframe'
 import { canRateRequest } from './ratingForm'
@@ -158,6 +159,7 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
             </header>
 
             <div className="request-detail-modal__body" ref={bodyRef}>
+                {awaitsPayment(request) && !cancelling && <PaymentRequestSection request={request} isClient={isClient} />}
                 {canComplete && !cancelling && <CompleteRequestSection
                     request={request} onCompleted={onAnswered} onBusyChange={setAnswering}
                 />}
@@ -216,9 +218,43 @@ export default function RequestDetailModal({ request, isClient, pin, initialResp
                     </div>
                     {request.paymentState && <div>
                         <span>Pago</span>
-                        <strong>{paymentLabels[request.paymentState]}</strong>
+                        <strong>{request.status === 'CANCELLED' && request.paymentState === 'RETAINED' ? 'Devolución pendiente' : paymentLabels[request.paymentState]}</strong>
                     </div>}
                 </section>
+
+                {request.mpPaymentId && <section className="request-detail-section" aria-labelledby="request-receipt-title">
+                    <h3 id="request-receipt-title">Comprobante de pago</h3>
+                    <div className="request-detail-summary">
+                        <div>
+                            <span>N° de operación (Mercado Pago)</span>
+                            <strong>{request.mpPaymentId}</strong>
+                        </div>
+                        {request.paidAt && <div>
+                            <span>Fecha de pago</span>
+                            <strong>{dateFormatter.format(new Date(request.paidAt))}</strong>
+                        </div>}
+                    </div>
+                </section>}
+
+                {!isClient && request.status !== 'CANCELLED' && (request.paymentState === 'RETAINED' || request.paymentState === 'PAID') && <section className="request-detail-section" aria-labelledby="request-payout-title">
+                    <h3 id="request-payout-title">Tu cobro</h3>
+                    {request.paymentState === 'PAID' && request.platformFee != null
+                        ? <div className="request-detail-summary">
+                            <div>
+                                <span>Recibís</span>
+                                <strong>{amountFormatter.format(request.paymentAmount - request.platformFee)}</strong>
+                            </div>
+                            <div>
+                                <span>Comisión de OficiosYa</span>
+                                <strong>{amountFormatter.format(request.platformFee)}</strong>
+                            </div>
+                            <div>
+                                <span>Transferencia</span>
+                                <strong>{request.payoutAt ? `Hecha el ${dateFormatter.format(new Date(request.payoutAt))}` : 'Pendiente'}</strong>
+                            </div>
+                        </div>
+                        : <p className="request-detail-muted">Cuando el cliente te dé el PIN, te transferimos el monto descontada la comisión de OficiosYa a la cuenta de tu perfil.</p>}
+                </section>}
 
                 <section className="request-detail-section">
                     <h3>Trabajo</h3>

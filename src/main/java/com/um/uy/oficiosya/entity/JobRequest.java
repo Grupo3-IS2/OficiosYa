@@ -84,6 +84,27 @@ public class JobRequest {
     @Column(nullable = false, length = 32)
     private PaymentState paymentState = PaymentState.PENDING;
 
+    /** The Mercado Pago payment holding the money; set once it is RETAINED, refunded from it on cancel. */
+    @Column(length = 64)
+    private String mpPaymentId;
+
+    /**
+     * The professional's Mercado Pago account the checkout charges into, as it was when opened; null when it is
+     * OficiosYa's own. Says whose token reads and refunds the payment, and whether an admin still has to transfer it.
+     */
+    @Column(length = 32)
+    private String mpCollectorUserId;
+
+    /** When Mercado Pago confirmed that payment; null on jobs paid before it was kept. */
+    private OffsetDateTime paidAt;
+
+    /** OficiosYa's commission, taken when the PIN releases the payment (PAID); the professional gets the rest. */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal platformFee;
+
+    /** When an admin transferred the professional their share; null while a PAID job waits for it. */
+    private OffsetDateTime payoutAt;
+
     @Builder.Default
     @NotNull
     @Enumerated(EnumType.STRING)

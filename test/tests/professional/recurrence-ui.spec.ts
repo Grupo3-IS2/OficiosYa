@@ -30,6 +30,7 @@ async function openSchedule(page: Page) {
     published: false, expertiseTrades: [], emailNotifications: true,
   } }));
   await page.route('**/api/v1/trades', route => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/professionals/me/mercado-pago', route => route.fulfill({ json: { available: false } }));
   await page.route('**/api/v1/professionals/me', route => route.fulfill({ json: {
     id: professionalId, name: 'Profesional Agenda', email: 'agenda@qa.test', role: 'PROFESSIONAL',
     phoneNumber: '099123456', profileImageUrl: null, workingLocation: 'Montevideo',

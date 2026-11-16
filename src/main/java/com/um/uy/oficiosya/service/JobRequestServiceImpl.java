@@ -30,6 +30,7 @@ import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.TradeRepository;
 import com.um.uy.oficiosya.repository.ClientRepository;
 import com.um.uy.oficiosya.service.interfaces.JobRequestService;
+import com.um.uy.oficiosya.service.interfaces.PaymentGateway;
 import com.um.uy.oficiosya.service.interfaces.ScheduleService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,6 +44,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
@@ -75,6 +78,9 @@ public class JobRequestServiceImpl implements JobRequestService {
     private final Duration minNotice;
     private final ApplicationEventPublisher events;
     private final ConversationRepository conversationRepository;
+    private final PaymentGateway paymentGateway;
+    /** OficiosYa's share of each job's amount, in percent, taken when the PIN releases the payment. */
+    private final BigDecimal commissionPercent;
 
     public JobRequestServiceImpl(JobRequestRepository jobRequestRepository,
                                   ClientRepository clientRepository,
@@ -86,7 +92,9 @@ public class JobRequestServiceImpl implements JobRequestService {
                                   Clock clock,
                                   @Value("${app.job-request.min-notice-hours}") long minNoticeHours,
                                   ApplicationEventPublisher events,
-                                  ConversationRepository conversationRepository) {
+                                  ConversationRepository conversationRepository,
+                                  PaymentGateway paymentGateway,
+                                  @Value("${app.payments.commission-percent}") BigDecimal commissionPercent) {
         this.jobRequestRepository = jobRequestRepository;
         this.clientRepository = clientRepository;
         this.professionalRepository = professionalRepository;
@@ -98,6 +106,8 @@ public class JobRequestServiceImpl implements JobRequestService {
         this.minNotice = Duration.ofHours(minNoticeHours);
         this.events = events;
         this.conversationRepository = conversationRepository;
+        this.paymentGateway = paymentGateway;
+        this.commissionPercent = commissionPercent;
     }
 
     @Override
@@ -225,6 +235,11 @@ public class JobRequestServiceImpl implements JobRequestService {
             jobRequest.setProposedStart(null);
             jobRequest.setProposedEnd(null);
         } else {
+            // The professional accepts: without where to pay them, the job couldn't be charged or paid out
+            if (paymentGateway.isEnabled() && !paymentGateway.canCollect(jobRequest.getProfessional())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Vinculá en tu perfil la cuenta donde querés cobrar antes de aceptar trabajos");
+            }
             if (request == null || request.getStartTimestamp() == null || request.getEndTimestamp() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí el horario del trabajo para aceptarlo");
             }
@@ -279,10 +294,7 @@ public class JobRequestServiceImpl implements JobRequestService {
             scheduleService.releaseJobSchedule(jobRequest);
         }
 
-        if (jobRequest.getPaymentState() == PaymentState.RETAINED) {
-            jobRequest.setPaymentState(PaymentState.REFUNDED);
-        }
-
+        // A paid job keeps its payment RETAINED: cancelled like that, it waits for an admin to give the money back
         jobRequest.setStatus(JobStatus.CANCELLED);
         jobRequest.setCancelledBy(jobRequest.getClient().getPublicId().equals(requesterId)
                 ? Role.CLIENT : Role.PROFESSIONAL);
@@ -362,8 +374,24 @@ public class JobRequestServiceImpl implements JobRequestService {
                     "Solo se puede completar un trabajo en estado ACCEPTED");
         }
 
+        // With payments off (no MP_ACCESS_TOKEN) jobs complete unpaid, as before payments existed
+        if (paymentGateway.isEnabled() && jobRequest.getPaymentState() != PaymentState.RETAINED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El cliente todavía no pagó el trabajo: se puede completar una vez que lo pague");
+        }
+
         if (!passwordEncoder.matches(request.getPin(), jobRequest.getConfirmationPinHash())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El PIN ingresado es incorrecto");
+        }
+
+        if (jobRequest.getPaymentState() == PaymentState.RETAINED) {
+            jobRequest.setPaymentState(PaymentState.PAID);
+            jobRequest.setPlatformFee(jobRequest.getPaymentAmount().multiply(commissionPercent)
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+            // Charged into the professional's linked account (split): Mercado Pago already paid them, nothing to transfer
+            if (jobRequest.getMpCollectorUserId() != null) {
+                jobRequest.setPayoutAt(OffsetDateTime.now(clock));
+            }
         }
 
         jobRequest.setStatus(JobStatus.COMPLETED);

@@ -34,6 +34,7 @@ import com.um.uy.oficiosya.repository.ConversationRepository;
 import com.um.uy.oficiosya.repository.JobRequestRepository;
 import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import com.um.uy.oficiosya.repository.TradeRepository;
+import com.um.uy.oficiosya.service.interfaces.PaymentGateway;
 import com.um.uy.oficiosya.service.interfaces.ScheduleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -84,6 +86,8 @@ class JobRequestServiceImplTest {
     private ApplicationEventPublisher events;
     @Mock
     private ConversationRepository conversationRepository;
+    @Mock
+    private PaymentGateway paymentGateway;
 
     private JobRequestServiceImpl service;
 
@@ -97,7 +101,8 @@ class JobRequestServiceImplTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new JobRequestServiceImpl(jobRequestRepository, clientRepository, professionalRepository,
-                tradeRepository, new JobRequestMapperImpl(), scheduleService, passwordEncoder, Clock.systemUTC(), 24, events, conversationRepository);
+                tradeRepository, new JobRequestMapperImpl(), scheduleService, passwordEncoder, Clock.systemUTC(), 24, events, conversationRepository,
+                paymentGateway, BigDecimal.valueOf(15));
         client = Client.builder().id(1L).publicId(clientId).name("Ana").email("ana@example.com").build();
         professional = Professional.builder().id(2L).publicId(professionalId).name("Beto")
                 .email("beto@example.com").phoneNumber("099123456").build();
@@ -302,6 +307,22 @@ class JobRequestServiceImplTest {
     }
 
     @Test
+    void acceptJobRequest_withPaymentsOn_needsWhereToPayTheProfessional() {
+        job(JobStatus.PROPOSED);
+        when(paymentGateway.isEnabled()).thenReturn(true);
+        JobRequestAcceptRequest request = new JobRequestAcceptRequest();
+        OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+        request.setStartTimestamp(start);
+        request.setEndTimestamp(start.plusHours(2));
+
+        assertThrows(ResponseStatusException.class, () -> service.acceptJobRequest(10L, request, professionalId));
+        verify(scheduleService, never()).createJobSchedule(any(), any(), any());
+
+        when(paymentGateway.canCollect(professional)).thenReturn(true);
+        assertEquals(JobStatus.ACCEPTED, service.acceptJobRequest(10L, request, professionalId).getStatus());
+    }
+
+    @Test
     void acceptJobRequest_unknownJob_isNotFound() {
         when(jobRequestRepository.findById(10L)).thenReturn(Optional.empty());
         JobRequestAcceptRequest request = new JobRequestAcceptRequest();
@@ -400,11 +421,23 @@ class JobRequestServiceImplTest {
     }
 
     @Test
-    void cancelJobRequest_withARetainedPayment_refundsIt() {
+    void cancelJobRequest_withARetainedPayment_leavesItForAnAdminToGiveBack() {
         JobRequest job = scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusDays(3));
         job.setPaymentState(PaymentState.RETAINED);
+        job.setMpPaymentId("pay-1");
 
-        assertEquals(PaymentState.REFUNDED, service.cancelJobRequest(10L, null, clientId).getPaymentState());
+        assertEquals(PaymentState.RETAINED, service.cancelJobRequest(10L, null, clientId).getPaymentState());
+
+        assertEquals(JobStatus.CANCELLED, job.getStatus());
+        verify(paymentGateway, never()).refund(any(), any());
+    }
+
+    @Test
+    void cancelJobRequest_unpaid_refundsNothing() {
+        scheduledJob(JobStatus.ACCEPTED, OffsetDateTime.now().plusDays(3));
+
+        assertEquals(PaymentState.PENDING, service.cancelJobRequest(10L, null, clientId).getPaymentState());
+        verify(paymentGateway, never()).refund(any(), any());
     }
 
     @Test
@@ -704,6 +737,72 @@ class JobRequestServiceImplTest {
     }
 
     @Test
+    void completeJobRequest_withPaymentsOn_releasesTheRetainedPaymentMinusTheCommission() {
+        JobRequest job = job(JobStatus.ACCEPTED);
+        job.setPaymentAmount(BigDecimal.valueOf(1000));
+        job.setPaymentState(PaymentState.RETAINED);
+        when(paymentGateway.isEnabled()).thenReturn(true);
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+
+        JobRequestResponse response = service.completeJobRequest(10L, pin("123456"), professionalId);
+
+        assertEquals(JobStatus.COMPLETED, response.getStatus());
+        assertEquals(PaymentState.PAID, response.getPaymentState());
+        assertEquals(new BigDecimal("150.00"), response.getPlatformFee());
+        assertNull(response.getPayoutAt());
+    }
+
+    @Test
+    void completeJobRequest_ofASplitPayment_hasNothingLeftToTransfer() {
+        JobRequest job = job(JobStatus.ACCEPTED);
+        job.setPaymentAmount(BigDecimal.valueOf(1000));
+        job.setPaymentState(PaymentState.RETAINED);
+        job.setMpCollectorUserId("987");
+        when(paymentGateway.isEnabled()).thenReturn(true);
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+
+        JobRequestResponse response = service.completeJobRequest(10L, pin("123456"), professionalId);
+
+        assertEquals(PaymentState.PAID, response.getPaymentState());
+        assertNotNull(response.getPayoutAt());
+    }
+
+    @Test
+    void completeJobRequest_collectedByOficiosYa_stillHasToBeTransferred_evenIfTheProfessionalLinkedSince() {
+        JobRequest job = job(JobStatus.ACCEPTED);
+        job.setPaymentAmount(BigDecimal.valueOf(1000));
+        job.setPaymentState(PaymentState.RETAINED);
+        professional.setMpAccessToken("encrypted");
+        when(paymentGateway.isEnabled()).thenReturn(true);
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+
+        assertNull(service.completeJobRequest(10L, pin("123456"), professionalId).getPayoutAt());
+    }
+
+    @Test
+    void completeJobRequest_withPaymentsOn_unpaid_isRejected() {
+        JobRequest job = job(JobStatus.ACCEPTED);
+        when(paymentGateway.isEnabled()).thenReturn(true);
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+        JobRequestCompleteRequest request = pin("123456");
+
+        assertThrows(ResponseStatusException.class, () -> service.completeJobRequest(10L, request, professionalId));
+        assertEquals(JobStatus.ACCEPTED, job.getStatus());
+    }
+
+    @Test
+    void completeJobRequest_withPaymentsOff_completesUnpaid() {
+        job(JobStatus.ACCEPTED);
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+
+        JobRequestResponse response = service.completeJobRequest(10L, pin("123456"), professionalId);
+
+        assertEquals(JobStatus.COMPLETED, response.getStatus());
+        assertEquals(PaymentState.PENDING, response.getPaymentState());
+        assertNull(response.getPlatformFee());
+    }
+
+    @Test
     void completeJobRequest_notAccepted_isRejected() {
         job(JobStatus.PROPOSED);
         JobRequestCompleteRequest request = pin("123456");
@@ -834,7 +933,7 @@ class JobRequestServiceImplTest {
     }
 
     @Test
-    void getJobRequest_showsWhoTakesPart_andTheirContactOnlyOnceAccepted() {
+    void getJobRequest_showsWhoTakesPart_andTheirContactOnlyOnceAcceptedAndPaid() {
         job(JobStatus.PROPOSED);
 
         JobRequestResponse proposed = service.getJobRequest(10L, professionalId);
@@ -845,6 +944,13 @@ class JobRequestServiceImplTest {
         assertNull(proposed.getProfessionalPhoneNumber());
 
         job(JobStatus.ACCEPTED);
+
+        JobRequestResponse unpaid = service.getJobRequest(10L, professionalId);
+
+        assertNull(unpaid.getClientEmail());
+        assertNull(unpaid.getProfessionalPhoneNumber());
+
+        job(JobStatus.ACCEPTED).setPaymentState(PaymentState.RETAINED);
 
         JobRequestResponse accepted = service.getJobRequest(10L, professionalId);
 

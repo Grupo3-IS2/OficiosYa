@@ -260,7 +260,7 @@ function ServiceRequestModal({ professional, preferredTradeId, onClose }: Readon
                                 <input
                                     id="service-request-amount"
                                     type="number"
-                                    min="0"
+                                    min="0.01"
                                     step="0.01"
                                     inputMode="decimal"
                                     placeholder="Ingrese el monto"

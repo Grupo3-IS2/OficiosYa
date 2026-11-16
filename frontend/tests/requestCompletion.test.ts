@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
 import { after, beforeEach, test } from 'node:test'
-import { canCompleteRequest, completionPin } from '../src/pages/Requests/requestResponse.ts'
+import { awaitsPayment, canCompleteRequest, completionPin } from '../src/pages/Requests/requestResponse.ts'
 import type { JobStatus } from '../src/types/JobRequest.ts'
 
 test('only the professional assigned to an accepted job can enter its PIN', () => {
@@ -72,4 +72,12 @@ test('an incorrect PIN surfaces the backend error and can be retried', async () 
     await assert.rejects(completeJobRequest(12, '123456'), /El PIN ingresado es incorrecto/)
     fail = false
     assert.equal((await completeJobRequest(12, '001234')).status, 'COMPLETED')
+})
+
+test('an accepted job awaits payment until the client pays it', () => {
+    assert.equal(awaitsPayment({ status: 'ACCEPTED', paymentState: 'PENDING' }), true)
+    assert.equal(awaitsPayment({ status: 'RESCHEDULE_REQUESTED', paymentState: 'PENDING' }), true)
+    assert.equal(awaitsPayment({ status: 'ACCEPTED', paymentState: 'RETAINED' }), false)
+    assert.equal(awaitsPayment({ status: 'PROPOSED', paymentState: 'PENDING' }), false)
+    assert.equal(awaitsPayment({ status: 'CANCELLED', paymentState: 'PENDING' }), false)
 })

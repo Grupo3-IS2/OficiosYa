@@ -23,6 +23,9 @@ public class ProfessionalUpdateRequest extends ClientUpdateRequest {
     @Valid
     private ServiceAreaRequest serviceArea;
 
+    @Size(max = 200, message = "La cuenta para cobrar puede tener como máximo 200 caracteres")
+    private String payoutAccount;
+
     @Size(min = 20, max = 500, message = "La descripción debe tener entre 20 y 500 caracteres")
     private String description;
 }

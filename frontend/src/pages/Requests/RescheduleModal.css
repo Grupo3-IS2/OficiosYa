@@ -31,3 +31,6 @@
   .reschedule-review__comparison { grid-template-columns: 1fr; }
   .reschedule-review__arrow { justify-self: center; transform: rotate(90deg); }
 }
+/* Rescheduling shows the professional's agenda above the fields, so it needs the room */
+.reschedule-modal:has(.reschedule-modal__calendar) { width: min(820px, calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.reschedule-modal__calendar { grid-column: 1 / -1; min-width: 0; }

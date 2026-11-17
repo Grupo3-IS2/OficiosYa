@@ -286,6 +286,19 @@ test.describe('Agenda profesional', () => {
     });
     expect(accepted.status()).toBe(200);
 
+    // Visitors don't see the job, only a gap in the availability where it is
+    const visitorAgenda = await getAgenda(request, professional.id, {
+      from: '2035-05-07T00:00:00Z',
+      to: '2035-05-08T00:00:00Z'
+    });
+    expect(visitorAgenda.status()).toBe(200);
+    const pieces = (await visitorAgenda.json()) as Array<{ type: string; startTimestamp: string; endTimestamp: string }>;
+    expect(pieces.map(piece => piece.type)).toEqual(['URGENT_AVAILABLE', 'URGENT_AVAILABLE']);
+    expect(pieces.map(piece => [Date.parse(piece.startTimestamp), Date.parse(piece.endTimestamp)])).toEqual([
+      [Date.parse('2035-05-07T13:00:00+02:00'), Date.parse('2035-05-07T14:00:00+02:00')],
+      [Date.parse('2035-05-07T15:00:00+02:00'), Date.parse('2035-05-07T17:00:00+02:00')]
+    ]);
+
     // Jobs are booked inside availability, so the job doesn't stop the professional from changing it
     const stretched = await request.patch(`${SCHEDULES_URL}/${block.id}`, {
       headers: authHeaders(professional.token),

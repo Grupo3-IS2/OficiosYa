@@ -25,6 +25,23 @@ export function withinAvailability(schedules: Schedule[], start: Date, end: Date
     return false
 }
 
+/** The job being moved, with the slot it holds now. */
+export interface OwnJob {
+    id: number
+    start?: string | null
+    end?: string | null
+}
+
+/** The agenda as it reads while moving a job: its own block isn't in the way, and its current slot can be kept. */
+export function withOwnJob(schedules: Schedule[], job: OwnJob): Schedule[] {
+    const others = schedules.filter(schedule => schedule.jobRequestId !== job.id)
+    if (!job.start || !job.end) return others
+    return [...others, {
+        id: -job.id, professionalId: '', jobRequestId: job.id, type: 'URGENT_AVAILABLE',
+        startTimestamp: job.start, endTimestamp: job.end, rrule: null, tzid: null, exdates: null, recurrenceEnd: null,
+    }]
+}
+
 /** The reason of a rejection or a cancellation is optional: blank is no reason at all. */
 export function optionalReason(text: string): { reason?: string } | { error: string } {
     const reason = text.trim()

@@ -249,14 +249,28 @@ public class ScheduleServiceImpl implements ScheduleService {
                                             boolean ownerOrAdmin) {
         requireProfessionalVisible(professionalId, ownerOrAdmin);
 
-        return scheduleRepository.findAgenda(professionalId, from, to).stream()
+        List<Schedule> agenda = scheduleRepository.findAgenda(professionalId, from, to);
+        // Visitors don't see a booked job, only a gap where the availability around it was
+        List<Schedule.Occurrence> booked = ownerOrAdmin ? List.of() : agenda.stream()
+                .filter(schedule -> schedule.getType() == ScheduleType.SCHEDULED_JOB)
+                .map(schedule -> new Schedule.Occurrence(schedule.getStartTimestamp(), schedule.getEndTimestamp()))
+                .toList();
+
+        return agenda.stream()
                 .filter(schedule -> visibleTo(schedule, ownerOrAdmin))
                 .flatMap(schedule -> {
-                    if (!schedule.isRecurring() && (schedule.getExdates() == null || schedule.getExdates().isEmpty())) {
+                    boolean single = !schedule.isRecurring() && (schedule.getExdates() == null || schedule.getExdates().isEmpty());
+                    if (single && (booked.isEmpty() || schedule.getType() != ScheduleType.URGENT_AVAILABLE)) {
                         ScheduleResponse res = scheduleMapper.toResponse(schedule);
                         return res != null ? java.util.stream.Stream.of(res) : java.util.stream.Stream.empty();
                     }
-                    return schedule.expandOccurrences(from, to).stream()
+                    List<Schedule.Occurrence> occurrences = single
+                            ? List.of(new Schedule.Occurrence(schedule.getStartTimestamp(), schedule.getEndTimestamp()))
+                            : schedule.expandOccurrences(from, to);
+                    return occurrences.stream()
+                            .flatMap(occurrence -> schedule.getType() == ScheduleType.URGENT_AVAILABLE
+                                    ? withoutBooked(occurrence, booked).stream()
+                                    : java.util.stream.Stream.of(occurrence))
                             .map(occurrence -> scheduleMapper.toOccurrenceResponse(schedule, occurrence))
                             .filter(Objects::nonNull);
                 })
@@ -284,6 +298,28 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
         sb.append("END:VCALENDAR\r\n");
         return sb.toString();
+    }
+
+    /** What is left of an available slot once the booked jobs are cut out of it, in order. */
+    static List<Schedule.Occurrence> withoutBooked(Schedule.Occurrence slot, List<Schedule.Occurrence> booked) {
+        List<Schedule.Occurrence> pieces = List.of(slot);
+        for (Schedule.Occurrence job : booked) {
+            List<Schedule.Occurrence> left = new ArrayList<>();
+            for (Schedule.Occurrence piece : pieces) {
+                if (!job.startTimestamp().isBefore(piece.endTimestamp()) || !job.endTimestamp().isAfter(piece.startTimestamp())) {
+                    left.add(piece);
+                    continue;
+                }
+                if (piece.startTimestamp().isBefore(job.startTimestamp())) {
+                    left.add(new Schedule.Occurrence(piece.startTimestamp(), job.startTimestamp()));
+                }
+                if (job.endTimestamp().isBefore(piece.endTimestamp())) {
+                    left.add(new Schedule.Occurrence(job.endTimestamp(), piece.endTimestamp()));
+                }
+            }
+            pieces = left;
+        }
+        return pieces;
     }
 
     /** Booked jobs stay private: anyone else would learn when, and how often, the professional is hired. */

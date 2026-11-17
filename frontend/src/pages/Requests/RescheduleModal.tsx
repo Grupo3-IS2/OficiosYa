@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import type { SubmitEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../components/Button/Button'
+import { useSession } from '../../components/SessionProvider/useSession'
+import BookingCalendar from '../ProfessionalProfile/components/BookingCalendar'
 import { requestReschedule } from '../../services/jobRequestService'
 import { getProfessionalSchedule } from '../../services/scheduleService'
 import type { JobRequest } from '../../types/JobRequest'
 import { rescheduleDraftFrom, rescheduleTimeframe } from './rescheduleForm'
 import OutsideAvailabilityModal from './OutsideAvailabilityModal'
-import { withinAvailability } from './requestResponse'
+import { withinAvailability, withOwnJob } from './requestResponse'
 import './RescheduleModal.css'
 
 export default function RescheduleModal({ request, onRescheduled, onClose }: Readonly<{
@@ -16,6 +18,10 @@ export default function RescheduleModal({ request, onRescheduled, onClose }: Rea
     onClose: () => void
 }>) {
     const dialog = useRef<HTMLDialogElement>(null)
+    const { user } = useSession()
+    const owner = user?.id === request.professionalId
+    // One object for the whole modal: the calendar reloads its agenda when it changes
+    const [ownJob] = useState(() => ({ id: request.id, start: request.scheduledStart, end: request.scheduledEnd }))
     const [initialDraft] = useState(() => rescheduleDraftFrom(request.scheduledStart, request.scheduledEnd))
     const [draft, setDraft] = useState(initialDraft)
     const unchanged = draft.date === initialDraft.date && draft.startTime === initialDraft.startTime && draft.endTime === initialDraft.endTime
@@ -50,7 +56,7 @@ export default function RescheduleModal({ request, onRescheduled, onClose }: Rea
         setError('')
         // shortcut: an agenda that can't be loaded skips the warning; the backend still rejects real clashes
         const available = await getProfessionalSchedule(request.professionalId, timeframe.start, timeframe.end)
-            .then(schedules => withinAvailability(schedules, timeframe.start, timeframe.end), () => true)
+            .then(schedules => withinAvailability(withOwnJob(schedules, ownJob), timeframe.start, timeframe.end), () => true)
         if (available) await propose(timeframe)
         else {
             setUnavailable(timeframe)
@@ -74,6 +80,10 @@ export default function RescheduleModal({ request, onRescheduled, onClose }: Rea
             onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
             <form className="reschedule-modal__body" onSubmit={event => { void handleSubmit(event) }}>
                 <h2 id="reschedule-title">Reagendar solicitud</h2>
+                <div className="reschedule-modal__calendar">
+                    <BookingCalendar professionalId={request.professionalId} value={draft} owner={owner} ownJob={ownJob} disabled={busy}
+                        onChange={timeframe => setDraft(timeframe)} />
+                </div>
                 <label className="reschedule-modal__field reschedule-modal__field--wide">
                     Fecha
                     <input type="date" required value={draft.date} disabled={busy}

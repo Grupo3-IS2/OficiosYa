@@ -81,11 +81,12 @@ export function resendCode(request: APIRequestContext, email: string) {
 /**
  * Finishes a registration that was just started: reads the code from the inbox and verifies
  * it, so the result is the login the old one-step registration returned. A start that was
- * refused (validation) is returned as is, since there is no code to wait for.
+ * refused (validation) is returned as is, since there is no code to wait for. `messages`: for an
+ * inbox that already had codes, how many emails to wait for (see waitForVerificationCode).
  */
-export async function completeRegistration(request: APIRequestContext, started: APIResponse, email: string): Promise<APIResponse> {
+export async function completeRegistration(request: APIRequestContext, started: APIResponse, email: string, messages = 1): Promise<APIResponse> {
   if (started.status() !== 202) {
     return started;
   }
-  return verifyEmail(request, email, await waitForVerificationCode(request, email));
+  return verifyEmail(request, email, await waitForVerificationCode(request, email, messages));
 }

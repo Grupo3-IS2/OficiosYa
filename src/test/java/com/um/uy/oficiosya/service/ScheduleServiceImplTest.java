@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -486,13 +487,23 @@ class ScheduleServiceImplTest {
     }
 
     @Test
-    void getAgenda_public_hidesTheJob() {
+    void getAgenda_public_hidesBookedJobs() {
         when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
-        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock()));
+        Schedule available = Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start).endTimestamp(end).build();
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock(), available));
 
         List<ScheduleResponse> agenda = service.getAgenda(professionalId, null, null, false);
 
-        assertNull(agenda.getFirst().getJobRequestId());
+        assertEquals(List.of(ScheduleType.URGENT_AVAILABLE), agenda.stream().map(ScheduleResponse::getType).toList());
+    }
+
+    @Test
+    void exportAgendaICalendar_public_hidesBookedJobs() {
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock()));
+
+        assertFalse(service.exportAgendaICalendar(professionalId, null, null, false).contains("BEGIN:VEVENT"));
     }
 
     @Test

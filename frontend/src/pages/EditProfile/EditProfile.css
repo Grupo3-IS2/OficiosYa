@@ -75,7 +75,8 @@
 .become-professional > p { max-width: 440px; margin: 0 auto 28px; color: #6b7890; font-size: 15px; line-height: 1.6; }
 .become-professional .button { width: min(100%, 380px); }
 .become-professional > small { margin-top: 14px; color: #6b7890; font-size: 14px; }
-.become-professional .profile-feedback { margin: 18px auto 0; color: #42664c; }
+.become-professional__form { max-width: 380px; margin: 0 auto; text-align: left; }
+.become-professional__form .profile-error { margin: 0 0 14px; }
 @media (max-width: 650px) {
     .edit-profile-page { padding: 20px 14px; }
     .edit-profile-brand { font-size: 25px; }

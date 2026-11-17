@@ -173,6 +173,14 @@ export function unlinkMercadoPago(): Promise<void> {
   return apiRequest<void>('/professionals/me/mercado-pago', { method: 'DELETE' })
 }
 
+/** The client's account becomes a professional one too, unpublished until the profile is complete. */
+export function becomeProfessional(phoneNumber: string, workingLocation: string): Promise<ProfessionalResponse> {
+  return apiRequest<ProfessionalResponse>('/professionals/me', {
+    method: 'POST',
+    body: JSON.stringify({ phoneNumber, workingLocation }),
+  })
+}
+
 export function updateProfessional(request: ProfessionalUpdateRequest): Promise<ProfessionalResponse> {
   return apiRequest<ProfessionalResponse>('/professionals/me', {
     method: 'PATCH',

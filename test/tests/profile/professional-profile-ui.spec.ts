@@ -23,9 +23,12 @@ function professional(published = false, description = '') {
   };
 }
 
-async function prepareProfile(page: Page) {
+/** The edit page of a professional, or of a client who can become one (`asClient`). */
+async function prepareProfile(page: Page, asClient = false) {
   const calls: Array<{ method: string; url: string; body: unknown }> = [];
-  let current = professional();
+  let current: ReturnType<typeof professional> = asClient
+    ? { ...professional(), role: 'CLIENT', phoneNumber: '', workingLocation: '' }
+    : professional();
   await page.route('**/api/v1/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -40,6 +43,10 @@ async function prepareProfile(page: Page) {
     }
     if (url.pathname === '/api/v1/trades') {
       return route.fulfill({ json: [{ id: 7, name: 'Plomería' }] });
+    }
+    if (url.pathname === '/api/v1/professionals/me' && request.method() === 'POST') {
+      current = { ...professional(), ...(body as object) };
+      return route.fulfill({ status: 201, json: current });
     }
     if (url.pathname === '/api/v1/professionals/me' && request.method() === 'PATCH') {
       current = { ...current, ...(body as object) };
@@ -71,21 +78,35 @@ async function prepareProfile(page: Page) {
     return route.fulfill({ json: current });
   });
 
-  await page.addInitScript(({ token, professionalId }) => {
+  await page.addInitScript(({ token, professionalId, role }) => {
     localStorage.setItem('oficiosya_token', token);
     localStorage.setItem('oficiosya_user', JSON.stringify({
       id: professionalId,
       name: 'Profesional UI',
       email: 'professional.ui@qa.test',
-      role: 'PROFESSIONAL',
+      role,
     }));
-  }, { token: TOKEN, professionalId });
+  }, { token: TOKEN, professionalId, role: current.role });
   await page.goto(`${FRONTEND_BASE}/profile/edit`);
-  await expect(page.getByRole('heading', { name: 'Perfil profesional' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: asClient ? '¿Quieres ofrecer tus servicios en OficiosYa?' : 'Perfil profesional' })).toBeVisible();
   return { calls, getCurrent: () => current };
 }
 
 test.describe('Perfil profesional desde la UI', () => {
+  test('un cliente se convierte en profesional y ve las secciones para completar su perfil', async ({ page }) => {
+    const { calls } = await prepareProfile(page, true);
+    await page.getByRole('button', { name: 'Quiero ofrecer mis servicios' }).click();
+    await page.getByLabel('Número de teléfono').fill('099 123 456');
+    await page.getByLabel('Ubicación').fill('  Cordón, Montevideo  ');
+    await page.getByRole('button', { name: 'Activar perfil profesional' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Perfil profesional' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '¿Quieres ofrecer tus servicios en OficiosYa?' })).toHaveCount(0);
+    const sent = calls.find(call => call.url === '/api/v1/professionals/me' && call.method === 'POST');
+    expect(sent?.body).toMatchObject({ workingLocation: 'Cordón, Montevideo' });
+    expect((sent?.body as { phoneNumber: string }).phoneNumber).toMatch(/99123456$/);
+  });
+
   test('rechaza descripción corta y tarifas incompletas sin llamar al backend', async ({ page }) => {
     const { calls } = await prepareProfile(page);
     await page.locator('#profile-description').fill('Muy corto');

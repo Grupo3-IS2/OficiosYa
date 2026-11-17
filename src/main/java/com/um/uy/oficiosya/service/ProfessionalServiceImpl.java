@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.service;
 
+import com.um.uy.oficiosya.dto.request.BecomeProfessionalRequest;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.response.PriceRangeResponse;
@@ -8,8 +9,10 @@ import com.um.uy.oficiosya.dto.response.ProfessionalPublicResponse;
 import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
+import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.ExpertiseTrade;
 import com.um.uy.oficiosya.entity.Professional;
+import com.um.uy.oficiosya.entity.Role;
 import com.um.uy.oficiosya.entity.ServiceArea;
 import com.um.uy.oficiosya.entity.Trade;
 import com.um.uy.oficiosya.exception.ExpertiseTradeNotFoundException;
@@ -90,6 +93,19 @@ public class ProfessionalServiceImpl implements ProfessionalService {
         professional = this.professionalRepository.save(professional);
 
         return professionalMapper.toResponse(professional);
+    }
+
+    @Override
+    @Transactional
+    public ProfessionalResponse becomeProfessional(UUID id, BecomeProfessionalRequest request) {
+        Client user = clientRepository.findByPublicId(id)
+                .orElseThrow(() -> new ClientNotFoundException("Usuario no encontrado."));
+        if (Role.of(user) != Role.CLIENT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Tu cuenta ya tiene un perfil profesional.");
+        }
+        professionalRepository.addProfessionalRow(user.getId(), request.getPhoneNumber(), request.getWorkingLocation());
+        // The insert cleared the persistence context, so this loads the user as a Professional
+        return getProfessional(id);
     }
 
     @Override

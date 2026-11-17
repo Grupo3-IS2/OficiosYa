@@ -66,7 +66,7 @@ class AccountCreationTest {
         clientService = new ClientServiceImpl(clientRepository, passwordEncoder, clientMapper, profileImageStorage,
                 emailVerificationService, mock(EmailSenderService.class), mock(JobRequestRepository.class));
         professionalService = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
-                expertiseTradeRepository, professionalMapper, passwordEncoder, mock(MercadoPagoAccountLink.class));
+                expertiseTradeRepository, professionalMapper, passwordEncoder);
         when(passwordEncoder.encode("ClaveSegura2026!")).thenReturn("{argon2}fresh");
     }
 

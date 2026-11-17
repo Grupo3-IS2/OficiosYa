@@ -32,6 +32,16 @@ export async function startPayment(id: number): Promise<string> {
     return initPoint
 }
 
+/** Admin: jobs whose money OficiosYa still holds, oldest payment first. */
+export function getRetainedPayments(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/payments/retained')
+}
+
+/** Admin: gives a held payment back to the client and cancels the job. */
+export function refundRetained(id: number): Promise<JobRequest> {
+    return apiRequest<JobRequest>(`/admin/payments/${id}/refund`, { method: 'POST' })
+}
+
 /** Admin: paid jobs whose professional still has to be transferred their share by hand. */
 export function getPendingPayouts(): Promise<JobRequest[]> {
     return apiRequest<JobRequest[]>('/admin/payouts')

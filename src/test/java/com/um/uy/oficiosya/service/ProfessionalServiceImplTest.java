@@ -80,25 +80,11 @@ class ProfessionalServiceImplTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
-                expertiseTradeRepository, professionalMapper, passwordEncoder, mock(MercadoPagoAccountLink.class));
+                expertiseTradeRepository, professionalMapper, passwordEncoder);
         professional = Professional.builder().id(1L).publicId(id).name("Beto Gómez").email("beto@example.com")
                 .phoneNumber("099123456").workingLocation("Montevideo").build();
         when(professionalRepository.save(any(Professional.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(professionalMapper.toResponse(any(Professional.class))).thenReturn(mapped);
-    }
-
-    @Test
-    void updateProfessional_aTypedPayoutAccount_isRefusedWhileAnOpenJobDependsOnTheLinkedOne() {
-        MercadoPagoAccountLink accountLink = mock(MercadoPagoAccountLink.class);
-        service = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
-                expertiseTradeRepository, professionalMapper, passwordEncoder, accountLink);
-        found();
-        professional.setPayoutMpUserId("123");
-        doThrow(new ResponseStatusException(HttpStatus.CONFLICT)).when(accountLink).requireNoOpenCharges(professional);
-
-        assertThrows(ResponseStatusException.class, () -> service.updateProfessional(
-                ProfessionalUpdateRequest.builder().payoutAccount("BROU · 001234567-00001 · Ana").build(), id));
-        assertEquals("123", professional.getPayoutMpUserId());
     }
 
     private void found() {

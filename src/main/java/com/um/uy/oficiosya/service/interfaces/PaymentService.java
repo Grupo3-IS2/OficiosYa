@@ -5,7 +5,7 @@ import com.um.uy.oficiosya.dto.response.JobRequestResponse;
 import java.util.List;
 import java.util.UUID;
 
-/** Payment lifecycle: PENDING → (client pays) RETAINED → (PIN) PAID, or RETAINED → (cancel, then an admin) REFUNDED. */
+/** Payment lifecycle: PENDING → (client pays) RETAINED → (PIN) PAID, or RETAINED → (cancel, admin) REFUNDED. */
 public interface PaymentService {
 
     /**
@@ -16,10 +16,16 @@ public interface PaymentService {
 
     /**
      * What Mercado Pago tells us changed: re-reads the payment and, if approved, holds it on its job.
-     * A payment the job can't take (cancelled meanwhile, already paid, wrong amount) is refunded. Safe to repeat.
-     * {@code jobRequestId} is the ?job= the checkout put on the notification URL, null without it.
+     * A payment the job can't take (cancelled meanwhile, already paid, wrong amount) is refunded, and one reversed
+     * outside OficiosYa (chargeback, refund from the panel) stops being held or paid out. Safe to repeat.
      */
-    void handlePaymentNotification(String paymentId, Long jobRequestId);
+    void handlePaymentNotification(String paymentId);
+
+    /** Jobs whose money OficiosYa still holds, oldest payment first. */
+    List<JobRequestResponse> listRetained();
+
+    /** An admin gives a held payment back and cancels the job (a no-show, a dispute); 400 unless it is RETAINED. */
+    JobRequestResponse refundRetained(Long jobRequestId);
 
     /** PAID jobs whose professional wasn't transferred their share yet, oldest first. */
     List<JobRequestResponse> listPendingPayouts();

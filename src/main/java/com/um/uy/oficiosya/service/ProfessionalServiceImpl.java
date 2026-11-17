@@ -47,22 +47,19 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     private final ExpertiseTradeRepository expertiseTradeRepository;
     private final ProfessionalMapper professionalMapper;
     private final PasswordEncoder passwordEncoder;
-    private final MercadoPagoAccountLink accountLink;
 
     public ProfessionalServiceImpl(ProfessionalRepository professionalRepository,
                                    ClientRepository clientRepository,
                                    TradeRepository tradeRepository,
                                    ExpertiseTradeRepository expertiseTradeRepository,
                                    ProfessionalMapper professionalMapper,
-                                   PasswordEncoder passwordEncoder,
-                                   MercadoPagoAccountLink accountLink) {
+                                   PasswordEncoder passwordEncoder) {
         this.professionalRepository = professionalRepository;
         this.clientRepository = clientRepository;
         this.tradeRepository = tradeRepository;
         this.expertiseTradeRepository = expertiseTradeRepository;
         this.professionalMapper = professionalMapper;
         this.passwordEncoder = passwordEncoder;
-        this.accountLink = accountLink;
     }
 
     @Override
@@ -116,10 +113,9 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
         String payoutAccount = professionalRequest.getPayoutAccount() == null ? "" : professionalRequest.getPayoutAccount().trim();
         if (!payoutAccount.isEmpty() && !payoutAccount.equals(professional.getPayoutAccount())) {
-            accountLink.requireNoOpenCharges(professional);
             professional.setPayoutAccount(payoutAccount);
             // Typed, it is no longer the account Mercado Pago confirmed
-            professional.clearMercadoPagoLink();
+            professional.setPayoutMpUserId(null);
         }
 
         if (professionalRequest.getServiceArea() != null) {

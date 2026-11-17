@@ -83,9 +83,23 @@ Notes:
 - Locally the site isn't https, so Mercado Pago doesn't redirect back by itself:
   click *Volver al sitio*.
 - Cancelling a paid job doesn't refund it: it waits in `/admin/transferencias`, under
-  *Devoluciones*. The admin refunds it from Mercado Pago and then presses *Marcar devuelto*.
-  It is by hand because Mercado Pago's API refuses refunds for test sellers ("Unauthorized
-  use of live credentials").
+  *Devoluciones*. The admin refunds it from Mercado Pago and then presses *Marcar devuelto*
+  (or Mercado Pago's notification of that refund marks it). It is by hand because Mercado
+  Pago's API refuses refunds for test sellers ("Unauthorized use of live credentials").
+- Money flow: every job is charged into the `MP_ACCESS_TOKEN` account, which holds it until
+  the PIN; an admin then transfers the professional `paymentAmount - platformFee` from
+  Mercado Pago and marks it in *Transferencias*. *Retenidos* there refunds a held payment
+  and cancels the job (no-shows, disputes). A payment reversed in Mercado Pago (chargeback,
+  refund from the panel) cancels a held job, or takes a completed one off the pending transfers.
+- Linking accounts (OAuth): with `MP_CLIENT_ID` and `MP_CLIENT_SECRET` set (*Credenciales de
+  producción*), professionals must link their Mercado Pago account by logging in to it before
+  accepting or proposing jobs. That only proves the account is theirs: no token is kept and no
+  money goes to it directly. Add `https://<host>/api/v1/payments/mercado-pago/callback` as the
+  app's *URL de redireccionamiento*; locally the host is the Cloudflare tunnel's, set as
+  `MP_OAUTH_REDIRECT_URL`.
+- Testing linking: test users' apps have no Client ID/Secret, so those come from an app on your
+  real account, with `MP_OAUTH_TEST_TOKENS=true`. `MP_ACCESS_TOKEN` and `MP_WEBHOOK_SECRET` stay
+  the test seller's. The professional links with a second test seller.
 
 # Coding standards
 

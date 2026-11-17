@@ -1,0 +1,47 @@
+package com.um.uy.oficiosya.service.interfaces;
+
+import com.um.uy.oficiosya.dto.response.JobRequestResponse;
+
+import java.util.List;
+import java.util.UUID;
+
+/** Payment lifecycle: PENDING → (client pays) RETAINED → (PIN) PAID, or RETAINED → (cancel, admin) REFUNDED. */
+public interface PaymentService {
+
+    /**
+     * The checkout URL for the client of an accepted job that isn't paid yet. 403 for anyone else,
+     * 400 if there is nothing to pay, 503 if payments are disabled.
+     */
+    String startPayment(Long jobRequestId, UUID clientId);
+
+    /**
+     * What Mercado Pago tells us changed: re-reads the payment and, if approved, holds it on its job.
+     * A payment the job can't take (cancelled meanwhile, already paid, wrong amount) is refunded, and one reversed
+     * outside OficiosYa (chargeback, refund from the panel) stops being held or paid out. Safe to repeat.
+     */
+    void handlePaymentNotification(String paymentId);
+
+    /** Jobs whose money OficiosYa still holds, oldest payment first. */
+    List<JobRequestResponse> listRetained();
+
+    /** An admin gives a held payment back and cancels the job (a no-show, a dispute); 400 unless it is RETAINED. */
+    JobRequestResponse refundRetained(Long jobRequestId);
+
+    /** PAID jobs whose professional wasn't transferred their share yet, oldest first. */
+    List<JobRequestResponse> listPendingPayouts();
+
+    /** Transfers already made to professionals, newest first. */
+    List<JobRequestResponse> listPayoutHistory();
+
+    /** An admin transferred the professional their share; 400 unless the job waits for that. */
+    JobRequestResponse markPaidOut(Long jobRequestId);
+
+    /** Cancelled jobs whose money is still held, oldest first. */
+    List<JobRequestResponse> listPendingRefunds();
+
+    /** Money already given back to clients, newest first. */
+    List<JobRequestResponse> listRefundHistory();
+
+    /** An admin gave the client their money back, from Mercado Pago; 400 unless the job waits for that. */
+    JobRequestResponse markRefunded(Long jobRequestId);
+}

@@ -91,9 +91,11 @@ test('a professional with an open job can delete the account only once it is can
   // The email is free again. For a taken email registration answers 202 and mails nothing (so it doesn't
   // tell which emails exist); a 429 means it went on to mail a code, held back only by the cooldown since
   // this email's first registration code. A 202 has to go all the way to prove it.
+  // Its inbox already has the first registration's and the deletion's codes: wait for the new one
+  const mailsBeforeAgain = (await mailsTo(request, professional.email)).length;
   const again = await startClientRegistration(request, { name: 'Vuelve Otra Vez', email: professional.email, password: PASSWORD });
   if (again.status() === 202) {
-    expect((await completeRegistration(request, again, professional.email)).status()).toBe(200);
+    expect((await completeRegistration(request, again, professional.email, mailsBeforeAgain + 1)).status()).toBe(200);
   } else {
     expect(again.status()).toBe(429);
   }

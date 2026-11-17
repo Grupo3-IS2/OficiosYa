@@ -1,4 +1,4 @@
-import type { CreatedJobRequest, CreateJobRequestPayload, JobRequest } from '../types/JobRequest'
+import type { CreatedJobRequest, CreateJobRequestPayload, JobRequest, JobStatus } from '../types/JobRequest'
 import { apiRequest } from './api'
 import { publishRatingChange } from './ratingEvents'
 
@@ -9,8 +9,8 @@ export function createJobRequest(payload: CreateJobRequestPayload): Promise<Crea
     })
 }
 
-export function getMyJobRequests(): Promise<JobRequest[]> {
-    return apiRequest<JobRequest[]>('/job-requests/mine')
+export function getMyJobRequests(status?: JobStatus): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>(status ? `/job-requests/mine?status=${status}` : '/job-requests/mine')
 }
 
 export function getJobRequest(id: number): Promise<JobRequest> {
@@ -24,6 +24,52 @@ export async function reviewJobRequest(id: number, payload: { rating: number; re
     })
     publishRatingChange(updated.professionalId)
     return updated
+}
+
+/** The client of an accepted, unpaid job gets the Mercado Pago checkout to send the browser to. */
+export async function startPayment(id: number): Promise<string> {
+    const { initPoint } = await apiRequest<{ initPoint: string }>(`/job-requests/${id}/payment`, { method: 'POST' })
+    return initPoint
+}
+
+/** Admin: jobs whose money OficiosYa still holds, oldest payment first. */
+export function getRetainedPayments(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/payments/retained')
+}
+
+/** Admin: gives a held payment back to the client and cancels the job. */
+export function refundRetained(id: number): Promise<JobRequest> {
+    return apiRequest<JobRequest>(`/admin/payments/${id}/refund`, { method: 'POST' })
+}
+
+/** Admin: paid jobs whose professional still has to be transferred their share by hand. */
+export function getPendingPayouts(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/payouts')
+}
+
+/** Admin: transfers already made to professionals, newest first. */
+export function getPayoutHistory(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/payouts/history')
+}
+
+/** Admin: cancelled jobs whose money the client still has to get back, oldest first. */
+export function getPendingRefunds(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/refunds')
+}
+
+/** Admin: money already given back to clients, newest first. */
+export function getRefundHistory(): Promise<JobRequest[]> {
+    return apiRequest<JobRequest[]>('/admin/refunds/history')
+}
+
+/** Admin: records that the money was given back to the client. */
+export function markRefunded(id: number): Promise<JobRequest> {
+    return apiRequest<JobRequest>(`/admin/refunds/${id}`, { method: 'POST' })
+}
+
+/** Admin: records that the transfer to the professional was made. */
+export function markPaidOut(id: number): Promise<JobRequest> {
+    return apiRequest<JobRequest>(`/admin/payouts/${id}`, { method: 'POST' })
 }
 
 /** Only the job's professional can confirm the client's PIN and complete the work. */

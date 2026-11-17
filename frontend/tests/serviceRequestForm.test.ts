@@ -30,11 +30,11 @@ test('without a trade chosen, the only one there is, or none so the client picks
     assert.equal(initialTradeId([], null), 0)
 })
 
-test('accepts zero because the backend contract is positive-or-zero', () => {
+test('rejects zero: Mercado Pago cannot charge it', () => {
     const errors = validateServiceRequest({ ...validForm(), paymentAmount: '0' })
 
-    assert.equal(errors.paymentAmount, undefined)
-    assert.equal(hasServiceRequestErrors(errors), false)
+    assert.equal(errors.paymentAmount, 'El monto tiene que ser mayor a cero.')
+    assert.equal(hasServiceRequestErrors(errors), true)
 })
 
 test('rejects missing fields, a negative amount and incomplete tasks', () => {
@@ -48,7 +48,7 @@ test('rejects missing fields, a negative amount and incomplete tasks', () => {
     })
 
     assert.equal(errors.location, 'Ingresá la dirección o ubicación.')
-    assert.equal(errors.paymentAmount, 'El monto no puede ser negativo.')
+    assert.equal(errors.paymentAmount, 'El monto tiene que ser mayor a cero.')
     assert.equal(errors.taskErrors[0]?.tradeId, 'Seleccioná un oficio.')
     assert.equal(errors.taskErrors[0]?.description, 'Describí el trabajo a realizar.')
     assert.equal(hasServiceRequestErrors(errors), true)

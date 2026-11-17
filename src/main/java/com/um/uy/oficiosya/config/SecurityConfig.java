@@ -88,6 +88,11 @@ public class SecurityConfig {
                         // STOMP CONNECT authenticates instead (JwtChannelInterceptor)
                         .requestMatchers("/ws/**").permitAll()
 
+                        // Mercado Pago's notifications: they carry no token, the signature is checked instead
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()
+                        // Mercado Pago brings the browser back from linking an account: the signed state is checked instead
+                        .requestMatchers(HttpMethod.GET, "/api/v1/payments/mercado-pago/callback").permitAll()
+
                         // Uploaded profile images are public
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 

@@ -5,6 +5,7 @@ import com.um.uy.oficiosya.dto.response.ReviewResponse;
 import com.um.uy.oficiosya.dto.response.TaskResponse;
 import com.um.uy.oficiosya.entity.JobRequest;
 import com.um.uy.oficiosya.entity.JobStatus;
+import com.um.uy.oficiosya.entity.PaymentState;
 import com.um.uy.oficiosya.entity.ScheduleType;
 import com.um.uy.oficiosya.entity.Task;
 import org.mapstruct.AfterMapping;
@@ -22,6 +23,8 @@ public interface JobRequestMapper {
     @Mapping(target = "professionalName", source = "professional.name")
     @Mapping(target = "professionalProfileImageUrl", source = "professional.profileImageUrl")
     @Mapping(target = "clientEmail", ignore = true)
+    @Mapping(target = "professionalPayoutAccount", ignore = true)
+    @Mapping(target = "professionalPayoutVerified", ignore = true)
     @Mapping(target = "professionalPhoneNumber", ignore = true)
     @Mapping(target = "confirmationPin", ignore = true)
     @Mapping(target = "scheduledStart", ignore = true)
@@ -55,13 +58,16 @@ public interface JobRequestMapper {
 
     @AfterMapping
     default void addContactDetails(JobRequest jobRequest, @MappingTarget JobRequestResponse response) {
-        if (isContactVisible(jobRequest.getStatus())) {
+        if (isContactVisible(jobRequest.getStatus()) && jobRequest.getPaymentState() != PaymentState.PENDING) {
             response.setClientEmail(jobRequest.getClient().getEmail());
             response.setProfessionalPhoneNumber(jobRequest.getProfessional().getPhoneNumber());
         }
     }
 
-    /** Statuses in which both sides have committed to the job, so each can see how to reach the other. */
+    /**
+     * Statuses in which both sides have committed to the job, so each can see how to reach the other; only
+     * once it's paid, so the contact can't be used to settle the payment outside the app.
+     */
     private static boolean isContactVisible(JobStatus status) {
         return status == JobStatus.ACCEPTED
                 || status == JobStatus.RESCHEDULE_REQUESTED

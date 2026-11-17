@@ -52,6 +52,14 @@ function tomorrow() {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** Accepting first checks the professional's agenda: one block covering the next days skips the warning. */
+async function availableThisWeek(page: Page) {
+  await page.route('**/api/v1/schedules?**', route => route.fulfill({ json: [{
+    id: 1, professionalId, type: 'URGENT_AVAILABLE',
+    startTimestamp: new Date().toISOString(), endTimestamp: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
+  }] }));
+}
+
 test('a pending request hides even a saved PIN and explains when it becomes visible', async ({ page }) => {
   await page.addInitScript(id => {
     localStorage.setItem(`oficiosya_job_request_pins:${id}`, JSON.stringify({ 71: '482731' }));
@@ -89,6 +97,7 @@ test('the professional accepts a request choosing when to do the job', async ({ 
     sent = route.request().postDataJSON();
     await route.fulfill({ json: proposedRequest({ status: 'ACCEPTED', scheduledStart: sent!.startTimestamp, scheduledEnd: sent!.endTimestamp }) });
   });
+  await availableThisWeek(page);
   const dialog = await openRequests(page, professionalId);
   const response = dialog.getByRole('region', { name: 'Responder solicitud' });
 
@@ -141,6 +150,7 @@ test('a taken timeframe shows the backend error and leaves the request pending',
   await page.route('**/api/v1/job-requests/71/accept', route => route.fulfill({
     status: 409, json: { error: 'El horario se superpone con otro bloque de tu agenda' },
   }));
+  await availableThisWeek(page);
   const dialog = await openRequests(page, professionalId);
   const response = dialog.getByRole('region', { name: 'Responder solicitud' });
 
@@ -278,6 +288,32 @@ test('SCRUM-25: a client rates a completed job and the updated rating is visible
   await expect(page.locator('.reviews-section')).toContainText('Excelente servicio.');
 });
 
+test('SCRUM-25: a completed request cannot be rated twice and a concurrent rating is reconciled', async ({ page }) => {
+  const completed = proposedRequest({ status: 'COMPLETED', rating: null, review: null });
+  let reviewAttempts = 0;
+  await page.route('**/api/v1/job-requests/71/review', async route => {
+    reviewAttempts++;
+    await route.fulfill({ status: 409, json: { message: 'La solicitud ya fue calificada' } });
+  });
+  await page.route('**/api/v1/job-requests/71', route => route.fulfill({
+    json: { ...completed, rating: 10, review: 'Valoración existente.' },
+  }));
+  await listRequests(page, clientId, [completed], 'CLIENT');
+  await page.getByRole('button', { name: 'Calificar profesional' }).click();
+  const rating = page.getByRole('dialog', { name: 'Calificá tu experiencia' });
+  await rating.getByRole('radio').last().check();
+  await rating.getByLabel('Contanos tu experiencia').fill('Intento duplicado');
+  await rating.getByRole('button', { name: 'Enviar valoración' }).click();
+  await expect(rating).toContainText('ya fue calificada');
+  await expect(rating).toContainText('La valoración existente no se modificó');
+  expect(reviewAttempts).toBe(1);
+});
+
+test('SCRUM-25: a non-completed request does not offer rating', async ({ page }) => {
+  await listRequests(page, clientId, [proposedRequest({ status: 'ACCEPTED', rating: null, review: null })], 'CLIENT');
+  await expect(page.getByRole('button', { name: 'Calificar profesional' })).toHaveCount(0);
+});
+
 /** A professional who also hired someone: one request to answer and one of their own, both pending. */
 function bothSides() {
   const received = proposedRequest();
@@ -356,6 +392,12 @@ test('the professional can reschedule an accepted job too, and then waits for th
       rescheduleStart: sent!.startTimestamp, rescheduleEnd: sent!.endTimestamp,
     }) });
   });
+  // The reschedule dialog shows the professional's own agenda, available all that day
+  await page.route('**/api/v1/schedules?**', route => route.fulfill({ json: [{
+    id: 1, professionalId, jobRequestId: null, type: 'URGENT_AVAILABLE',
+    startTimestamp: new Date(`${tomorrow()}T08:00`).toISOString(), endTimestamp: new Date(`${tomorrow()}T20:00`).toISOString(),
+    rrule: null, tzid: null, exdates: null, recurrenceEnd: null,
+  }] }));
   await listRequests(page, professionalId, [acceptedRequest()]);
   const card = page.locator('.request-card');
 

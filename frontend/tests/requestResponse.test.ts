@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { REASON_MAX_LENGTH, acceptanceTimeframe, optionalReason, withinAvailability } from '../src/pages/Requests/requestResponse.ts'
+import { REASON_MAX_LENGTH, acceptanceTimeframe, optionalReason, withinAvailability, withOwnJob } from '../src/pages/Requests/requestResponse.ts'
 import type { Schedule } from '../src/types/Schedule.ts'
 
 const now = new Date('2026-10-13T12:00:00')
@@ -58,7 +58,25 @@ describe('the professional\'s availability', () => {
         assert.equal(withinAvailability([block('URGENT_AVAILABLE', '2026-10-15T09:00', '2026-10-15T11:00')], start, end), false)
     })
 
+    it('covers a timeframe spanning blocks back to back, but not one with a gap', () => {
+        const morning = block('URGENT_AVAILABLE', '2026-10-15T09:00', '2026-10-15T11:00')
+        assert.equal(withinAvailability([block('URGENT_AVAILABLE', '2026-10-15T11:00', '2026-10-15T13:00'), morning], start, end), true)
+        assert.equal(withinAvailability([block('URGENT_AVAILABLE', '2026-10-15T11:30', '2026-10-15T13:00'), morning], start, end), false)
+    })
+
     it('only counts availability, not busy blocks', () => {
         assert.equal(withinAvailability([block('USER_RESERVED', '2026-10-15T09:00', '2026-10-15T13:00')], start, end), false)
+    })
+
+    it('while moving a job, its own slot is free to keep: a visitor sees it as a gap, its professional as busy', () => {
+        const job = { id: 7, start: '2026-10-15T11:00', end: '2026-10-15T12:00' }
+        const before = block('URGENT_AVAILABLE', '2026-10-15T09:00', '2026-10-15T11:00')
+        // What a client gets: the availability with the job cut out of it
+        assert.equal(withinAvailability(withOwnJob([before], job), start, end), true)
+        // What the professional gets: the whole availability, and the job's own block on top
+        const ownBlock = { ...block('SCHEDULED_JOB', job.start, job.end), jobRequestId: 7 }
+        const otherJob = { ...block('SCHEDULED_JOB', '2026-10-15T13:00', '2026-10-15T14:00'), jobRequestId: 8 }
+        const agenda = withOwnJob([before, ownBlock, otherJob], job)
+        assert.deepEqual(agenda.filter(schedule => schedule.type === 'SCHEDULED_JOB').map(schedule => schedule.jobRequestId), [8])
     })
 })

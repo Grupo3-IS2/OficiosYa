@@ -8,6 +8,9 @@ import ProfessionalProfilePage from './pages/ProfessionalProfile/ProfessionalPro
 import RequestsPage from './pages/Requests/RequestsPage'
 import TermsPage from './pages/Terms/TermsPage'
 import ChatPage from './pages/Chat/ChatPage'
+import PayoutsPage from './pages/Admin/PayoutsPage'
+import BalancePage from './pages/Balance/BalancePage'
+import BecomeProfessionalPage from './pages/BecomeProfessional/BecomeProfessionalPage'
 
 function App() {
     const currentPath = window.location.pathname
@@ -38,9 +41,17 @@ function App() {
         )
     }
 
+    if (currentPath === '/convertirse-en-profesional') {
+        return (
+            <RequireAuth notForAdmin>
+                <BecomeProfessionalPage />
+            </RequireAuth>
+        )
+    }
+
     if (currentPath === '/mis-solicitudes') {
         return (
-            <RequireAuth>
+            <RequireAuth notForAdmin>
                 <RequestsPage />
             </RequireAuth>
         )
@@ -48,8 +59,24 @@ function App() {
 
     if (currentPath === '/chat') {
         return (
-            <RequireAuth>
+            <RequireAuth notForAdmin>
                 <ChatPage />
+            </RequireAuth>
+        )
+    }
+
+    if (currentPath === '/admin/transferencias') {
+        return (
+            <RequireAuth>
+                <PayoutsPage />
+            </RequireAuth>
+        )
+    }
+
+    if (currentPath === '/mi-balance') {
+        return (
+            <RequireAuth>
+                <BalancePage />
             </RequireAuth>
         )
     }

@@ -2011,9 +2011,39 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await expect(page.getByText('Este profesional no tiene bloques cargados para esta semana.')).toBeVisible();
   });
 
+  test('SCRUM-16: la disponibilidad semanal se ajusta a sus horarios y solo scrollea si no entran', async ({ page }) => {
+    const professionalId = '66666666-6666-4666-8666-666666666666';
+    const today = (from: number, to: number) => {
+      const start = new Date(); start.setHours(from, 0, 0, 0);
+      const end = new Date(); end.setHours(to, 0, 0, 0);
+      return { id: from, professionalId, type: 'URGENT_AVAILABLE', startTimestamp: start.toISOString(), endTimestamp: end.toISOString() };
+    };
+    let schedules = [today(10, 12)];
+    await mockProfileViewer(page);
+    await blockProfileMapRequests(page);
+    await page.route('**/api/v1/schedules?**', (route) => route.fulfill({ json: schedules }));
+    await page.route(`**/api/v1/professionals/${professionalId}`, (route) => route.fulfill({ json: {
+      id: professionalId, name: 'Profesional Agenda', profileImageUrl: null, workingLocation: '',
+      description: 'Perfil de prueba.', rating: null, expertiseTrades: []
+    } }));
+    const grid = page.getByLabel('Disponibilidad de la semana actual');
+    const overflows = () => grid.evaluate((element) => element.scrollHeight > element.clientHeight);
+
+    await page.goto(`${FRONTEND_BASE}/profesionales/${professionalId}`);
+    await expect(grid.getByText('10:00')).toBeVisible();
+    await expect(grid.getByText('00:00')).toHaveCount(0);
+    expect(await overflows()).toBe(false);
+
+    schedules = [today(1, 23)];
+    await page.reload();
+    await expect(grid.getByText('01:00')).toBeAttached();
+    expect(await overflows()).toBe(true);
+  });
+
   test('SCRUM-11: cierre de sesión limpia sesión y redirige al home', async ({ page }) => {
     const token = fakeJwt();
-    await mockHomeApi(page);
+    // A fake token checked against the real backend logs the user out on its own, racing the click
+    await mockVerifiedSession(page, { name: 'Usuario Cierre Scrum', email: 'logout.scrum@qa.test' });
     await page.goto(FRONTEND_BASE);
     await page.evaluate((sessionToken) => {
       localStorage.setItem('oficiosya_token', sessionToken);
@@ -2026,9 +2056,12 @@ test.describe('OficiosYa - QA suite expandida', () => {
     await page.reload();
 
     await page.locator('.profile-menu__trigger').click();
+    // Logging out reloads the home: wait for it, or reading localStorage races the navigation
+    const reloaded = page.waitForEvent('load');
     await page.getByRole('menuitem', { name: /cerrar sesión/i }).click();
+    await reloaded;
 
-    await expect(page).toHaveURL(/\//);
+    await expect(page).toHaveURL(`${FRONTEND_BASE}/`);
     await expect(page.locator('.profile-menu__trigger')).toHaveCount(0);
 
     const tokenAfterLogout = await page.evaluate(() => localStorage.getItem('oficiosya_token'));

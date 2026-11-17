@@ -1,0 +1,67 @@
+.booking-calendar { grid-column: 1 / -1; min-width: 0; }
+.booking-calendar__legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 10px; color: #5f6b65; font-size: 13px; }
+.booking-calendar__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.booking-calendar__swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; }
+.booking-calendar__swatch--available { border: 1px solid #7fd0a3; background: #d9f3e4; }
+.booking-calendar__swatch--busy { background: repeating-linear-gradient(135deg, #e7ebe9 0 4px, #d3d9d6 4px 8px); }
+.booking-calendar__swatch--choice { background: #0a225e; }
+.booking-calendar__swatch--original { border: 2px dashed #0a225e; background: rgb(10 34 94 / 8%); }
+
+.booking-calendar__frame { position: relative; padding: 10px; border: 1px solid #e2e9e7; border-radius: 12px; background: #fff; }
+.booking-calendar__loading { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border-radius: 12px; background: rgb(255 255 255 / 88%); color: #5f6b65; font-size: 14px; opacity: 0; visibility: hidden; transition: opacity .25s ease, visibility 0s linear .25s; }
+.booking-calendar__loading.is-visible { opacity: 1; visibility: visible; transition: none; }
+.booking-calendar__spinner { width: 30px; height: 30px; border: 3px solid #dff2e6; border-top-color: #07984c; border-radius: 50%; animation: booking-spin .8s linear infinite; }
+@keyframes booking-spin { to { transform: rotate(360deg); } }
+
+.booking-calendar__note { margin: 10px 0 0; color: #60728a; font-size: 13px; line-height: 1.45; }
+.booking-calendar__summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 12px 14px; border: 1px solid #f0d9a8; border-left: 4px solid #e0a12b; border-radius: 10px; background: #fff9ec; animation: booking-pop .2s ease-out; }
+.booking-calendar__summary.is-available { border-color: #bfe6cf; border-left-color: #07984c; background: #f1faf5; }
+.booking-calendar__summary div { display: grid; gap: 2px; }
+.booking-calendar__summary strong { color: #0a225e; font-size: 15px; text-transform: capitalize; }
+.booking-calendar__summary span { color: #1a2d4e; font-size: 14px; }
+.booking-calendar__summary small { color: #8a6116; font-size: 12px; }
+.booking-calendar__summary.is-available small { color: #087f41; }
+.booking-calendar__summary button { flex: 0 0 auto; padding: 6px 12px; border: 1px solid #cad6e1; border-radius: 8px; background: #fff; color: #51647b; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.booking-calendar__summary button:hover { border-color: #d94b3d; color: #d94b3d; }
+@keyframes booking-pop { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .booking-calendar__summary { animation: none; }
+  .booking-calendar__spinner { animation-duration: 2.4s; }
+}
+
+.booking-calendar .fc {
+  --fc-border-color: #e8eef0;
+  --fc-button-text-color: #087f41;
+  --fc-button-bg-color: #fff;
+  --fc-button-border-color: #cdd2cf;
+  --fc-button-hover-bg-color: #eef8f2;
+  --fc-button-hover-border-color: #9fd1b2;
+  --fc-button-active-bg-color: #dff2e6;
+  --fc-button-active-border-color: #71c390;
+  --fc-today-bg-color: #f7fbf9;
+  --fc-now-indicator-color: #e24335;
+  --fc-highlight-color: rgb(10 34 94 / 14%);
+  font-size: 13px;
+}
+.booking-calendar .fc .fc-toolbar.fc-header-toolbar { margin-bottom: 10px; }
+.booking-calendar .fc .fc-toolbar-title { color: #0a225e; font-size: 16px; font-weight: 700; text-transform: capitalize; }
+.booking-calendar .fc .fc-button { padding: 4px 10px; border-radius: 8px; box-shadow: none; font-weight: 600; text-transform: capitalize; }
+.booking-calendar .fc .fc-button-primary:disabled { border-color: #e2e9e7; background: #f6f8f7; color: #9aa59f; }
+.booking-calendar .fc .fc-col-header-cell-cushion { padding: 6px 2px; color: #3c4a42; text-transform: capitalize; text-decoration: none; }
+.booking-calendar .fc .fc-timegrid-slot { height: 20px; }
+.booking-calendar .fc .fc-timegrid-slot-label-cushion { color: #79847e; font-size: 11px; }
+.booking-calendar .fc .fc-timegrid-col:not(.fc-day-past) { cursor: crosshair; }
+.booking-calendar .fc .booking-elapsed { background: repeating-linear-gradient(135deg, #f3f5f4 0 6px, #eceff0 6px 12px); opacity: 1; }
+.booking-calendar .fc .booking-slot--available { border-left: 3px solid #0ba756; background: #d9f3e4; opacity: 1; }
+.booking-calendar .fc .booking-slot--busy { background: repeating-linear-gradient(135deg, #e7ebe9 0 6px, #dbe1de 6px 12px); opacity: 1; }
+.booking-calendar .fc .fc-bg-event .fc-event-title { margin: 3px 5px; color: #087f41; font-size: 11px; font-style: normal; font-weight: 600; }
+.booking-calendar .fc .booking-slot--busy .fc-event-title { color: #5c6862; }
+.booking-calendar .fc .booking-original { border: 2px dashed #0a225e; border-radius: 8px; background: rgb(10 34 94 / 12%); opacity: 1; }
+/* Above the availability it usually sits on (background events are 2), still under the new time (events are 3, later) */
+.booking-calendar .fc .fc-timegrid-col-bg .booking-original { z-index: 3; }
+.booking-calendar .fc .booking-original .fc-event-title { color: #0a225e; }
+.booking-calendar .fc .booking-choice,
+.booking-calendar .fc .fc-timegrid-event.fc-event-mirror { border: 0; border-radius: 8px; background: #0a225e; box-shadow: 0 4px 14px rgb(10 34 94 / 30%); cursor: grab; }
+.booking-calendar .fc .booking-choice .fc-event-main { padding: 3px 6px; color: #fff; font-weight: 600; }
+.booking-calendar .fc .fc-timegrid-event .fc-event-resizer-end { height: 10px; }
+.booking-calendar .fc .fc-timegrid-event .fc-event-resizer-end::after { content: ''; position: absolute; left: 50%; bottom: 3px; width: 22px; height: 3px; border-radius: 2px; background: rgb(255 255 255 / 75%); transform: translateX(-50%); }

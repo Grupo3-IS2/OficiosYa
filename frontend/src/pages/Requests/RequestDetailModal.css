@@ -110,6 +110,21 @@
 .request-response__field input:focus-visible, .request-response__field textarea:focus-visible { outline: 2px solid #07984c; outline-offset: 1px; }
 .request-callout .request-response__error { grid-column: 1 / -1; margin: 0; color: #b42318; }
 .request-callout .request-response__recommended { grid-column: 1 / -1; margin: 0; color: #4f5e64; }
+.request-response__calendar-toggle { display: inline-flex; grid-column: 1 / -1; justify-self: start; align-items: center; gap: 8px; margin: 12px 0 14px; padding: 8px 12px; border: 1px solid #bfe6cf; border-radius: 9px; background: #f1faf5; color: #087f41; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.request-response__form .request-response__calendar-toggle { margin: 0; }
+.request-response__calendar-toggle:hover { border-color: #71c390; background: #e4f5eb; }
+.request-response__calendar-toggle:focus-visible { outline: 2px solid #07984c; outline-offset: 2px; }
+.request-response__calendar-toggle .icon { width: 18px; height: 18px; }
+.request-response__calendar-toggle .icon:last-child { transition: transform .2s; }
+.request-response__calendar-toggle[aria-expanded="true"] .icon:last-child { transform: rotate(180deg); }
+.request-callout > .booking-calendar { margin-bottom: 14px; }
+.request-response__outside { display: flex; grid-column: 1 / -1; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border: 1px solid #f0d9a8; border-left: 4px solid #e0a12b; border-radius: 10px; background: #fff9ec; color: #6b4b10; font-size: 14px; }
+.request-response__form .request-response__outside { margin: 0; }
+.request-response__outside > span { display: grid; flex: 0 0 auto; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #e0a12b; color: #fff; font-weight: 800; }
+.request-response__outside p { flex: 1; margin: 0; line-height: 1.4; }
+.request-response__outside button { flex: 0 0 auto; padding: 6px 12px; border: 1px solid #e0a12b; border-radius: 8px; background: #fff; color: #8a6116; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.request-response__outside button:hover { background: #fdf0d3; }
+.request-response__outside button:focus-visible { outline: 2px solid #e0a12b; outline-offset: 2px; }
 .request-callout .request-response__reject { background: #c64e56; }
 .request-callout .request-detail-reject { color: #b42318; background: #fdeeee; }
 .request-callout .request-response__reject:hover { box-shadow: 0 8px 18px rgb(198 78 86 / 22%); }

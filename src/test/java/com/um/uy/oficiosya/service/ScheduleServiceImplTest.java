@@ -22,10 +22,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -163,12 +166,26 @@ class ScheduleServiceImplTest {
     @Test
     void createSchedule_overlapping_isAConflict() {
         when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
-        when(scheduleRepository.existsOverlapping(professionalId, start, end, 0L)).thenReturn(true);
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start).endTimestamp(end).build());
         ScheduleCreateRequest request = createRequest(ScheduleType.URGENT_AVAILABLE, start, end);
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
                 () -> service.createSchedule(request, professionalId));
         assertEquals(409, e.getStatusCode().value());
+    }
+
+    @Test
+    void createSchedule_onAnExcludedFirstOccurrence_isAllowed() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        Schedule weekly = Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start).endTimestamp(end).rrule("FREQ=WEEKLY")
+                .exdates(new ArrayList<>(List.of(start))).build();
+        weekly.validateAndNormalizeRecurrence();
+        agendaHas(weekly);
+        ScheduleCreateRequest request = createRequest(ScheduleType.USER_RESERVED, start, end);
+
+        assertDoesNotThrow(() -> service.createSchedule(request, professionalId));
     }
 
     @Test
@@ -300,11 +317,48 @@ class ScheduleServiceImplTest {
     @Test
     void updateSchedule_overlapping_isAConflict() {
         block(ScheduleType.USER_RESERVED);
-        when(scheduleRepository.existsOverlapping(professionalId, start, end, 5L)).thenReturn(true);
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start).endTimestamp(end).build());
         ScheduleUpdateRequest request = new ScheduleUpdateRequest();
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
                 () -> service.updateSchedule(request, 5L, professionalId));
+        assertEquals(409, e.getStatusCode().value());
+    }
+
+    @Test
+    void updateSchedule_availabilityWithAJobBookedInside_canStillBeChanged() {
+        Schedule availability = block(ScheduleType.URGENT_AVAILABLE);
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.SCHEDULED_JOB)
+                .startTimestamp(start.plusMinutes(30)).endTimestamp(end.minusMinutes(30)).build());
+        ScheduleUpdateRequest request = new ScheduleUpdateRequest();
+        request.setEndTimestamp(end.plusHours(1));
+
+        service.updateSchedule(request, 5L, professionalId);
+
+        assertEquals(end.plusHours(1), availability.getEndTimestamp());
+    }
+
+    @Test
+    void createSchedule_availabilityAroundABookedJob_isAllowed() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.SCHEDULED_JOB)
+                .startTimestamp(start).endTimestamp(end).build());
+
+        ScheduleResponse response = service.createSchedule(
+                createRequest(ScheduleType.URGENT_AVAILABLE, start.minusHours(1), end.plusHours(1)), professionalId);
+
+        assertEquals(ScheduleType.URGENT_AVAILABLE, response.getType());
+    }
+
+    @Test
+    void createSchedule_timeOffOverABookedJob_isAConflict() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.SCHEDULED_JOB)
+                .startTimestamp(start).endTimestamp(end).build());
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.createSchedule(
+                createRequest(ScheduleType.USER_RESERVED, start, end), professionalId));
         assertEquals(409, e.getStatusCode().value());
     }
 
@@ -469,13 +523,66 @@ class ScheduleServiceImplTest {
     }
 
     @Test
-    void getAgenda_public_hidesTheJob() {
+    void getAgenda_public_hidesBookedJobs_leavingAGapInTheAvailabilityAroundThem() {
         when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
-        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock()));
+        Schedule available = Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start.minusHours(1)).endTimestamp(end.plusHours(1)).build();
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock(), available));
 
         List<ScheduleResponse> agenda = service.getAgenda(professionalId, null, null, false);
 
-        assertNull(agenda.getFirst().getJobRequestId());
+        assertEquals(List.of(ScheduleType.URGENT_AVAILABLE, ScheduleType.URGENT_AVAILABLE),
+                agenda.stream().map(ScheduleResponse::getType).toList());
+        assertEquals(List.of(start.minusHours(1), end), agenda.stream().map(ScheduleResponse::getStartTimestamp).toList());
+        assertEquals(List.of(start, end.plusHours(1)), agenda.stream().map(ScheduleResponse::getEndTimestamp).toList());
+    }
+
+    @Test
+    void getAgenda_public_aWeeklyAvailability_hasTheGapOnlyTheWeekOfTheJob() {
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
+        Schedule weekly = Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start.minusHours(1)).endTimestamp(end.plusHours(1)).rrule("FREQ=WEEKLY;COUNT=2").build();
+        weekly.validateAndNormalizeRecurrence();
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock(), weekly));
+
+        List<ScheduleResponse> agenda = service.getAgenda(professionalId, null, null, false);
+
+        assertEquals(List.of(start.minusHours(1), end, start.minusHours(1).plusWeeks(1)),
+                agenda.stream().map(ScheduleResponse::getStartTimestamp).toList());
+    }
+
+    @Test
+    void getAgenda_owner_keepsTheAvailabilityWhole() {
+        when(professionalRepository.existsByPublicId(professionalId)).thenReturn(true);
+        Schedule available = Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start.minusHours(1)).endTimestamp(end.plusHours(1)).build();
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock(), available));
+
+        assertEquals(2, service.getAgenda(professionalId, null, null, true).size());
+    }
+
+    @Test
+    void withoutBooked_cutsEveryJobOutOfTheSlot() {
+        OffsetDateTime nine = OffsetDateTime.of(2030, 5, 6, 9, 0, 0, 0, ZoneOffset.ofHours(-3));
+        Schedule.Occurrence slot = new Schedule.Occurrence(nine, nine.plusHours(8));
+        List<Schedule.Occurrence> jobs = List.of(
+                new Schedule.Occurrence(nine.minusHours(1), nine.plusHours(1)),   // over its start
+                new Schedule.Occurrence(nine.plusHours(3), nine.plusHours(4)),    // inside
+                new Schedule.Occurrence(nine.plusHours(10), nine.plusHours(11))); // after it
+
+        assertEquals(List.of(new Schedule.Occurrence(nine.plusHours(1), nine.plusHours(3)),
+                        new Schedule.Occurrence(nine.plusHours(4), nine.plusHours(8))),
+                ScheduleServiceImpl.withoutBooked(slot, jobs));
+        assertEquals(List.of(), ScheduleServiceImpl.withoutBooked(slot,
+                List.of(new Schedule.Occurrence(nine, nine.plusHours(8)))));
+    }
+
+    @Test
+    void exportAgendaICalendar_public_hidesBookedJobs() {
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock()));
+
+        assertFalse(service.exportAgendaICalendar(professionalId, null, null, false).contains("BEGIN:VEVENT"));
     }
 
     @Test

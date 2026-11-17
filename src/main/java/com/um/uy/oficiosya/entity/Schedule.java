@@ -263,7 +263,16 @@ public class Schedule {
         if (Objects.isNull(exdates)) {
             exdates = new ArrayList<>();
         } else {
-            exdates = deduplicateByInstant(exdates);
+            List<OffsetDateTime> unique = deduplicateByInstant(exdates);
+            // Same list when possible: on @PreUpdate it's Hibernate's, and a new one set while flushing is never saved
+            if (unique.size() != exdates.size()) {
+                try {
+                    exdates.clear();
+                    exdates.addAll(unique);
+                } catch (UnsupportedOperationException immutable) {
+                    exdates = unique;
+                }
+            }
         }
 
         if (Objects.nonNull(tzid)) {

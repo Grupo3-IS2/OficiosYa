@@ -10,10 +10,36 @@ export function acceptanceTimeframe(draft: RescheduleDraft, now = new Date()): {
     return rescheduleTimeframe(draft, {}, now)
 }
 
-/** Whether one of the professional's availability blocks covers the whole timeframe. */
+/** Whether the professional's availability blocks cover the whole timeframe, also when it spans blocks back to back. */
 export function withinAvailability(schedules: Schedule[], start: Date, end: Date): boolean {
-    return schedules.some(schedule => schedule.type === 'URGENT_AVAILABLE'
-        && new Date(schedule.startTimestamp) <= start && new Date(schedule.endTimestamp) >= end)
+    const blocks = schedules
+        .filter(schedule => schedule.type === 'URGENT_AVAILABLE')
+        .map(schedule => [Date.parse(schedule.startTimestamp), Date.parse(schedule.endTimestamp)])
+        .sort((first, second) => first[0] - second[0])
+    let covered = start.getTime()
+    for (const [blockStart, blockEnd] of blocks) {
+        if (blockStart > covered) break
+        covered = Math.max(covered, blockEnd)
+        if (covered >= end.getTime()) return true
+    }
+    return false
+}
+
+/** The job being moved, with the slot it holds now. */
+export interface OwnJob {
+    id: number
+    start?: string | null
+    end?: string | null
+}
+
+/** The agenda as it reads while moving a job: its own block isn't in the way, and its current slot can be kept. */
+export function withOwnJob(schedules: Schedule[], job: OwnJob): Schedule[] {
+    const others = schedules.filter(schedule => schedule.jobRequestId !== job.id)
+    if (!job.start || !job.end) return others
+    return [...others, {
+        id: -job.id, professionalId: '', jobRequestId: job.id, type: 'URGENT_AVAILABLE',
+        startTimestamp: job.start, endTimestamp: job.end, rrule: null, tzid: null, exdates: null, recurrenceEnd: null,
+    }]
 }
 
 /** The reason of a rejection or a cancellation is optional: blank is no reason at all. */
@@ -35,6 +61,11 @@ export type RequestOutcome = 'accepted' | 'rejected' | 'cancelled' | 'completed'
 export function canCompleteRequest(request: Pick<JobRequest, 'professionalId' | 'status'>, viewerId: string | undefined): boolean {
     return Boolean(viewerId && request.professionalId === viewerId
         && (request.status === 'ACCEPTED' || request.status === 'RESCHEDULE_REQUESTED'))
+}
+
+/** An accepted job the client still has to pay: until then it can't be completed and the contact stays hidden. */
+export function awaitsPayment(request: Pick<JobRequest, 'status' | 'paymentState'>): boolean {
+    return request.paymentState === 'PENDING' && (request.status === 'ACCEPTED' || request.status === 'RESCHEDULE_REQUESTED')
 }
 
 /** PINs are six-digit strings, including leading zeroes; never parse them as numbers. */

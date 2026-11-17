@@ -2,6 +2,7 @@ package com.um.uy.oficiosya.controller;
 
 import com.um.uy.oficiosya.config.AuthenticatedUser;
 import com.um.uy.oficiosya.config.ViewerAccess;
+import com.um.uy.oficiosya.dto.request.BecomeProfessionalRequest;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.response.PriceRangeResponse;
@@ -47,6 +48,15 @@ public class ProfessionalController {
     @GetMapping("/me")
     public ResponseEntity<ProfessionalResponse> getMyProfile(Authentication authentication) {
         return ResponseEntity.ok(professionalService.getProfessional(AuthenticatedUser.id(authentication)));
+    }
+
+    /** A client starts offering services: the profile starts unpublished, to be completed first. */
+    @PreAuthorize("hasRole('CLIENT')")
+    @PostMapping("/me")
+    public ResponseEntity<ProfessionalResponse> becomeProfessional(@Valid @RequestBody BecomeProfessionalRequest request,
+                                                                   Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(professionalService.becomeProfessional(AuthenticatedUser.id(authentication), request));
     }
 
     @PreAuthorize("hasRole('PROFESSIONAL')")

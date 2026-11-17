@@ -40,7 +40,7 @@ export interface StoredUser {
   id: string
   email: string
   name: string
-  role?: 'CLIENT' | 'PROFESSIONAL'
+  role?: 'CLIENT' | 'PROFESSIONAL' | 'ADMIN'
 }
 
 export interface LoginResponse {
@@ -48,7 +48,7 @@ export interface LoginResponse {
   token: string
   email: string
   name: string
-  role: 'CLIENT' | 'PROFESSIONAL'
+  role: 'CLIENT' | 'PROFESSIONAL' | 'ADMIN'
   message: string
 }
 

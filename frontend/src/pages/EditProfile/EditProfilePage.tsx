@@ -1,20 +1,61 @@
+import { lazy, Suspense, useState } from 'react'
 import Icon from '../../components/Icon/Icon'
 import PersonalDataSection from './components/PersonalDataSection'
 import SecuritySection from './components/SecuritySection'
 import GoogleAccountSection from './components/GoogleAccountSection'
 import ProfessionalProfileSection from './components/ProfessionalProfileSection'
-import ScheduleSection from './components/ScheduleSection'
+import PayoutSection from './components/PayoutSection'
 import BecomeProfessionalCard from './components/BecomeProfessionalCard'
 import TermsSection from './components/TermsSection'
 import DeleteAccountSection from './components/DeleteAccountSection'
 import UnsavedChangesModal from './components/UnsavedChangesModal'
 import useProfileEditor from './useProfileEditor'
+import { startMercadoPagoLink } from '../../services/userService'
 import useUnsavedNavigation from './useUnsavedNavigation'
+import { useSession } from '../../components/SessionProvider/useSession'
+import { MERCADO_PAGO_LINK_CHANNEL } from './payoutAccount'
 import './EditProfile.css'
+
+// The calendar library is heavy and only professionals need it
+const ScheduleSection = lazy(() => import('./components/ScheduleSection'))
+
+/** How linking Mercado Pago went, as it comes back in ?mercadopago= */
+const linkOutcomes: Record<string, { message?: string; error?: string }> = {
+    linked: { message: 'Vinculaste tu cuenta de Mercado Pago.' },
+    cancelled: { error: 'No se vinculó la cuenta: no autorizaste a OficiosYa en Mercado Pago.' },
+    error: { error: 'No pudimos vincular tu cuenta de Mercado Pago. Intentá nuevamente.' },
+    busy: { error: 'Tenés trabajos en curso cobrados en otra cuenta de Mercado Pago: terminalos o cancelalos antes de cambiarla.' },
+}
 
 export default function EditProfilePage({ isProfessional }: { isProfessional?: boolean }) {
     const editor = useProfileEditor(isProfessional)
+    const isAdmin = useSession().user?.role === 'ADMIN'
     const navigation = useUnsavedNavigation(editor.hasChanges, editor.busy)
+    const [linkOutcome] = useState(() => {
+        const outcome = linkOutcomes[new URLSearchParams(window.location.search).get('mercadopago') ?? '']
+        // Said once: reloading the page doesn't repeat it
+        if (outcome) {
+            window.history.replaceState(null, '', window.location.pathname)
+            const channel = new BroadcastChannel(MERCADO_PAGO_LINK_CHANNEL)
+            channel.postMessage('done')
+            channel.close()
+        }
+        return outcome
+    })
+
+    /** In another tab, opened before waiting: browsers block the ones opened later, away from the click. */
+    async function linkMercadoPago() {
+        const tab = window.open('', '_blank')
+        try {
+            const url = await startMercadoPagoLink()
+            if (!tab) return navigation.leave(url)
+            tab.opener = null
+            tab.location.href = url
+        } catch (failure) {
+            tab?.close()
+            throw failure
+        }
+    }
 
     async function saveAndLeave() {
         if (await editor.savePending()) navigation.continueNavigation()
@@ -39,9 +80,13 @@ export default function EditProfilePage({ isProfessional }: { isProfessional?: b
                     {editor.isProfessional
                         ? <>
                             <ProfessionalProfileSection value={editor.professional} onChange={editor.setProfessional} onSave={() => editor.saveSection('professional')} message={editor.messages.professional} error={editor.errorSection === 'professional' ? editor.error : ''} trades={editor.trades} tradesLoading={editor.tradesLoading} tradesError={editor.tradesError} />
-                            {editor.user && <ScheduleSection professionalId={editor.user.id} />}
+                            <PayoutSection value={editor.payout} saved={editor.savedPayout} verified={editor.payoutVerified} linkAvailable={editor.mercadoPagoLinkAvailable} onChange={editor.setPayout} onSave={() => editor.saveSection('payout')}
+                                onLink={linkMercadoPago}
+                                onUnlink={editor.unlinkPayout}
+                                message={editor.messages.payout || linkOutcome?.message} error={editor.errorSection === 'payout' ? editor.error : linkOutcome?.error} profileName={editor.personal.name} />
+                            {editor.user && <Suspense fallback={null}><ScheduleSection professionalId={editor.user.id} /></Suspense>}
                         </>
-                        : <BecomeProfessionalCard />}
+                        : !isAdmin && <BecomeProfessionalCard />}
                 </fieldset>
                 <TermsSection />
                 {/* At the end, with deleting the account: unlinking Google is the other way to lose a way in.

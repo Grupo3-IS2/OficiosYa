@@ -68,3 +68,16 @@ test('the own professional card opens the same profile as Panel profesional with
   await expect(page.getByRole('button', { name: 'Solicitar servicio', exact: true })).toHaveCount(0);
   expect(selfChats).toBe(0);
 });
+
+test('Convertirse en profesional takes a client to the page that activates it', async ({ page }) => {
+  await mockVerifiedSession(page, { name: 'Cliente QA', email: 'client@qa.test', role: 'CLIENT' });
+  await page.addInitScript(token => {
+    localStorage.setItem('oficiosya_token', token);
+    localStorage.setItem('oficiosya_user', JSON.stringify({ id: 'client-id', name: 'Cliente QA', role: 'CLIENT' }));
+  }, fakeJwt());
+  await page.route('**/api/v1/professionals/search**', route => route.fulfill({ json: { content: [], totalPages: 0 } }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Convertirse en profesional', exact: true }).click();
+  await expect(page).toHaveURL(/\/convertirse-en-profesional$/);
+  await expect(page.getByRole('heading', { name: 'Convertite en profesional' })).toBeVisible();
+});

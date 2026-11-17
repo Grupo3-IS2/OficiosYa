@@ -27,22 +27,9 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
                                @Param("from") OffsetDateTime from,
                                @Param("to") OffsetDateTime to);
 
-    /** excludeId lets an update check for overlaps against every block except itself; pass 0L when creating. */
-    @Query("""
-            SELECT COUNT(s) > 0 FROM Schedule s LEFT JOIN s.jobRequest j
-            WHERE s.professional.publicId = :professionalPublicId
-            AND (j IS NULL OR j.status <> com.um.uy.oficiosya.entity.JobStatus.COMPLETED)
-            AND s.id <> :excludeId
-            AND s.startTimestamp < :end
-            AND s.endTimestamp > :start
-            """)
-    boolean existsOverlapping(@Param("professionalPublicId") UUID professionalPublicId,
-                               @Param("start") OffsetDateTime start,
-                               @Param("end") OffsetDateTime end,
-                               @Param("excludeId") Long excludeId);
-
     /**
      * Fetches candidate schedules (including recurring ones) that can overlap a window starting at {@code from}.
+     * excludeId lets an update check for overlaps against every block except itself; pass 0L when creating.
      */
     @Query("""
             SELECT s FROM Schedule s LEFT JOIN s.jobRequest j

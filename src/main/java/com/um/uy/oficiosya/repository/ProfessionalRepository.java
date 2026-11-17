@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,6 +26,17 @@ public interface ProfessionalRepository extends JpaRepository<Professional, Long
                 * POWER(SIN(RADIANS(p.serviceArea.longitude - :lon) / 2), 2)))""" + " ";
 
     Optional<Professional> findByPublicId(UUID publicId);
+
+    /**
+     * Makes an existing user a professional. JPA can't change an entity's type, so the professional
+     * row of the JOINED hierarchy is added next to the user's: same id, so their jobs, chats and session stay.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(nativeQuery = true, value = """
+            INSERT INTO professional (id, phone_number, working_location, published)
+            VALUES (:userId, :phoneNumber, :workingLocation, false)""")
+    void addProfessionalRow(@Param("userId") Long userId, @Param("phoneNumber") String phoneNumber,
+                            @Param("workingLocation") String workingLocation);
     boolean existsByPublicId(UUID publicId);
     boolean existsByPublicIdAndPublishedTrue(UUID publicId);
 

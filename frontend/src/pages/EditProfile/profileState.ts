@@ -32,7 +32,7 @@ export interface ProfessionalTradeData {
     maximumHourlyWage: string
 }
 
-export type ProfileSection = 'personal' | 'security' | 'professional'
+export type ProfileSection = 'personal' | 'security' | 'professional' | 'payout'
 
 export function personalChanged(current: PersonalData, saved: PersonalData) {
     return current.name !== saved.name || current.email !== saved.email

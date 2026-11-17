@@ -206,21 +206,23 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
     }
 
+    /** Compares every occurrence, so a day taken out of a repeating block (exdate) leaves its slot free. */
     private void requireNoOverlap(UUID professionalId, Schedule candidate, Long excludeId) {
-        if (scheduleRepository.existsOverlapping(
-                professionalId, candidate.getStartTimestamp(), candidate.getEndTimestamp(), excludeId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
-        }
         OffsetDateTime candidateEnd = candidate.getRecurrenceEnd();
         List<Schedule> existingSchedules = scheduleRepository.findActiveCandidates(
                 professionalId, candidate.getStartTimestamp(), candidateEnd, excludeId);
         if (existingSchedules != null) {
             for (Schedule existing : existingSchedules) {
-                if (candidate.overlaps(existing)) {
+                if (!jobInsideAvailability(candidate, existing) && candidate.overlaps(existing)) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
                 }
             }
         }
+    }
+
+    /** Jobs are booked inside availability (see requireIntervalSlotFree), so those two may share a timeframe. */
+    private static boolean jobInsideAvailability(Schedule candidate, Schedule existing) {
+        return candidate.getType() == ScheduleType.URGENT_AVAILABLE && existing.getType() == ScheduleType.SCHEDULED_JOB;
     }
 
     private static void validateRecurrenceOrThrow(Schedule schedule) {
@@ -247,21 +249,30 @@ public class ScheduleServiceImpl implements ScheduleService {
                                             boolean ownerOrAdmin) {
         requireProfessionalVisible(professionalId, ownerOrAdmin);
 
-        return scheduleRepository.findAgenda(professionalId, from, to).stream()
+        List<Schedule> agenda = scheduleRepository.findAgenda(professionalId, from, to);
+        // Visitors don't see a booked job, only a gap where the availability around it was
+        List<Schedule.Occurrence> booked = ownerOrAdmin ? List.of() : agenda.stream()
+                .filter(schedule -> schedule.getType() == ScheduleType.SCHEDULED_JOB)
+                .map(schedule -> new Schedule.Occurrence(schedule.getStartTimestamp(), schedule.getEndTimestamp()))
+                .toList();
+
+        return agenda.stream()
+                .filter(schedule -> visibleTo(schedule, ownerOrAdmin))
                 .flatMap(schedule -> {
-                    if (!schedule.isRecurring() && (schedule.getExdates() == null || schedule.getExdates().isEmpty())) {
+                    boolean single = !schedule.isRecurring() && (schedule.getExdates() == null || schedule.getExdates().isEmpty());
+                    if (single && (booked.isEmpty() || schedule.getType() != ScheduleType.URGENT_AVAILABLE)) {
                         ScheduleResponse res = scheduleMapper.toResponse(schedule);
                         return res != null ? java.util.stream.Stream.of(res) : java.util.stream.Stream.empty();
                     }
-                    return schedule.expandOccurrences(from, to).stream()
+                    List<Schedule.Occurrence> occurrences = single
+                            ? List.of(new Schedule.Occurrence(schedule.getStartTimestamp(), schedule.getEndTimestamp()))
+                            : schedule.expandOccurrences(from, to);
+                    return occurrences.stream()
+                            .flatMap(occurrence -> schedule.getType() == ScheduleType.URGENT_AVAILABLE
+                                    ? withoutBooked(occurrence, booked).stream()
+                                    : java.util.stream.Stream.of(occurrence))
                             .map(occurrence -> scheduleMapper.toOccurrenceResponse(schedule, occurrence))
                             .filter(Objects::nonNull);
-                })
-                .map(schedule -> {
-                    if (!ownerOrAdmin) {
-                        schedule.setJobRequestId(null);
-                    }
-                    return schedule;
                 })
                 .sorted(Comparator.comparing(ScheduleResponse::getStartTimestamp,
                         Comparator.nullsLast(Comparator.naturalOrder())))
@@ -274,7 +285,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                                         boolean ownerOrAdmin) {
         requireProfessionalVisible(professionalId, ownerOrAdmin);
 
-        List<Schedule> schedules = scheduleRepository.findAgenda(professionalId, from, to);
+        List<Schedule> schedules = scheduleRepository.findAgenda(professionalId, from, to).stream()
+                .filter(schedule -> visibleTo(schedule, ownerOrAdmin))
+                .toList();
         StringBuilder sb = new StringBuilder();
         sb.append("BEGIN:VCALENDAR\r\n");
         sb.append("VERSION:2.0\r\n");
@@ -285,6 +298,33 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
         sb.append("END:VCALENDAR\r\n");
         return sb.toString();
+    }
+
+    /** What is left of an available slot once the booked jobs are cut out of it, in order. */
+    static List<Schedule.Occurrence> withoutBooked(Schedule.Occurrence slot, List<Schedule.Occurrence> booked) {
+        List<Schedule.Occurrence> pieces = List.of(slot);
+        for (Schedule.Occurrence job : booked) {
+            List<Schedule.Occurrence> left = new ArrayList<>();
+            for (Schedule.Occurrence piece : pieces) {
+                if (!job.startTimestamp().isBefore(piece.endTimestamp()) || !job.endTimestamp().isAfter(piece.startTimestamp())) {
+                    left.add(piece);
+                    continue;
+                }
+                if (piece.startTimestamp().isBefore(job.startTimestamp())) {
+                    left.add(new Schedule.Occurrence(piece.startTimestamp(), job.startTimestamp()));
+                }
+                if (job.endTimestamp().isBefore(piece.endTimestamp())) {
+                    left.add(new Schedule.Occurrence(job.endTimestamp(), piece.endTimestamp()));
+                }
+            }
+            pieces = left;
+        }
+        return pieces;
+    }
+
+    /** Booked jobs stay private: anyone else would learn when, and how often, the professional is hired. */
+    private static boolean visibleTo(Schedule schedule, boolean ownerOrAdmin) {
+        return ownerOrAdmin || schedule.getType() != ScheduleType.SCHEDULED_JOB;
     }
 
     private void requireProfessionalVisible(UUID professionalId, boolean ownerOrAdmin) {

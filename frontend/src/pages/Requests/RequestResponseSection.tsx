@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { SubmitEvent } from 'react'
 import Button from '../../components/Button/Button'
 import Icon from '../../components/Icon/Icon'
 import { acceptJobRequest, rejectJobRequest } from '../../services/jobRequestService'
 import { getProfessionalSchedule } from '../../services/scheduleService'
 import type { JobRequest } from '../../types/JobRequest'
-import OutsideAvailabilityModal from './OutsideAvailabilityModal'
+import BookingCalendar from '../ProfessionalProfile/components/BookingCalendar'
 import { rescheduleDraftFrom } from './rescheduleForm'
 import { timeframeText } from './rescheduleTimeframe'
 import { REASON_MAX_LENGTH, acceptanceTimeframe, optionalReason, withinAvailability, type RequestOutcome } from './requestResponse'
@@ -32,8 +32,22 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
     const [reason, setReason] = useState('')
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState('')
-    // A timeframe outside the professional's availability, waiting for the user to confirm it
-    const [unavailable, setUnavailable] = useState<{ start: Date; end: Date } | null>(null)
+    // Hidden until asked for, and kept open or closed between viewing and accepting
+    const [showCalendar, setShowCalendar] = useState(false)
+    // The timeframe that falls outside the professional's availability, warned about without opening the calendar
+    const [outsideKey, setOutsideKey] = useState('')
+    const timeframe = acceptanceTimeframe(draft)
+    const timeframeKey = 'start' in timeframe ? `${timeframe.start.getTime()}|${timeframe.end.getTime()}` : ''
+
+    useEffect(() => {
+        if (!timeframeKey) return
+        const [start, end] = timeframeKey.split('|').map(time => new Date(Number(time)))
+        let active = true
+        // shortcut: an agenda that can't be loaded shows no warning; the backend still rejects real clashes
+        void getProfessionalSchedule(request.professionalId, start, end, true)
+            .then(schedules => { if (active) setOutsideKey(withinAvailability(schedules, start, end) ? '' : timeframeKey) }, () => undefined)
+        return () => { active = false }
+    }, [request.professionalId, timeframeKey])
 
     function switchTo(next: Mode) {
         setError('')
@@ -54,23 +68,13 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
         }
     }
 
-    async function accept(event: SubmitEvent<HTMLFormElement>) {
+    function accept(event: SubmitEvent<HTMLFormElement>) {
         event.preventDefault()
-        const timeframe = acceptanceTimeframe(draft)
         if ('error' in timeframe) {
             setError(timeframe.error)
             return
         }
-        setError('')
-        // shortcut: an agenda that can't be loaded skips the warning; the backend still rejects real clashes
-        const available = await getProfessionalSchedule(request.professionalId, timeframe.start, timeframe.end)
-            .then(schedules => withinAvailability(schedules, timeframe.start, timeframe.end), () => true)
-        if (available) book(timeframe)
-        else setUnavailable(timeframe)
-    }
-
-    function book(timeframe: { start: Date; end: Date }) {
-        setUnavailable(null)
+        // Outside their availability it's still their call: the warning above already told them
         void send(() => acceptJobRequest(request.id, timeframe.start, timeframe.end), 'accepted')
     }
 
@@ -88,6 +92,20 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
         ? <p className="request-response__recommended">Horario recomendado por {request.clientName}: <strong>{timeframeText(request.proposedStart, request.proposedEnd)}</strong></p>
         : null
 
+    const outsideWarning = !showCalendar && timeframeKey && outsideKey === timeframeKey
+        ? <div className="request-response__outside" role="status">
+            <span aria-hidden="true">!</span>
+            <p>Este horario queda fuera de tu disponibilidad. Podés editarlo{mode === 'choosing' ? ' al aceptar la solicitud' : ''}.</p>
+            <button type="button" onClick={() => { setError(''); setMode('accepting'); setShowCalendar(true) }}>Editar horario</button>
+        </div>
+        : null
+
+    const calendarToggle = <button type="button" className="request-response__calendar-toggle" aria-expanded={showCalendar}
+        onClick={() => setShowCalendar(open => !open)}>
+        <Icon name="calendar" /> {showCalendar ? 'Ocultar calendario' : 'Ver en mi calendario'}
+        <Icon name="chevron-down" />
+    </button>
+
     return <section className="request-callout request-callout--urgent request-response" aria-labelledby="request-response-title" aria-busy={busy}>
         <div className="request-callout__heading">
             <Icon name="calendar" />
@@ -100,18 +118,24 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
         {mode === 'choosing' && <>
             <p>Si la aceptás, elegí cuándo vas a hacer el trabajo: queda reservado en tu agenda.</p>
             {recommended}
+            {outsideWarning}
+            {calendarToggle}
+            {showCalendar && <BookingCalendar professionalId={request.professionalId} value={draft} owner readOnly onChange={setDraft} />}
             <div className="request-response__actions">
                 <Button type="button" variant="ghost" className="request-detail-reject" onClick={() => switchTo('rejecting')}>Rechazar</Button>
                 <Button type="button" onClick={() => switchTo('accepting')}>Aceptar</Button>
             </div>
         </>}
 
-        {mode === 'accepting' && <form className="request-response__form" onSubmit={event => { void accept(event) }}>
+        {mode === 'accepting' && <form className="request-response__form" onSubmit={accept}>
             <p>¿Cuándo vas a hacer el trabajo? {request.clientName} lo va a ver en su solicitud.</p>
             {recommended}
+            {outsideWarning}
+            {calendarToggle}
+            {showCalendar && <BookingCalendar professionalId={request.professionalId} value={draft} owner disabled={busy} onChange={setDraft} />}
             <label className="request-response__field request-response__field--wide">
                 Fecha
-                <input type="date" required autoFocus value={draft.date} disabled={busy}
+                <input type="date" required value={draft.date} disabled={busy}
                     onChange={event => setDraft(previous => ({ ...previous, date: event.target.value }))} />
             </label>
             <label className="request-response__field">
@@ -130,7 +154,6 @@ export default function RequestResponseSection({ request, initialMode, onAnswere
                 <Button type="submit" disabled={busy}>{busy ? 'Aceptando…' : 'Confirmar y aceptar'}</Button>
             </div>
         </form>}
-        {unavailable && <OutsideAvailabilityModal onConfirm={() => book(unavailable)} onCancel={() => setUnavailable(null)} />}
 
         {mode === 'rejecting' && <form className="request-response__form" onSubmit={reject}>
             <label className="request-response__field request-response__field--wide">

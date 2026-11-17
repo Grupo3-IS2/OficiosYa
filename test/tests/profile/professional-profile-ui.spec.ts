@@ -75,9 +75,14 @@ async function prepareProfile(page: Page, asClient = false) {
       return route.fulfill({ json: current });
     }
     if (url.pathname === '/api/v1/schedules') return route.fulfill({ json: [] });
+    // What the header asks for on the become-professional page
+    if (url.pathname === '/api/v1/conversations/unread-count') return route.fulfill({ json: { count: 0 } });
+    if (url.pathname === '/api/v1/job-requests/mine') return route.fulfill({ json: [] });
+    if (url.pathname === '/api/v1/conversations') return route.fulfill({ json: [] });
     return route.fulfill({ json: current });
   });
 
+  await page.routeWebSocket('**/ws/chat', () => {});
   await page.addInitScript(({ token, professionalId, role }) => {
     localStorage.setItem('oficiosya_token', token);
     localStorage.setItem('oficiosya_user', JSON.stringify({
@@ -96,10 +101,12 @@ test.describe('Perfil profesional desde la UI', () => {
   test('un cliente se convierte en profesional y ve las secciones para completar su perfil', async ({ page }) => {
     const { calls } = await prepareProfile(page, true);
     await page.getByRole('button', { name: 'Quiero ofrecer mis servicios' }).click();
+    await expect(page).toHaveURL(/\/convertirse-en-profesional$/);
     await page.getByLabel('Número de teléfono').fill('099 123 456');
     await page.getByLabel('Ubicación').fill('  Cordón, Montevideo  ');
     await page.getByRole('button', { name: 'Activar perfil profesional' }).click();
 
+    await expect(page).toHaveURL(/\/profile\/edit$/);
     await expect(page.getByRole('heading', { name: 'Perfil profesional' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '¿Quieres ofrecer tus servicios en OficiosYa?' })).toHaveCount(0);
     const sent = calls.find(call => call.url === '/api/v1/professionals/me' && call.method === 'POST');

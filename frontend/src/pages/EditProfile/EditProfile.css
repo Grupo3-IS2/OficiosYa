@@ -70,7 +70,7 @@
 .profile-editor-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
 .profile-page-error { margin: 0 0 20px; padding: 12px 16px; background: #fff4f1; border-radius: 6px; }
 .become-professional { padding: 26px 24px 30px; text-align: center; }
-.become-professional img { display: block; object-fit: contain; margin: 0 auto 14px; }
+.become-professional > img { display: block; object-fit: contain; margin: 0 auto 14px; }
 .become-professional h2 { max-width: 420px; margin: 0 auto 16px; font-size: 25px; line-height: 1.35; color: #132238; }
 .become-professional > p { max-width: 440px; margin: 0 auto 28px; color: #6b7890; font-size: 15px; line-height: 1.6; }
 .become-professional .button { width: min(100%, 380px); }

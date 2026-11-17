@@ -110,8 +110,23 @@ class ProfessionalServiceImplTest {
         when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(client));
         found();
 
-        assertSame(mapped, service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Montevideo")));
+        assertSame(mapped, service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Montevideo", null)));
         verify(professionalRepository).addProfessionalRow(5L, "099123456", "Montevideo");
+    }
+
+    @Test
+    void becomeProfessional_withAZone_savesItOnTheNewProfessional() {
+        Client client = Client.builder().id(5L).publicId(id).name("Ana").email("ana@example.com").password("x").build();
+        when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(client));
+        found();
+        ServiceAreaRequest zone = new ServiceAreaRequest(-34.9, -56.16, 10);
+        ServiceArea area = new ServiceArea(-34.9, -56.16, 10);
+        when(professionalMapper.toServiceArea(zone)).thenReturn(area);
+
+        service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Cordón, Montevideo", zone));
+
+        assertSame(area, professional.getServiceArea());
+        verify(professionalRepository).save(professional);
     }
 
     @Test
@@ -119,7 +134,7 @@ class ProfessionalServiceImplTest {
         when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(professional));
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
-                () -> service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Montevideo")));
+                () -> service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Montevideo", null)));
         assertEquals(HttpStatus.CONFLICT, error.getStatusCode());
         verify(professionalRepository, never()).addProfessionalRow(any(), any(), any());
     }

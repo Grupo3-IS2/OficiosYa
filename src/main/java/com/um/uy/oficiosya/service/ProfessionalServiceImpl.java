@@ -101,6 +101,12 @@ public class ProfessionalServiceImpl implements ProfessionalService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Tu cuenta ya tiene un perfil profesional.");
         }
         professionalRepository.addProfessionalRow(user.getId(), request.getPhoneNumber(), request.getWorkingLocation());
+        if (request.getServiceArea() != null) {
+            Professional professional = professionalRepository.findByPublicId(id)
+                    .orElseThrow(() -> new ClientNotFoundException(PROFESSIONAL_NOT_FOUND));
+            professional.setServiceArea(professionalMapper.toServiceArea(request.getServiceArea()));
+            professionalRepository.save(professional);
+        }
         // The insert cleared the persistence context, so this loads the user as a Professional
         return getProfessional(id);
     }

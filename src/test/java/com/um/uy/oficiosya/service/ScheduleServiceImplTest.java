@@ -326,6 +326,42 @@ class ScheduleServiceImplTest {
         assertEquals(409, e.getStatusCode().value());
     }
 
+    @Test
+    void updateSchedule_availabilityWithAJobBookedInside_canStillBeChanged() {
+        Schedule availability = block(ScheduleType.URGENT_AVAILABLE);
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.SCHEDULED_JOB)
+                .startTimestamp(start.plusMinutes(30)).endTimestamp(end.minusMinutes(30)).build());
+        ScheduleUpdateRequest request = new ScheduleUpdateRequest();
+        request.setEndTimestamp(end.plusHours(1));
+
+        service.updateSchedule(request, 5L, professionalId);
+
+        assertEquals(end.plusHours(1), availability.getEndTimestamp());
+    }
+
+    @Test
+    void createSchedule_availabilityAroundABookedJob_isAllowed() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.SCHEDULED_JOB)
+                .startTimestamp(start).endTimestamp(end).build());
+
+        ScheduleResponse response = service.createSchedule(
+                createRequest(ScheduleType.URGENT_AVAILABLE, start.minusHours(1), end.plusHours(1)), professionalId);
+
+        assertEquals(ScheduleType.URGENT_AVAILABLE, response.getType());
+    }
+
+    @Test
+    void createSchedule_timeOffOverABookedJob_isAConflict() {
+        when(professionalRepository.findByPublicIdForUpdate(professionalId)).thenReturn(Optional.of(professional));
+        agendaHas(Schedule.builder().id(8L).professional(professional).type(ScheduleType.SCHEDULED_JOB)
+                .startTimestamp(start).endTimestamp(end).build());
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.createSchedule(
+                createRequest(ScheduleType.USER_RESERVED, start, end), professionalId));
+        assertEquals(409, e.getStatusCode().value());
+    }
+
     // --- job blocks ---
 
     @Test

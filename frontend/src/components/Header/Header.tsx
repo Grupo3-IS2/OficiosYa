@@ -28,9 +28,9 @@ function Header() {
     const awaiting = useAwaitingAnswers(participant)
     const unreadChats = useUnreadChats(participant)
 
-    const openProfessionalPanel = isProfessional && user
-        ? () => { window.location.href = `/profesionales/${encodeURIComponent(user.id)}` }
-        : undefined
+    const openProfessionalPanel = () => {
+        window.location.href = isProfessional && user ? `/profesionales/${encodeURIComponent(user.id)}` : '/convertirse-en-profesional'
+    }
 
     const toggleMenu = () => {
         setIsMenuOpen((isOpen) => !isOpen)

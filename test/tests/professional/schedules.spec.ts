@@ -51,7 +51,9 @@ async function registerProfessional(request: APIRequestContext, prefix = 'agenda
     headers: { Authorization: `Bearer ${auth.token}` },
     data: {
       description: 'Atención profesional para trabajos y reparaciones.',
-      workingLocation: 'Montevideo'
+      workingLocation: 'Montevideo',
+      // Where payments are on, proposing a job needs somewhere to pay the professional
+      payoutAccount: 'BROU · 001234567-00001 · Agenda QA'
     }
   });
   expect(profile.status()).toBe(200);
@@ -253,5 +255,47 @@ test.describe('Agenda profesional', () => {
     const released = await getAgenda(request, professional.id, {}, professional.token);
     expect(released.status()).toBe(200);
     expect(await released.json()).toEqual([]);
+  });
+  test('la disponibilidad con un trabajo aceptado adentro se puede seguir editando', async ({ request }) => {
+    const professional = await registerProfessional(request, 'agenda.disponibilidad-con-trabajo');
+    const client = await registerClient(request);
+    const availability = await createAvailableBlock(request, professional.token,
+      '2035-05-07T13:00:00+02:00', '2035-05-07T17:00:00+02:00');
+    expect(availability.status()).toBe(201);
+    const block = await availability.json();
+
+    const conversation = await request.post(`${API_BASE}/api/v1/conversations`, {
+      headers: authHeaders(client.token),
+      data: { professionalId: professional.id }
+    });
+    expect(conversation.ok()).toBe(true);
+    const createdJob = await request.post(`${API_BASE}/api/v1/job-requests`, {
+      headers: authHeaders(professional.token),
+      data: {
+        clientId: client.id,
+        location: 'Montevideo',
+        paymentAmount: 1200,
+        startTimestamp: '2035-05-07T14:00:00+02:00',
+        endTimestamp: '2035-05-07T15:00:00+02:00',
+        tasks: [{ tradeId: professional.tradeId, description: 'Trabajo dentro de la disponibilidad' }]
+      }
+    });
+    expect(createdJob.status()).toBe(201);
+    const accepted = await request.post(`${API_BASE}/api/v1/job-requests/${(await createdJob.json()).id}/accept`, {
+      headers: authHeaders(client.token)
+    });
+    expect(accepted.status()).toBe(200);
+
+    // Jobs are booked inside availability, so the job doesn't stop the professional from changing it
+    const stretched = await request.patch(`${SCHEDULES_URL}/${block.id}`, {
+      headers: authHeaders(professional.token),
+      data: { endTimestamp: '2035-05-07T18:00:00+02:00' }
+    });
+    expect(stretched.status()).toBe(200);
+
+    // Marking the job's own time as unavailable still clashes with it
+    const timeOff = await createAvailableBlock(request, professional.token,
+      '2035-05-07T14:00:00+02:00', '2035-05-07T15:00:00+02:00', 'USER_RESERVED');
+    expect(timeOff.status()).toBe(409);
   });
 });

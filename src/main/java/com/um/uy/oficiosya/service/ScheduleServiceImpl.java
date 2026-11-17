@@ -213,11 +213,16 @@ public class ScheduleServiceImpl implements ScheduleService {
                 professionalId, candidate.getStartTimestamp(), candidateEnd, excludeId);
         if (existingSchedules != null) {
             for (Schedule existing : existingSchedules) {
-                if (candidate.overlaps(existing)) {
+                if (!jobInsideAvailability(candidate, existing) && candidate.overlaps(existing)) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
                 }
             }
         }
+    }
+
+    /** Jobs are booked inside availability (see requireIntervalSlotFree), so those two may share a timeframe. */
+    private static boolean jobInsideAvailability(Schedule candidate, Schedule existing) {
+        return candidate.getType() == ScheduleType.URGENT_AVAILABLE && existing.getType() == ScheduleType.SCHEDULED_JOB;
     }
 
     private static void validateRecurrenceOrThrow(Schedule schedule) {

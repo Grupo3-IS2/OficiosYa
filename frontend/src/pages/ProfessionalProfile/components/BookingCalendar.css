@@ -5,6 +5,7 @@
 .booking-calendar__swatch--available { border: 1px solid #7fd0a3; background: #d9f3e4; }
 .booking-calendar__swatch--busy { background: repeating-linear-gradient(135deg, #e7ebe9 0 4px, #d3d9d6 4px 8px); }
 .booking-calendar__swatch--choice { background: #0a225e; }
+.booking-calendar__swatch--original { border: 2px dashed #0a225e; background: rgb(10 34 94 / 8%); }
 
 .booking-calendar__frame { position: relative; padding: 10px; border: 1px solid #e2e9e7; border-radius: 12px; background: #fff; }
 .booking-calendar__loading { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border-radius: 12px; background: rgb(255 255 255 / 88%); color: #5f6b65; font-size: 14px; opacity: 0; visibility: hidden; transition: opacity .25s ease, visibility 0s linear .25s; }
@@ -55,6 +56,10 @@
 .booking-calendar .fc .booking-slot--busy { background: repeating-linear-gradient(135deg, #e7ebe9 0 6px, #dbe1de 6px 12px); opacity: 1; }
 .booking-calendar .fc .fc-bg-event .fc-event-title { margin: 3px 5px; color: #087f41; font-size: 11px; font-style: normal; font-weight: 600; }
 .booking-calendar .fc .booking-slot--busy .fc-event-title { color: #5c6862; }
+.booking-calendar .fc .booking-original { border: 2px dashed #0a225e; border-radius: 8px; background: rgb(10 34 94 / 12%); opacity: 1; }
+/* Above the availability it usually sits on (background events are 2), still under the new time (events are 3, later) */
+.booking-calendar .fc .fc-timegrid-col-bg .booking-original { z-index: 3; }
+.booking-calendar .fc .booking-original .fc-event-title { color: #0a225e; }
 .booking-calendar .fc .booking-choice,
 .booking-calendar .fc .fc-timegrid-event.fc-event-mirror { border: 0; border-radius: 8px; background: #0a225e; box-shadow: 0 4px 14px rgb(10 34 94 / 30%); cursor: grab; }
 .booking-calendar .fc .booking-choice .fc-event-main { padding: 3px 6px; color: #fff; font-weight: 600; }

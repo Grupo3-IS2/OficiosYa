@@ -392,6 +392,12 @@ test('the professional can reschedule an accepted job too, and then waits for th
       rescheduleStart: sent!.startTimestamp, rescheduleEnd: sent!.endTimestamp,
     }) });
   });
+  // The reschedule dialog shows the professional's own agenda, available all that day
+  await page.route('**/api/v1/schedules?**', route => route.fulfill({ json: [{
+    id: 1, professionalId, jobRequestId: null, type: 'URGENT_AVAILABLE',
+    startTimestamp: new Date(`${tomorrow()}T08:00`).toISOString(), endTimestamp: new Date(`${tomorrow()}T20:00`).toISOString(),
+    rrule: null, tzid: null, exdates: null, recurrenceEnd: null,
+  }] }));
   await listRequests(page, professionalId, [acceptedRequest()]);
   const card = page.locator('.request-card');
 

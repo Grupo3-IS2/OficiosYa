@@ -523,15 +523,58 @@ class ScheduleServiceImplTest {
     }
 
     @Test
-    void getAgenda_public_hidesBookedJobs() {
+    void getAgenda_public_hidesBookedJobs_leavingAGapInTheAvailabilityAroundThem() {
         when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
         Schedule available = Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
-                .startTimestamp(start).endTimestamp(end).build();
+                .startTimestamp(start.minusHours(1)).endTimestamp(end.plusHours(1)).build();
         when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock(), available));
 
         List<ScheduleResponse> agenda = service.getAgenda(professionalId, null, null, false);
 
-        assertEquals(List.of(ScheduleType.URGENT_AVAILABLE), agenda.stream().map(ScheduleResponse::getType).toList());
+        assertEquals(List.of(ScheduleType.URGENT_AVAILABLE, ScheduleType.URGENT_AVAILABLE),
+                agenda.stream().map(ScheduleResponse::getType).toList());
+        assertEquals(List.of(start.minusHours(1), end), agenda.stream().map(ScheduleResponse::getStartTimestamp).toList());
+        assertEquals(List.of(start, end.plusHours(1)), agenda.stream().map(ScheduleResponse::getEndTimestamp).toList());
+    }
+
+    @Test
+    void getAgenda_public_aWeeklyAvailability_hasTheGapOnlyTheWeekOfTheJob() {
+        when(professionalRepository.existsByPublicIdAndPublishedTrue(professionalId)).thenReturn(true);
+        Schedule weekly = Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start.minusHours(1)).endTimestamp(end.plusHours(1)).rrule("FREQ=WEEKLY;COUNT=2").build();
+        weekly.validateAndNormalizeRecurrence();
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock(), weekly));
+
+        List<ScheduleResponse> agenda = service.getAgenda(professionalId, null, null, false);
+
+        assertEquals(List.of(start.minusHours(1), end, start.minusHours(1).plusWeeks(1)),
+                agenda.stream().map(ScheduleResponse::getStartTimestamp).toList());
+    }
+
+    @Test
+    void getAgenda_owner_keepsTheAvailabilityWhole() {
+        when(professionalRepository.existsByPublicId(professionalId)).thenReturn(true);
+        Schedule available = Schedule.builder().id(8L).professional(professional).type(ScheduleType.URGENT_AVAILABLE)
+                .startTimestamp(start.minusHours(1)).endTimestamp(end.plusHours(1)).build();
+        when(scheduleRepository.findAgenda(professionalId, null, null)).thenReturn(List.of(jobBlock(), available));
+
+        assertEquals(2, service.getAgenda(professionalId, null, null, true).size());
+    }
+
+    @Test
+    void withoutBooked_cutsEveryJobOutOfTheSlot() {
+        OffsetDateTime nine = OffsetDateTime.of(2030, 5, 6, 9, 0, 0, 0, ZoneOffset.ofHours(-3));
+        Schedule.Occurrence slot = new Schedule.Occurrence(nine, nine.plusHours(8));
+        List<Schedule.Occurrence> jobs = List.of(
+                new Schedule.Occurrence(nine.minusHours(1), nine.plusHours(1)),   // over its start
+                new Schedule.Occurrence(nine.plusHours(3), nine.plusHours(4)),    // inside
+                new Schedule.Occurrence(nine.plusHours(10), nine.plusHours(11))); // after it
+
+        assertEquals(List.of(new Schedule.Occurrence(nine.plusHours(1), nine.plusHours(3)),
+                        new Schedule.Occurrence(nine.plusHours(4), nine.plusHours(8))),
+                ScheduleServiceImpl.withoutBooked(slot, jobs));
+        assertEquals(List.of(), ScheduleServiceImpl.withoutBooked(slot,
+                List.of(new Schedule.Occurrence(nine, nine.plusHours(8)))));
     }
 
     @Test

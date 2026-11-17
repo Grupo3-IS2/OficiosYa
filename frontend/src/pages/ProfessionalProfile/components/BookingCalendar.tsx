@@ -7,7 +7,7 @@ import type { DatesSetArg, EventApi, EventInput } from '@fullcalendar/core'
 import { getProfessionalSchedule } from '../../../services/scheduleService'
 import type { Schedule } from '../../../types/Schedule'
 import { rescheduleDraftFrom, rescheduleTimeframe, type RescheduleDraft } from '../../Requests/rescheduleForm'
-import { withinAvailability } from '../../Requests/requestResponse'
+import { withinAvailability, withOwnJob, type OwnJob } from '../../Requests/requestResponse'
 import { currentWeek } from '../scheduleCalendar'
 import './BookingCalendar.css'
 
@@ -44,10 +44,12 @@ interface BookingCalendarProps {
     disabled?: boolean
     /** Only shows the agenda and the chosen time, with nothing to change. */
     readOnly?: boolean
+    /** Moving an existing job: its own slot doesn't count as taken. */
+    ownJob?: OwnJob
 }
 
 /** The professional's agenda, where the time for the job is dragged out. */
-export default function BookingCalendar({ professionalId, value, onChange, owner = false, disabled = false, readOnly = false }: Readonly<BookingCalendarProps>) {
+export default function BookingCalendar({ professionalId, value, onChange, owner = false, disabled = false, readOnly = false, ownJob }: Readonly<BookingCalendarProps>) {
     const calendar = useRef<FullCalendar>(null)
     const [validRange] = useState(() => ({ start: currentWeek().start }))
     // A string, not Dates: setting the same range again must not trigger another fetch
@@ -64,11 +66,11 @@ export default function BookingCalendar({ professionalId, value, onChange, owner
         const [from, to] = visibleRange.split('|').map(time => new Date(Number(time)))
         let active = true
         void getProfessionalSchedule(professionalId, from, to, owner)
-            .then(response => { if (active) { setSchedules(response); setError(false) } })
+            .then(response => { if (active) { setSchedules(ownJob ? withOwnJob(response, ownJob) : response); setError(false) } })
             .catch(() => { if (active) setError(true) })
             .finally(() => { if (active) setLoading(false) })
         return () => { active = false }
-    }, [professionalId, visibleRange, owner])
+    }, [professionalId, visibleRange, owner, ownJob])
 
     useEffect(() => {
         const media = window.matchMedia(COMPACT_QUERY)
@@ -88,7 +90,8 @@ export default function BookingCalendar({ professionalId, value, onChange, owner
 
     const events = useMemo<EventInput[]>(() => [
         { id: 'elapsed', start: validRange.start, end: new Date(), display: 'background', classNames: ['booking-elapsed'] },
-        ...schedules.map(schedule => {
+        // The job's own slot is drawn as "Horario actual" instead (see withOwnJob)
+        ...schedules.filter(schedule => !ownJob || schedule.jobRequestId !== ownJob.id).map(schedule => {
             const available = schedule.type === 'URGENT_AVAILABLE'
             return {
                 id: `${schedule.id}-${schedule.startTimestamp}`,
@@ -100,15 +103,25 @@ export default function BookingCalendar({ professionalId, value, onChange, owner
                 classNames: [available ? 'booking-slot--available' : 'booking-slot--busy'],
             }
         }),
+        // Rescheduling: where the job is now stays in sight while the new time is chosen
+        ...(ownJob?.start && ownJob.end ? [{
+            id: 'original',
+            title: 'Horario actual',
+            start: ownJob.start,
+            end: ownJob.end,
+            display: 'background',
+            extendedProps: { available: true },
+            classNames: ['booking-original'],
+        }] : []),
         ...(choiceStart !== undefined && choiceEnd !== undefined ? [{
             id: 'choice',
-            title: owner ? 'Este trabajo' : 'Tu horario',
+            title: ownJob ? 'Nuevo horario' : owner ? 'Este trabajo' : 'Tu horario',
             start: choiceStart,
             end: choiceEnd,
             editable: !locked,
             classNames: ['booking-choice'],
         }] : []),
-    ], [schedules, validRange, choiceStart, choiceEnd, owner, locked])
+    ], [schedules, validRange, choiceStart, choiceEnd, owner, locked, ownJob])
 
     function choose(start: Date, end: Date) {
         onChange(rescheduleDraftFrom(start.toISOString(), end.toISOString()))
@@ -127,7 +140,8 @@ export default function BookingCalendar({ professionalId, value, onChange, owner
         <div className="booking-calendar__legend" aria-hidden="true">
             <span><i className="booking-calendar__swatch booking-calendar__swatch--available" /> Disponible</span>
             <span><i className="booking-calendar__swatch booking-calendar__swatch--busy" /> Ocupado</span>
-            <span><i className="booking-calendar__swatch booking-calendar__swatch--choice" /> {owner ? 'Este trabajo' : 'Tu horario'}</span>
+            {ownJob && <span><i className="booking-calendar__swatch booking-calendar__swatch--original" /> Horario actual</span>}
+            <span><i className="booking-calendar__swatch booking-calendar__swatch--choice" /> {ownJob ? 'Nuevo horario' : owner ? 'Este trabajo' : 'Tu horario'}</span>
         </div>
         <div className="booking-calendar__frame" aria-busy={loading}>
             <FullCalendar

@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.entity.ServiceArea;
+import com.um.uy.oficiosya.dto.request.BecomeProfessionalRequest;
 import com.um.uy.oficiosya.dto.request.ServiceAreaRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
@@ -11,6 +12,7 @@ import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.entity.ExpertiseTrade;
+import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.entity.Trade;
 import com.um.uy.oficiosya.exception.ExpertiseTradeNotFoundException;
@@ -100,6 +102,26 @@ class ProfessionalServiceImplTest {
     private ProfessionalCreateRequest createRequest() {
         return ProfessionalCreateRequest.builder().name("Beto Gómez").email("beto@example.com")
                 .password("ClaveSegura2026!").phoneNumber("099123456").workingLocation("Montevideo").build();
+    }
+
+    @Test
+    void becomeProfessional_addsTheProfessionalRowToTheClientAccount() {
+        Client client = Client.builder().id(5L).publicId(id).name("Ana").email("ana@example.com").password("x").build();
+        when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(client));
+        found();
+
+        assertSame(mapped, service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Montevideo")));
+        verify(professionalRepository).addProfessionalRow(5L, "099123456", "Montevideo");
+    }
+
+    @Test
+    void becomeProfessional_anAccountThatIsAlreadyOne_isAConflict() {
+        when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(professional));
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Montevideo")));
+        assertEquals(HttpStatus.CONFLICT, error.getStatusCode());
+        verify(professionalRepository, never()).addProfessionalRow(any(), any(), any());
     }
 
     @Test

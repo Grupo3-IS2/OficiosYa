@@ -52,6 +52,14 @@ function tomorrow() {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** Accepting first checks the professional's agenda: one block covering the next days skips the warning. */
+async function availableThisWeek(page: Page) {
+  await page.route('**/api/v1/schedules?**', route => route.fulfill({ json: [{
+    id: 1, professionalId, type: 'URGENT_AVAILABLE',
+    startTimestamp: new Date().toISOString(), endTimestamp: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
+  }] }));
+}
+
 test('a pending request hides even a saved PIN and explains when it becomes visible', async ({ page }) => {
   await page.addInitScript(id => {
     localStorage.setItem(`oficiosya_job_request_pins:${id}`, JSON.stringify({ 71: '482731' }));
@@ -89,6 +97,7 @@ test('the professional accepts a request choosing when to do the job', async ({ 
     sent = route.request().postDataJSON();
     await route.fulfill({ json: proposedRequest({ status: 'ACCEPTED', scheduledStart: sent!.startTimestamp, scheduledEnd: sent!.endTimestamp }) });
   });
+  await availableThisWeek(page);
   const dialog = await openRequests(page, professionalId);
   const response = dialog.getByRole('region', { name: 'Responder solicitud' });
 
@@ -141,6 +150,7 @@ test('a taken timeframe shows the backend error and leaves the request pending',
   await page.route('**/api/v1/job-requests/71/accept', route => route.fulfill({
     status: 409, json: { error: 'El horario se superpone con otro bloque de tu agenda' },
   }));
+  await availableThisWeek(page);
   const dialog = await openRequests(page, professionalId);
   const response = dialog.getByRole('region', { name: 'Responder solicitud' });
 

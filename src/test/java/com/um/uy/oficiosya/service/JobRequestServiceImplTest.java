@@ -753,33 +753,6 @@ class JobRequestServiceImplTest {
     }
 
     @Test
-    void completeJobRequest_ofASplitPayment_hasNothingLeftToTransfer() {
-        JobRequest job = job(JobStatus.ACCEPTED);
-        job.setPaymentAmount(BigDecimal.valueOf(1000));
-        job.setPaymentState(PaymentState.RETAINED);
-        job.setMpCollectorUserId("987");
-        when(paymentGateway.isEnabled()).thenReturn(true);
-        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
-
-        JobRequestResponse response = service.completeJobRequest(10L, pin("123456"), professionalId);
-
-        assertEquals(PaymentState.PAID, response.getPaymentState());
-        assertNotNull(response.getPayoutAt());
-    }
-
-    @Test
-    void completeJobRequest_collectedByOficiosYa_stillHasToBeTransferred_evenIfTheProfessionalLinkedSince() {
-        JobRequest job = job(JobStatus.ACCEPTED);
-        job.setPaymentAmount(BigDecimal.valueOf(1000));
-        job.setPaymentState(PaymentState.RETAINED);
-        professional.setMpAccessToken("encrypted");
-        when(paymentGateway.isEnabled()).thenReturn(true);
-        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
-
-        assertNull(service.completeJobRequest(10L, pin("123456"), professionalId).getPayoutAt());
-    }
-
-    @Test
     void completeJobRequest_withPaymentsOn_unpaid_isRejected() {
         JobRequest job = job(JobStatus.ACCEPTED);
         when(paymentGateway.isEnabled()).thenReturn(true);
@@ -1032,6 +1005,15 @@ class JobRequestServiceImplTest {
         assertEquals(Role.PROFESSIONAL, response.getProposedBy());
         verify(scheduleService).checkJobSlotAvailable(any(), any(), any());
         verify(events).publishEvent(any(JobRequestEvents.JobProposed.class));
+    }
+
+    @Test
+    void createJobRequest_byAProfessionalWithNowhereToBePaid_isRejected() {
+        JobRequestCreateRequest request = professionalProposal();
+        when(paymentGateway.isEnabled()).thenReturn(true);
+
+        assertThrows(ResponseStatusException.class, () -> service.createJobRequest(request, professionalId));
+        verify(jobRequestRepository, never()).save(any());
     }
 
     @Test

@@ -213,11 +213,16 @@ public class ScheduleServiceImpl implements ScheduleService {
                 professionalId, candidate.getStartTimestamp(), candidateEnd, excludeId);
         if (existingSchedules != null) {
             for (Schedule existing : existingSchedules) {
-                if (candidate.overlaps(existing)) {
+                if (!jobInsideAvailability(candidate, existing) && candidate.overlaps(existing)) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, BLOCK_OVERLAPS);
                 }
             }
         }
+    }
+
+    /** Jobs are booked inside availability (see requireIntervalSlotFree), so those two may share a timeframe. */
+    private static boolean jobInsideAvailability(Schedule candidate, Schedule existing) {
+        return candidate.getType() == ScheduleType.URGENT_AVAILABLE && existing.getType() == ScheduleType.SCHEDULED_JOB;
     }
 
     private static void validateRecurrenceOrThrow(Schedule schedule) {
@@ -245,6 +250,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         requireProfessionalVisible(professionalId, ownerOrAdmin);
 
         return scheduleRepository.findAgenda(professionalId, from, to).stream()
+                .filter(schedule -> visibleTo(schedule, ownerOrAdmin))
                 .flatMap(schedule -> {
                     if (!schedule.isRecurring() && (schedule.getExdates() == null || schedule.getExdates().isEmpty())) {
                         ScheduleResponse res = scheduleMapper.toResponse(schedule);
@@ -253,12 +259,6 @@ public class ScheduleServiceImpl implements ScheduleService {
                     return schedule.expandOccurrences(from, to).stream()
                             .map(occurrence -> scheduleMapper.toOccurrenceResponse(schedule, occurrence))
                             .filter(Objects::nonNull);
-                })
-                .map(schedule -> {
-                    if (!ownerOrAdmin) {
-                        schedule.setJobRequestId(null);
-                    }
-                    return schedule;
                 })
                 .sorted(Comparator.comparing(ScheduleResponse::getStartTimestamp,
                         Comparator.nullsLast(Comparator.naturalOrder())))
@@ -271,7 +271,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                                         boolean ownerOrAdmin) {
         requireProfessionalVisible(professionalId, ownerOrAdmin);
 
-        List<Schedule> schedules = scheduleRepository.findAgenda(professionalId, from, to);
+        List<Schedule> schedules = scheduleRepository.findAgenda(professionalId, from, to).stream()
+                .filter(schedule -> visibleTo(schedule, ownerOrAdmin))
+                .toList();
         StringBuilder sb = new StringBuilder();
         sb.append("BEGIN:VCALENDAR\r\n");
         sb.append("VERSION:2.0\r\n");
@@ -282,6 +284,11 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
         sb.append("END:VCALENDAR\r\n");
         return sb.toString();
+    }
+
+    /** Booked jobs stay private: anyone else would learn when, and how often, the professional is hired. */
+    private static boolean visibleTo(Schedule schedule, boolean ownerOrAdmin) {
+        return ownerOrAdmin || schedule.getType() != ScheduleType.SCHEDULED_JOB;
     }
 
     private void requireProfessionalVisible(UUID professionalId, boolean ownerOrAdmin) {

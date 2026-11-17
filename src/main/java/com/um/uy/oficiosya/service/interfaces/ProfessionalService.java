@@ -1,5 +1,6 @@
 package com.um.uy.oficiosya.service.interfaces;
 
+import com.um.uy.oficiosya.dto.request.BecomeProfessionalRequest;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.response.PriceRangeResponse;
@@ -22,6 +23,8 @@ public interface ProfessionalService {
      * is ignored. For accounts whose data was validated and hashed earlier (a verified registration).
      */
     ProfessionalResponse createProfessional(ProfessionalCreateRequest professionalRequest, String encodedPassword);
+    /** Turns a client account into an unpublished professional one; 409 if it already is one. */
+    ProfessionalResponse becomeProfessional(UUID id, BecomeProfessionalRequest request);
     ProfessionalResponse updateProfessional(ProfessionalUpdateRequest professionalRequest, UUID id);
     /** The full profile, contact data included: only for the owner and admins. */
     ProfessionalResponse getProfessional(UUID id);

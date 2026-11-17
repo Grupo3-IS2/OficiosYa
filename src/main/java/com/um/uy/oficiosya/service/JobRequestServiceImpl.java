@@ -164,6 +164,7 @@ public class JobRequestServiceImpl implements JobRequestService {
             if (conversation == null) {
                 throw new AccessDeniedException("Solo puedes proponerle un trabajo a un cliente con el que ya tengas una conversación");
             }
+            requireCanCollect(professional);
             if (request.getStartTimestamp() == null || request.getEndTimestamp() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El horario propuesto es obligatorio");
             }
@@ -235,11 +236,7 @@ public class JobRequestServiceImpl implements JobRequestService {
             jobRequest.setProposedStart(null);
             jobRequest.setProposedEnd(null);
         } else {
-            // The professional accepts: without where to pay them, the job couldn't be charged or paid out
-            if (paymentGateway.isEnabled() && !paymentGateway.canCollect(jobRequest.getProfessional())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Vinculá en tu perfil la cuenta donde querés cobrar antes de aceptar trabajos");
-            }
+            requireCanCollect(jobRequest.getProfessional());
             if (request == null || request.getStartTimestamp() == null || request.getEndTimestamp() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí el horario del trabajo para aceptarlo");
             }
@@ -388,10 +385,6 @@ public class JobRequestServiceImpl implements JobRequestService {
             jobRequest.setPaymentState(PaymentState.PAID);
             jobRequest.setPlatformFee(jobRequest.getPaymentAmount().multiply(commissionPercent)
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
-            // Charged into the professional's linked account (split): Mercado Pago already paid them, nothing to transfer
-            if (jobRequest.getMpCollectorUserId() != null) {
-                jobRequest.setPayoutAt(OffsetDateTime.now(clock));
-            }
         }
 
         jobRequest.setStatus(JobStatus.COMPLETED);
@@ -557,6 +550,14 @@ public class JobRequestServiceImpl implements JobRequestService {
     private boolean isParticipant(JobRequest jobRequest, UUID userId) {
         return jobRequest.getClient().getPublicId().equals(userId)
                 || jobRequest.getProfessional().getPublicId().equals(userId);
+    }
+
+    /** Without where to pay the professional, the job couldn't be paid out: checked on the side they commit to it. */
+    private void requireCanCollect(Professional professional) {
+        if (paymentGateway.isEnabled() && !paymentGateway.canCollect(professional)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Vinculá en tu perfil la cuenta donde querés cobrar antes de aceptar trabajos");
+        }
     }
 
     private void requireFuture(OffsetDateTime start) {

@@ -51,7 +51,9 @@ async function registerProfessional(request: APIRequestContext, prefix = 'agenda
     headers: { Authorization: `Bearer ${auth.token}` },
     data: {
       description: 'Atención profesional para trabajos y reparaciones.',
-      workingLocation: 'Montevideo'
+      workingLocation: 'Montevideo',
+      // Where payments are on, proposing a job needs somewhere to pay the professional
+      payoutAccount: 'BROU · 001234567-00001 · Agenda QA'
     }
   });
   expect(profile.status()).toBe(200);
@@ -189,27 +191,36 @@ test.describe('Agenda profesional', () => {
     expect(await agenda.json()).toEqual([]);
   });
 
-  test('la reserva aceptada oculta su referencia al visitante y el dueño puede gestionarla por el flujo del trabajo', async ({ request }) => {
+  test('la reserva aceptada no aparece en la agenda pública y el dueño puede gestionarla por el flujo del trabajo', async ({ request }) => {
     const professional = await registerProfessional(request, 'agenda.reserva-profesional');
     const client = await registerClient(request);
 
-    const createdJob = await request.post(`${API_BASE}/api/v1/job-requests`, {
+    // The professional proposes the job and the client accepts it: accepting as the professional needs a
+    // payout account linked to Mercado Pago, which an API test can't do where payments are on.
+    const conversation = await request.post(`${API_BASE}/api/v1/conversations`, {
       headers: authHeaders(client.token),
+      data: { professionalId: professional.id }
+    });
+    expect(conversation.ok()).toBe(true);
+
+    const startTimestamp = '2035-04-05T14:00:00+02:00';
+    const endTimestamp = '2035-04-05T15:00:00+02:00';
+    const createdJob = await request.post(`${API_BASE}/api/v1/job-requests`, {
+      headers: authHeaders(professional.token),
       data: {
-        professionalId: professional.id,
+        clientId: client.id,
         location: 'Montevideo',
         paymentAmount: 1200,
+        startTimestamp,
+        endTimestamp,
         tasks: [{ tradeId: professional.tradeId, description: 'Reparación de prueba para agenda' }]
       }
     });
     expect(createdJob.status()).toBe(201);
     const job = await createdJob.json();
 
-    const startTimestamp = '2035-04-05T14:00:00+02:00';
-    const endTimestamp = '2035-04-05T15:00:00+02:00';
     const accepted = await request.post(`${API_BASE}/api/v1/job-requests/${job.id}/accept`, {
-      headers: authHeaders(professional.token),
-      data: { startTimestamp, endTimestamp }
+      headers: authHeaders(client.token)
     });
     expect(accepted.status()).toBe(200);
     expect((await accepted.json()).status).toBe('ACCEPTED');
@@ -219,16 +230,8 @@ test.describe('Agenda profesional', () => {
       to: '2035-04-05T12:30:00Z'
     });
     expect(visitorResponse.status()).toBe(200);
-    const visitorAgenda = await visitorResponse.json();
-    expect(visitorAgenda).toHaveLength(1);
-    expect(visitorAgenda[0].type).toBe('SCHEDULED_JOB');
-    expect(visitorAgenda[0].jobRequestId).toBeNull();
-    expect(visitorAgenda[0]).not.toHaveProperty('clientId');
-    expect(visitorAgenda[0]).not.toHaveProperty('location');
-    expect(visitorAgenda[0]).not.toHaveProperty('paymentAmount');
-    expect(visitorAgenda[0]).not.toHaveProperty('confirmationPin');
-    expect(Date.parse(visitorAgenda[0].startTimestamp)).toBe(Date.parse(startTimestamp));
-    expect(Date.parse(visitorAgenda[0].endTimestamp)).toBe(Date.parse(endTimestamp));
+    // A booked job is private: visitors don't even learn the professional is busy then
+    expect(await visitorResponse.json()).toEqual([]);
 
     const ownerResponse = await getAgenda(request, professional.id, {
       from: '2035-04-05T11:30:00Z',
@@ -238,7 +241,7 @@ test.describe('Agenda profesional', () => {
     const ownerAgenda = await ownerResponse.json();
     expect(ownerAgenda[0].jobRequestId).toBe(job.id);
 
-    const manualUpdate = await request.patch(`${SCHEDULES_URL}/${visitorAgenda[0].id}`, {
+    const manualUpdate = await request.patch(`${SCHEDULES_URL}/${ownerAgenda[0].id}`, {
       headers: authHeaders(professional.token),
       data: { startTimestamp: '2035-04-05T15:00:00+02:00' }
     });
@@ -248,7 +251,51 @@ test.describe('Agenda profesional', () => {
       headers: authHeaders(professional.token)
     });
     expect(cancelled.status()).toBe(200);
-    expect((await getAgenda(request, professional.id)).status()).toBe(200);
-    expect(await (await getAgenda(request, professional.id)).json()).toEqual([]);
+    // Visitors never saw the job, so the release is checked on the owner's own agenda
+    const released = await getAgenda(request, professional.id, {}, professional.token);
+    expect(released.status()).toBe(200);
+    expect(await released.json()).toEqual([]);
+  });
+  test('la disponibilidad con un trabajo aceptado adentro se puede seguir editando', async ({ request }) => {
+    const professional = await registerProfessional(request, 'agenda.disponibilidad-con-trabajo');
+    const client = await registerClient(request);
+    const availability = await createAvailableBlock(request, professional.token,
+      '2035-05-07T13:00:00+02:00', '2035-05-07T17:00:00+02:00');
+    expect(availability.status()).toBe(201);
+    const block = await availability.json();
+
+    const conversation = await request.post(`${API_BASE}/api/v1/conversations`, {
+      headers: authHeaders(client.token),
+      data: { professionalId: professional.id }
+    });
+    expect(conversation.ok()).toBe(true);
+    const createdJob = await request.post(`${API_BASE}/api/v1/job-requests`, {
+      headers: authHeaders(professional.token),
+      data: {
+        clientId: client.id,
+        location: 'Montevideo',
+        paymentAmount: 1200,
+        startTimestamp: '2035-05-07T14:00:00+02:00',
+        endTimestamp: '2035-05-07T15:00:00+02:00',
+        tasks: [{ tradeId: professional.tradeId, description: 'Trabajo dentro de la disponibilidad' }]
+      }
+    });
+    expect(createdJob.status()).toBe(201);
+    const accepted = await request.post(`${API_BASE}/api/v1/job-requests/${(await createdJob.json()).id}/accept`, {
+      headers: authHeaders(client.token)
+    });
+    expect(accepted.status()).toBe(200);
+
+    // Jobs are booked inside availability, so the job doesn't stop the professional from changing it
+    const stretched = await request.patch(`${SCHEDULES_URL}/${block.id}`, {
+      headers: authHeaders(professional.token),
+      data: { endTimestamp: '2035-05-07T18:00:00+02:00' }
+    });
+    expect(stretched.status()).toBe(200);
+
+    // Marking the job's own time as unavailable still clashes with it
+    const timeOff = await createAvailableBlock(request, professional.token,
+      '2035-05-07T14:00:00+02:00', '2035-05-07T15:00:00+02:00', 'USER_RESERVED');
+    expect(timeOff.status()).toBe(409);
   });
 });

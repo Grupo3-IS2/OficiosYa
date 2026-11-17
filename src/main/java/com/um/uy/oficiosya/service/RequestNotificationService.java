@@ -116,12 +116,14 @@ public class RequestNotificationService {
             case RESCHEDULE_REJECTED -> "rechazó el cambio de horario del trabajo";
             case COMPLETED -> "marcó como completado el trabajo";
             case PAID -> "pagó el trabajo";
-            case RESCHEDULE_REQUESTED, PAYMENT_EXPIRED -> null;
+            case RESCHEDULE_REQUESTED, PAYMENT_EXPIRED, REFUNDED -> null;
         };
-        // Nobody did it: the job wasn't paid in time
-        String event = change == JobRequestEvents.Change.PAYMENT_EXPIRED
-                ? "Se canceló por falta de pago el trabajo"
-                : actorOf(job, change, actorId).getName() + " " + what;
+        // Nobody did these: the job wasn't paid in time, or its payment went back to the client
+        String event = switch (change) {
+            case PAYMENT_EXPIRED -> "Se canceló por falta de pago el trabajo";
+            case REFUNDED -> "Se le devolvió el pago al cliente y se canceló el trabajo";
+            case null, default -> actorOf(job, change, actorId).getName() + " " + what;
+        };
 
         // The scheduled block once accepted, otherwise the timeframe the professional offered
         String when = job.getSchedules().stream()

@@ -39,7 +39,7 @@ public class MercadoPagoLinkController {
         return ResponseEntity.ok(Map.of("authorizationUrl", accountLink.authorizationUrl(AuthenticatedUser.id(authentication))));
     }
 
-    /** Stops charging into the linked account; 409 while an open job's payment depends on it. */
+    /** Forgets the linked account: what was typed or read from it stays, no longer verified. */
     @PreAuthorize("hasRole('PROFESSIONAL')")
     @DeleteMapping("/api/v1/professionals/me/mercado-pago")
     public ResponseEntity<Void> unlink(Authentication authentication) {

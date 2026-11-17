@@ -24,6 +24,7 @@ public interface JobRequestMapper {
     @Mapping(target = "professionalProfileImageUrl", source = "professional.profileImageUrl")
     @Mapping(target = "clientEmail", ignore = true)
     @Mapping(target = "professionalPayoutAccount", ignore = true)
+    @Mapping(target = "professionalPayoutVerified", ignore = true)
     @Mapping(target = "professionalPhoneNumber", ignore = true)
     @Mapping(target = "confirmationPin", ignore = true)
     @Mapping(target = "scheduledStart", ignore = true)

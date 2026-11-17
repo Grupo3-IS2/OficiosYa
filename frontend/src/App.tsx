@@ -10,6 +10,7 @@ import TermsPage from './pages/Terms/TermsPage'
 import ChatPage from './pages/Chat/ChatPage'
 import PayoutsPage from './pages/Admin/PayoutsPage'
 import BalancePage from './pages/Balance/BalancePage'
+import BecomeProfessionalPage from './pages/BecomeProfessional/BecomeProfessionalPage'
 
 function App() {
     const currentPath = window.location.pathname
@@ -36,6 +37,14 @@ function App() {
         return (
             <RequireAuth>
                 <EditProfilePage />
+            </RequireAuth>
+        )
+    }
+
+    if (currentPath === '/convertirse-en-profesional') {
+        return (
+            <RequireAuth notForAdmin>
+                <BecomeProfessionalPage />
             </RequireAuth>
         )
     }

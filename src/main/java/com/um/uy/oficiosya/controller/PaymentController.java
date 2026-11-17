@@ -46,16 +46,29 @@ public class PaymentController {
     @PostMapping("/api/v1/payments/webhook")
     public ResponseEntity<Void> webhook(@RequestParam(name = "type", required = false) String type,
                                         @RequestParam(name = "data.id", required = false) String dataId,
-                                        @RequestParam(name = "job", required = false) Long jobRequestId,
                                         @RequestHeader(name = "x-signature", required = false) String signature,
                                         @RequestHeader(name = "x-request-id", required = false) String requestId) {
         if (!paymentGateway.isValidNotification(signature, requestId, dataId)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         if ("payment".equals(type)) {
-            paymentService.handlePaymentNotification(dataId, jobRequestId);
+            paymentService.handlePaymentNotification(dataId);
         }
         return ResponseEntity.ok().build();
+    }
+
+    /** Jobs whose money is held, waiting for the PIN. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/api/v1/admin/payments/retained")
+    public ResponseEntity<List<JobRequestResponse>> listRetained() {
+        return ResponseEntity.ok(paymentService.listRetained());
+    }
+
+    /** Gives a held payment back to the client and cancels the job. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/api/v1/admin/payments/{id}/refund")
+    public ResponseEntity<JobRequestResponse> refundRetained(@PathVariable Long id) {
+        return ResponseEntity.ok(paymentService.refundRetained(id));
     }
 
     /** Completed jobs whose professional still has to be transferred paymentAmount - platformFee. */

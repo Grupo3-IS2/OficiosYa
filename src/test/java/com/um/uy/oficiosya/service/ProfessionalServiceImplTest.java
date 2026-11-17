@@ -1,6 +1,7 @@
 package com.um.uy.oficiosya.service;
 
 import com.um.uy.oficiosya.entity.ServiceArea;
+import com.um.uy.oficiosya.dto.request.BecomeProfessionalRequest;
 import com.um.uy.oficiosya.dto.request.ServiceAreaRequest;
 import com.um.uy.oficiosya.dto.request.ProfessionalSearchFilters;
 import com.um.uy.oficiosya.dto.request.ExpertiseTradeCreateRequest;
@@ -11,6 +12,7 @@ import com.um.uy.oficiosya.dto.response.ProfessionalResponse;
 import com.um.uy.oficiosya.dto.update.ExpertiseTradeUpdateRequest;
 import com.um.uy.oficiosya.dto.update.ProfessionalUpdateRequest;
 import com.um.uy.oficiosya.entity.ExpertiseTrade;
+import com.um.uy.oficiosya.entity.Client;
 import com.um.uy.oficiosya.entity.Professional;
 import com.um.uy.oficiosya.entity.Trade;
 import com.um.uy.oficiosya.exception.ExpertiseTradeNotFoundException;
@@ -80,25 +82,11 @@ class ProfessionalServiceImplTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
-                expertiseTradeRepository, professionalMapper, passwordEncoder, mock(MercadoPagoAccountLink.class));
+                expertiseTradeRepository, professionalMapper, passwordEncoder);
         professional = Professional.builder().id(1L).publicId(id).name("Beto Gómez").email("beto@example.com")
                 .phoneNumber("099123456").workingLocation("Montevideo").build();
         when(professionalRepository.save(any(Professional.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(professionalMapper.toResponse(any(Professional.class))).thenReturn(mapped);
-    }
-
-    @Test
-    void updateProfessional_aTypedPayoutAccount_isRefusedWhileAnOpenJobDependsOnTheLinkedOne() {
-        MercadoPagoAccountLink accountLink = mock(MercadoPagoAccountLink.class);
-        service = new ProfessionalServiceImpl(professionalRepository, clientRepository, tradeRepository,
-                expertiseTradeRepository, professionalMapper, passwordEncoder, accountLink);
-        found();
-        professional.setPayoutMpUserId("123");
-        doThrow(new ResponseStatusException(HttpStatus.CONFLICT)).when(accountLink).requireNoOpenCharges(professional);
-
-        assertThrows(ResponseStatusException.class, () -> service.updateProfessional(
-                ProfessionalUpdateRequest.builder().payoutAccount("BROU · 001234567-00001 · Ana").build(), id));
-        assertEquals("123", professional.getPayoutMpUserId());
     }
 
     private void found() {
@@ -114,6 +102,41 @@ class ProfessionalServiceImplTest {
     private ProfessionalCreateRequest createRequest() {
         return ProfessionalCreateRequest.builder().name("Beto Gómez").email("beto@example.com")
                 .password("ClaveSegura2026!").phoneNumber("099123456").workingLocation("Montevideo").build();
+    }
+
+    @Test
+    void becomeProfessional_addsTheProfessionalRowToTheClientAccount() {
+        Client client = Client.builder().id(5L).publicId(id).name("Ana").email("ana@example.com").password("x").build();
+        when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(client));
+        found();
+
+        assertSame(mapped, service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Montevideo", null)));
+        verify(professionalRepository).addProfessionalRow(5L, "099123456", "Montevideo");
+    }
+
+    @Test
+    void becomeProfessional_withAZone_savesItOnTheNewProfessional() {
+        Client client = Client.builder().id(5L).publicId(id).name("Ana").email("ana@example.com").password("x").build();
+        when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(client));
+        found();
+        ServiceAreaRequest zone = new ServiceAreaRequest(-34.9, -56.16, 10);
+        ServiceArea area = new ServiceArea(-34.9, -56.16, 10);
+        when(professionalMapper.toServiceArea(zone)).thenReturn(area);
+
+        service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Cordón, Montevideo", zone));
+
+        assertSame(area, professional.getServiceArea());
+        verify(professionalRepository).save(professional);
+    }
+
+    @Test
+    void becomeProfessional_anAccountThatIsAlreadyOne_isAConflict() {
+        when(clientRepository.findByPublicId(id)).thenReturn(Optional.of(professional));
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.becomeProfessional(id, new BecomeProfessionalRequest("099123456", "Montevideo", null)));
+        assertEquals(HttpStatus.CONFLICT, error.getStatusCode());
+        verify(professionalRepository, never()).addProfessionalRow(any(), any(), any());
     }
 
     @Test

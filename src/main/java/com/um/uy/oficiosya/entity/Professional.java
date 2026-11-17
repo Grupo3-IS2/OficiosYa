@@ -18,7 +18,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -65,23 +64,6 @@ public class Professional extends Client {
     /** The Mercado Pago account the professional linked by logging in to it; null when payoutAccount was typed. */
     @Column(length = 32)
     private String payoutMpUserId;
-
-    /** That account's OAuth tokens, encrypted (MercadoPagoAccountLink): job payments are created with it. */
-    @Column(length = 512)
-    private String mpAccessToken;
-
-    @Column(length = 512)
-    private String mpRefreshToken;
-
-    private OffsetDateTime mpTokenExpiresAt;
-
-    /** payoutAccount stays: with linking off, or for a job OficiosYa collected, it is still where to transfer. */
-    public void clearMercadoPagoLink() {
-        payoutMpUserId = null;
-        mpAccessToken = null;
-        mpRefreshToken = null;
-        mpTokenExpiresAt = null;
-    }
 
     @Size(min = 20, max = 500, message = "La descripción debe tener entre 20 y 500 caracteres")
     @Column(length = 500)

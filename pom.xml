@@ -29,6 +29,17 @@
 		<lombok.version>1.18.48</lombok.version>
 	</properties>
 
+	<dependencyManagement>
+		<dependencies>
+			<!-- CVE-2026-102554: guava transitiva de google-api-client viene en 33.1.0 -->
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<version>33.7.2-jre</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 
 		<!-- WEB -->

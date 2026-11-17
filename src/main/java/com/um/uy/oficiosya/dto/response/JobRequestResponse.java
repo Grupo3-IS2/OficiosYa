@@ -48,6 +48,8 @@ public class JobRequestResponse {
     private OffsetDateTime payoutAt;
     /** Where to transfer the professional; only in the admin's pending payouts. */
     private String professionalPayoutAccount;
+    /** Whether that account is one the professional linked by logging in, not typed; same lists. */
+    private boolean professionalPayoutVerified;
     private JobStatus status;
     private List<TaskResponse> tasks;
 

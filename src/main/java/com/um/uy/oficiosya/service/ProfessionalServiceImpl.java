@@ -116,9 +116,6 @@ public class ProfessionalServiceImpl implements ProfessionalService {
             professional.setPayoutAccount(payoutAccount);
             // Typed, it is no longer the account Mercado Pago confirmed
             professional.setPayoutMpUserId(null);
-            professional.setMpAccessToken(null);
-            professional.setMpRefreshToken(null);
-            professional.setMpTokenExpiresAt(null);
         }
 
         if (professionalRequest.getServiceArea() != null) {

@@ -265,6 +265,16 @@ class RequestNotificationServiceTest {
     }
 
     @Test
+    void aRefundedJob_hasNoActor_andTellsBothSides() {
+        job(Role.CLIENT);
+
+        service.notifyJobChanged(20L, JobRequestEvents.Change.REFUNDED, null);
+
+        assertTrue(mailTo("carla@example.com").contains("Se le devolvió el pago al cliente y se canceló el trabajo"));
+        assertTrue(mailTo("pablo@example.com").contains("Se le devolvió el pago al cliente y se canceló el trabajo"));
+    }
+
+    @Test
     void aChangeByTheClient_namesTheClient() {
         job(Role.CLIENT);
 

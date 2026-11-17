@@ -22,7 +22,9 @@ public final class JobRequestEvents {
         /** The client paid: the money is held until the PIN. */
         PAID,
         /** Nobody paid by the time it could still be cancelled, so it was cancelled; no actor. */
-        PAYMENT_EXPIRED
+        PAYMENT_EXPIRED,
+        /** The client got the money back outside a cancellation (an admin, or a chargeback), so it was cancelled; no actor. */
+        REFUNDED
     }
 
     /** One side asked to move an accepted job: the other side is told. */

@@ -40,6 +40,8 @@ export interface JobRequest {
     payoutAt?: string | null
     /** Where to transfer the professional; only in the admin's pending payouts. */
     professionalPayoutAccount?: string | null
+    /** Whether that account was linked by logging in to it, not typed; same lists. */
+    professionalPayoutVerified?: boolean
     status: JobStatus
     tasks: JobTask[]
     /** The timeframe the proposing side asked for, while the proposal waits for an answer. */

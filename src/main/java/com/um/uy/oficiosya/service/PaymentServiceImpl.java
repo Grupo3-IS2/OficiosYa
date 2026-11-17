@@ -9,6 +9,7 @@ import com.um.uy.oficiosya.mapper.JobRequestMapper;
 import com.um.uy.oficiosya.repository.JobRequestRepository;
 import com.um.uy.oficiosya.service.interfaces.PaymentGateway;
 import com.um.uy.oficiosya.service.interfaces.PaymentService;
+import com.um.uy.oficiosya.service.interfaces.ScheduleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -30,21 +31,26 @@ public class PaymentServiceImpl implements PaymentService {
     /** A job is paid once both sides committed to it, and until it's done. */
     static final Set<JobStatus> PAYABLE = Set.of(JobStatus.ACCEPTED, JobStatus.RESCHEDULE_REQUESTED);
     private static final String CURRENCY = "UYU";
+    static final String REFUND_REASON = "Un administrador le devolvió el pago al cliente";
+    static final String REVERSAL_REASON = "El pago se revirtió en Mercado Pago";
 
     private final JobRequestRepository jobRequestRepository;
     private final JobRequestMapper jobRequestMapper;
     private final PaymentGateway paymentGateway;
+    private final ScheduleService scheduleService;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public PaymentServiceImpl(JobRequestRepository jobRequestRepository,
                               JobRequestMapper jobRequestMapper,
                               PaymentGateway paymentGateway,
+                              ScheduleService scheduleService,
                               ApplicationEventPublisher events,
                               Clock clock) {
         this.jobRequestRepository = jobRequestRepository;
         this.jobRequestMapper = jobRequestMapper;
         this.paymentGateway = paymentGateway;
+        this.scheduleService = scheduleService;
         this.events = events;
         this.clock = clock;
     }
@@ -70,17 +76,18 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public void handlePaymentNotification(String paymentId, Long jobRequestId) {
-        JobRequest notified = jobRequestId == null ? null : jobRequestRepository.findById(jobRequestId).orElse(null);
-        PaymentGateway.Payment payment = paymentGateway.getPayment(paymentId, notified);
-        // Pending, rejected or already refunded: nothing to hold (a refund we made comes back as "refunded")
+    public void handlePaymentNotification(String paymentId) {
+        PaymentGateway.Payment payment = paymentGateway.getPayment(paymentId);
+        if (payment.isReversed()) {
+            handleReversal(paymentId, payment);
+            return;
+        }
+        // Pending or rejected: nothing to hold
         if (!payment.isApproved()) return;
 
         JobRequest job = jobOf(payment);
-        // ?job= isn't signed: the payment, read with that job's token, must say it is for that same job
-        if (job == null || (notified != null && !notified.getId().equals(job.getId()))) {
-            log.warn("Approved payment {} has no job (external_reference {}, notified for {})", paymentId,
-                    payment.externalReference(), jobRequestId);
+        if (job == null) {
+            log.warn("Approved payment {} has no job (external_reference {})", paymentId, payment.externalReference());
             return;
         }
         // Mercado Pago repeats notifications
@@ -105,6 +112,63 @@ public class PaymentServiceImpl implements PaymentService {
         paymentGateway.refund(paymentId, job);
     }
 
+    /**
+     * The money went back without the job being cancelled here (a chargeback, or a refund from Mercado Pago's panel),
+     * so it must not reach the professional. A refund we made finds the job REFUNDED, or is not the payment it holds.
+     */
+    private void handleReversal(String paymentId, PaymentGateway.Payment payment) {
+        JobRequest job = jobOf(payment);
+        if (job == null || !paymentId.equals(job.getMpPaymentId())) return;
+
+        if (job.getPaymentState() == PaymentState.RETAINED) {
+            log.warn("Payment {} holding job {} was reversed: cancelling the job", paymentId, job.getId());
+            cancelRefunded(job, REVERSAL_REASON);
+        } else if (job.getPaymentState() == PaymentState.PAID) {
+            // A completed job stays completed; without PAID it just leaves the pending payouts
+            if (job.getPayoutAt() != null) {
+                log.error("Payment {} of job {} was reversed after the professional was transferred their share: "
+                        + "OficiosYa is out of that money", paymentId, job.getId());
+            }
+            job.setPaymentState(PaymentState.REFUNDED);
+            jobRequestRepository.save(job);
+        }
+    }
+
+    /** A RETAINED job is always still accepted: the money is gone, so the job is too. */
+    private JobRequest cancelRefunded(JobRequest job, String reason) {
+        scheduleService.releaseJobSchedule(job);
+        job.setPaymentState(PaymentState.REFUNDED);
+        job.setStatus(JobStatus.CANCELLED);
+        job.setCancelledBy(null);
+        job.setCancellationReason(reason);
+        job.clearReschedule();
+        JobRequest saved = jobRequestRepository.save(job);
+        events.publishEvent(new JobRequestEvents.JobStatusChanged(saved.getId(), JobRequestEvents.Change.REFUNDED, null));
+        events.publishEvent(new JobRequestEvents.AwaitingAnswersChanged(Set.of(
+                saved.getClient().getPublicId(), saved.getProfessional().getPublicId())));
+        return saved;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<JobRequestResponse> listRetained() {
+        return jobRequestRepository.findByPaymentStateOrderByPaidAtAsc(PaymentState.RETAINED).stream()
+                .map(jobRequestMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public JobRequestResponse refundRetained(Long jobRequestId) {
+        JobRequest job = find(jobRequestId);
+        if (job.getPaymentState() != PaymentState.RETAINED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este trabajo no tiene un pago retenido");
+        }
+        // Before the change: if Mercado Pago fails, the job stays as it was instead of cancelled without the refund
+        paymentGateway.refund(job.getMpPaymentId(), job);
+        return jobRequestMapper.toResponse(cancelRefunded(job, REFUND_REASON));
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<JobRequestResponse> listPendingPayouts() {
@@ -125,6 +189,7 @@ public class PaymentServiceImpl implements PaymentService {
     private JobRequestResponse toPayoutResponse(JobRequest job) {
         JobRequestResponse response = jobRequestMapper.toResponse(job);
         response.setProfessionalPayoutAccount(job.getProfessional().getPayoutAccount());
+        response.setProfessionalPayoutVerified(job.getProfessional().getPayoutMpUserId() != null);
         return response;
     }
 

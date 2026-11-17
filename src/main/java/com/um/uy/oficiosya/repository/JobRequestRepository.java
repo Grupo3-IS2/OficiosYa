@@ -105,4 +105,6 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
     List<JobRequest> findByPaymentStateAndPayoutAtIsNullOrderByUpdatedAtAsc(PaymentState paymentState);
 
     List<JobRequest> findByPayoutAtIsNotNullOrderByPayoutAtDesc();
+
+    List<JobRequest> findByPaymentStateOrderByPaidAtAsc(PaymentState paymentState);
 }

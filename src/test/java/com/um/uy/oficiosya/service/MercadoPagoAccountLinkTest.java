@@ -5,7 +5,6 @@ import com.um.uy.oficiosya.repository.ProfessionalRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -15,13 +14,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,7 +32,6 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class MercadoPagoAccountLinkTest {
@@ -78,7 +74,7 @@ class MercadoPagoAccountLinkTest {
     }
 
     @Test
-    void comingBack_savesTheAccountsEmailAndHolder_andItsTokensEncrypted() {
+    void comingBack_savesTheAccountsIdEmailAndHolder() {
         MercadoPagoAccountLink link = link(NOW);
         String state = link.state(professionalId);
         mp.expect(requestTo(MercadoPagoGateway.API_URL + "/oauth/token"))
@@ -99,45 +95,7 @@ class MercadoPagoAccountLinkTest {
         mp.verify();
         assertEquals("Mercado Pago · ana@correo.com · Ana Pérez", professional.getPayoutAccount());
         assertEquals("987", professional.getPayoutMpUserId());
-        assertNotEquals("APP_USR-theirs", professional.getMpAccessToken());
-        assertEquals("APP_USR-theirs", link.accessToken(professional));
-        assertEquals("TG-refresh", link.decrypt(professional.getMpRefreshToken()));
         verify(professionalRepository).save(professional);
-    }
-
-    @Test
-    void anAboutToExpireToken_isRefreshedBeforeUse_replacingBothTokens() {
-        MercadoPagoAccountLink link = link(NOW);
-        professional.setMpAccessToken(link.encrypt("APP_USR-old"));
-        professional.setMpRefreshToken(link.encrypt("TG-old"));
-        professional.setMpTokenExpiresAt(OffsetDateTime.ofInstant(NOW.plus(Duration.ofHours(2)), ZoneOffset.UTC));
-        mp.expect(requestTo(MercadoPagoGateway.API_URL + "/oauth/token"))
-                .andExpect(jsonPath("$.grant_type").value("refresh_token"))
-                .andExpect(jsonPath("$.refresh_token").value("TG-old"))
-                .andRespond(withSuccess("""
-                        {"access_token":"APP_USR-new","refresh_token":"TG-new","expires_in":15552000}""",
-                        MediaType.APPLICATION_JSON));
-
-        assertEquals("APP_USR-new", link.accessToken(professional));
-        assertEquals("TG-new", link.decrypt(professional.getMpRefreshToken()));
-        verify(professionalRepository).save(professional);
-    }
-
-    @Test
-    void aTokenThatCantBeRefreshed_asksToLinkAgain() {
-        MercadoPagoAccountLink link = link(NOW);
-        professional.setMpAccessToken(link.encrypt("APP_USR-old"));
-        professional.setMpRefreshToken(link.encrypt("TG-old"));
-        professional.setMpTokenExpiresAt(OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
-        mp.expect(requestTo(MercadoPagoGateway.API_URL + "/oauth/token")).andRespond(withStatus(HttpStatus.BAD_REQUEST));
-
-        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> link.accessToken(professional));
-        assertEquals(502, e.getStatusCode().value());
-    }
-
-    @Test
-    void aProfessionalWhoDidntLink_hasNoToken() {
-        assertNull(link(NOW).accessToken(professional));
     }
 
     @Test

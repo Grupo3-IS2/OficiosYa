@@ -85,20 +85,20 @@ Notes:
 - Mercado Pago's API refuses refunds for test sellers ("Unauthorized use of live
   credentials"). Refund the payment from the seller's Mercado Pago account first,
   then cancel the job in the app.
-- Split payments (OAuth): with `MP_CLIENT_ID` and `MP_CLIENT_SECRET` set (same app,
-  *Credenciales de producción*), professionals must link their Mercado Pago account by
-  logging in to it before accepting jobs. Clients then pay straight into that account and
-  Mercado Pago sends OficiosYa's commission (`PAYMENT_COMMISSION_PERCENT`) to the
-  `MP_ACCESS_TOKEN` account as `marketplace_fee`; there is nothing left to transfer by hand.
-  Add `https://<host>/api/v1/payments/mercado-pago/callback` as the app's *URL de
-  redireccionamiento*; locally the host is the Cloudflare tunnel's, set as
-  `MP_OAUTH_REDIRECT_URL`. `MP_NOTIFICATION_URL` is required: each payment's notification
-  carries `?job=` to know whose account to read it from.
-- Testing split payments: test users' apps have no Client ID/Secret, so the app is your
-  real account's, with `MP_OAUTH_TEST_TOKENS=true` (linking returns `TEST-` tokens and
-  checkouts open on the sandbox) and its *test* access token as `MP_ACCESS_TOKEN`. The
-  professional links with a seller test user, and a buyer test user pays. Cancelling a paid job refunds it from the
-  professional's account, so it needs the money still there.
+- Money flow: every job is charged into the `MP_ACCESS_TOKEN` account, which holds it until
+  the PIN; an admin then transfers the professional `paymentAmount - platformFee` from
+  Mercado Pago and marks it in *Transferencias*. *Retenidos* there refunds a held payment
+  and cancels the job (no-shows, disputes). A payment reversed in Mercado Pago (chargeback,
+  refund from the panel) cancels a held job, or takes a completed one off the pending transfers.
+- Linking accounts (OAuth): with `MP_CLIENT_ID` and `MP_CLIENT_SECRET` set (*Credenciales de
+  producción*), professionals must link their Mercado Pago account by logging in to it before
+  accepting or proposing jobs. That only proves the account is theirs: no token is kept and no
+  money goes to it directly. Add `https://<host>/api/v1/payments/mercado-pago/callback` as the
+  app's *URL de redireccionamiento*; locally the host is the Cloudflare tunnel's, set as
+  `MP_OAUTH_REDIRECT_URL`.
+- Testing linking: test users' apps have no Client ID/Secret, so those come from an app on your
+  real account, with `MP_OAUTH_TEST_TOKENS=true`. `MP_ACCESS_TOKEN` and `MP_WEBHOOK_SECRET` stay
+  the test seller's. The professional links with a second test seller.
 
 # Coding standards
 

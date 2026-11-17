@@ -5,7 +5,7 @@ import { MERCADO_PAGO, URUGUAYAN_BANKS, normalizeAccount, validatePayout, emptyP
 
 const MERCADO_PAGO_LOGO = '/banks/mercadopago.svg'
 
-// With linking on, clients pay straight into the professional's Mercado Pago account: a bank account can't take that
+// With linking on, OficiosYa only transfers to a Mercado Pago account the professional proved is theirs
 const methods = (linkAvailable: boolean) => linkAvailable
     ? [{ value: 'MERCADO_PAGO', title: 'Mercado Pago', detail: 'Vinculás tu cuenta iniciando sesión', logo: MERCADO_PAGO_LOGO }] as const
     : [
@@ -127,7 +127,7 @@ export default function PayoutSection({ value, saved, verified, linkAvailable, o
             </div>}
 
             {linksMercadoPago && <div className="payout-link">
-                <p>Iniciá sesión en Mercado Pago y autorizá a OficiosYa. Los clientes te pagan directo a esa cuenta y Mercado Pago descuenta la comisión de OficiosYa.</p>
+                <p>Iniciá sesión en Mercado Pago y autorizá a OficiosYa, así confirmamos que la cuenta es tuya. Cuando termines un trabajo, te transferimos a esa cuenta lo que cobraste, descontada la comisión.</p>
                 <Button type="button" className="payout-link__button" disabled={linking} onClick={() => void link()}>
                     <img src={MERCADO_PAGO_LOGO} alt="" />
                     {linking ? 'Abriendo Mercado Pago…' : verified ? 'Vincular otra cuenta' : 'Vincular con Mercado Pago'}

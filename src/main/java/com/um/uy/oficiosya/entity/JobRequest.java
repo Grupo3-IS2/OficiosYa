@@ -66,6 +66,14 @@ public class JobRequest {
      */
     private String confirmationPinHash;
 
+    /** Wrong PINs in a row: at the limit the PIN locks until pinLockedUntil, so the professional can't guess it. */
+    @Builder.Default
+    @ColumnDefault("0")
+    @Column(nullable = false)
+    private int pinFailedAttempts = 0;
+
+    private OffsetDateTime pinLockedUntil;
+
     /** Which side proposed the job: the other one accepts or rejects it. Rows from before either side could propose were the client's. */
     @Builder.Default
     @NotNull

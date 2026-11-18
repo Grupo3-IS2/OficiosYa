@@ -52,6 +52,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -62,6 +63,11 @@ public class JobRequestServiceImpl implements JobRequestService {
     private static final String JOB_NOT_FOUND = "Trabajo no encontrado.";
 
     private static final SecureRandom PIN_RANDOM = new SecureRandom();
+
+    /** 5 tries every 15 minutes: guessing one of the million PINs would take years. */
+    static final int MAX_PIN_ATTEMPTS = 5;
+    static final Duration PIN_LOCK = Duration.ofMinutes(15);
+    static final String PIN_LOCKED = "Ingresaste un PIN incorrecto demasiadas veces. Probá de nuevo en 15 minutos.";
 
     private static final Set<JobStatus> CANCELLABLE =
             Set.of(JobStatus.PROPOSED, JobStatus.ACCEPTED, JobStatus.RESCHEDULE_REQUESTED);
@@ -361,9 +367,10 @@ public class JobRequestServiceImpl implements JobRequestService {
     }
 
     @Override
-    @Transactional
+    // Keeps the failed attempt counted when the wrong PIN is answered with an exception
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public JobRequestResponse completeJobRequest(Long id, JobRequestCompleteRequest request, UUID professionalId) {
-        JobRequest jobRequest = findOwnedByProfessional(id, professionalId, "completar");
+        JobRequest jobRequest = ownedByProfessional(jobRequestRepository.findByIdForUpdate(id), professionalId, "completar");
 
         // A pending reschedule doesn't stop the job from being done at its original time
         if (jobRequest.getStatus() != JobStatus.ACCEPTED && jobRequest.getStatus() != JobStatus.RESCHEDULE_REQUESTED) {
@@ -377,8 +384,22 @@ public class JobRequestServiceImpl implements JobRequestService {
                     "El cliente todavía no pagó el trabajo: se puede completar una vez que lo pague");
         }
 
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        if (jobRequest.getPinLockedUntil() != null && now.isBefore(jobRequest.getPinLockedUntil())) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, PIN_LOCKED);
+        }
+
         if (!passwordEncoder.matches(request.getPin(), jobRequest.getConfirmationPinHash())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El PIN ingresado es incorrecto");
+            // A lock that already ran out starts a new round of attempts
+            int failed = jobRequest.getPinLockedUntil() != null ? 1 : jobRequest.getPinFailedAttempts() + 1;
+            boolean locked = failed >= MAX_PIN_ATTEMPTS;
+            jobRequest.setPinFailedAttempts(failed);
+            jobRequest.setPinLockedUntil(locked ? now.plus(PIN_LOCK) : null);
+            jobRequestRepository.save(jobRequest);
+            if (locked) events.publishEvent(new JobRequestEvents.PinLocked(jobRequest.getId()));
+            throw locked
+                    ? new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, PIN_LOCKED)
+                    : new ResponseStatusException(HttpStatus.BAD_REQUEST, "El PIN ingresado es incorrecto");
         }
 
         if (jobRequest.getPaymentState() == PaymentState.RETAINED) {
@@ -506,8 +527,11 @@ public class JobRequestServiceImpl implements JobRequestService {
     }
 
     private JobRequest findOwnedByProfessional(Long id, UUID professionalId, String action) {
-        JobRequest jobRequest = jobRequestRepository.findById(id)
-                .orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
+        return ownedByProfessional(jobRequestRepository.findById(id), professionalId, action);
+    }
+
+    private static JobRequest ownedByProfessional(Optional<JobRequest> found, UUID professionalId, String action) {
+        JobRequest jobRequest = found.orElseThrow(() -> new JobRequestNotFoundException(JOB_NOT_FOUND));
 
         if (!jobRequest.getProfessional().getPublicId().equals(professionalId)) {
             throw new AccessDeniedException("No tienes permiso para " + action + " este trabajo");

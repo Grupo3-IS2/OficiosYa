@@ -34,6 +34,16 @@ public class RequestNotificationListener {
 
     @Async
     @TransactionalEventListener
+    public void onPinLocked(JobRequestEvents.PinLocked event) {
+        try {
+            notifications.notifyPinLocked(event.jobRequestId());
+        } catch (RuntimeException e) {
+            log.error("Could not notify the PIN lock of job request {}", event.jobRequestId(), e);
+        }
+    }
+
+    @Async
+    @TransactionalEventListener
     public void onJobProposed(JobRequestEvents.JobProposed event) {
         notifyJobChanged(event.jobRequestId(), null, null);
     }

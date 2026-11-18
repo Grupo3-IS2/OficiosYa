@@ -114,6 +114,7 @@ class JobRequestServiceImplTest {
         JobRequest job = JobRequest.builder().id(10L).client(client).professional(professional)
                 .location("Montevideo").paymentAmount(BigDecimal.TEN).confirmationPinHash("hash").status(status).build();
         when(jobRequestRepository.findById(10L)).thenReturn(Optional.of(job));
+        when(jobRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(job));
         return job;
     }
 
@@ -734,6 +735,46 @@ class JobRequestServiceImplTest {
 
         assertThrows(ResponseStatusException.class, () -> service.completeJobRequest(10L, request, professionalId));
         assertEquals(JobStatus.ACCEPTED, job.getStatus());
+        assertEquals(1, job.getPinFailedAttempts());
+    }
+
+    @Test
+    void completeJobRequest_afterTooManyWrongPins_locksEvenTheRightOne() {
+        JobRequest job = job(JobStatus.ACCEPTED);
+        when(passwordEncoder.matches("000000", "hash")).thenReturn(false);
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+        JobRequestCompleteRequest wrong = pin("000000");
+        for (int i = 1; i < JobRequestServiceImpl.MAX_PIN_ATTEMPTS; i++) {
+            ResponseStatusException failure = assertThrows(ResponseStatusException.class,
+                    () -> service.completeJobRequest(10L, wrong, professionalId));
+            assertEquals(HttpStatus.BAD_REQUEST, failure.getStatusCode());
+        }
+        ResponseStatusException last = assertThrows(ResponseStatusException.class,
+                () -> service.completeJobRequest(10L, wrong, professionalId));
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, last.getStatusCode());
+        verify(events).publishEvent(new JobRequestEvents.PinLocked(10L));
+
+        JobRequestCompleteRequest right = pin("123456");
+        ResponseStatusException locked = assertThrows(ResponseStatusException.class,
+                () -> service.completeJobRequest(10L, right, professionalId));
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, locked.getStatusCode());
+        assertEquals(JobStatus.ACCEPTED, job.getStatus());
+    }
+
+    @Test
+    void completeJobRequest_onceTheLockRunsOut_acceptsTheRightPinAndAWrongOneStartsOver() {
+        JobRequest job = job(JobStatus.ACCEPTED);
+        job.setPinFailedAttempts(JobRequestServiceImpl.MAX_PIN_ATTEMPTS);
+        job.setPinLockedUntil(OffsetDateTime.now().minusMinutes(1));
+        when(passwordEncoder.matches("000000", "hash")).thenReturn(false);
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+        JobRequestCompleteRequest wrong = pin("000000");
+
+        assertThrows(ResponseStatusException.class, () -> service.completeJobRequest(10L, wrong, professionalId));
+        assertEquals(1, job.getPinFailedAttempts());
+        assertNull(job.getPinLockedUntil());
+
+        assertEquals(JobStatus.COMPLETED, service.completeJobRequest(10L, pin("123456"), professionalId).getStatus());
     }
 
     @Test

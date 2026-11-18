@@ -120,6 +120,30 @@ class RequestNotificationServiceTest {
         verify(emailSender, never()).sendNotification(anyString(), anyString(), anyString());
     }
 
+    // --- PIN locked ---
+
+    @Test
+    void aLockedPin_isMailedToTheClientOnly() {
+        pendingReschedule(Role.PROFESSIONAL);
+
+        service.notifyPinLocked(10L);
+
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(emailSender).sendNotification(eq("carla@example.com"), eq("Se bloqueó el PIN de un trabajo"), body.capture());
+        assertTrue(body.getValue().contains("Pablo ingresó un PIN incorrecto demasiadas veces para completar \"Plomería\" (Av. Italia 1234)"));
+        verify(emailSender, never()).sendNotification(eq("pablo@example.com"), anyString(), anyString());
+    }
+
+    @Test
+    void aLockedPin_isNotMailedToAClientWithTheEmailsOff() {
+        client.setEmailNotifications(false);
+        pendingReschedule(Role.PROFESSIONAL);
+
+        service.notifyPinLocked(10L);
+
+        verify(emailSender, never()).sendNotification(anyString(), anyString(), anyString());
+    }
+
     // --- requests waiting for an answer ---
 
     private void awaiting(Client user, long proposals, long changes) {
@@ -237,7 +261,7 @@ class RequestNotificationServiceTest {
         String body = mailTo("carla@example.com");
         assertTrue(body.contains("Pablo propuso un trabajo \"Plomería\" (Av. Italia 1234)."));
         assertTrue(body.contains("Horario: domingo 18 de octubre, de 10:00 a 12:00"));
-        assertTrue(mailTo("pablo@example.com").contains("Pablo propuso un trabajo"));
+        verify(emailSender, never()).sendNotification(eq("pablo@example.com"), anyString(), anyString());
     }
 
     @Test
@@ -262,6 +286,7 @@ class RequestNotificationServiceTest {
         String body = mailTo("carla@example.com");
         assertTrue(body.contains("Pablo aceptó el trabajo"));
         assertTrue(body.contains("Horario: viernes 16 de octubre, de 13:30 a 15:30"));
+        verify(emailSender, never()).sendNotification(eq("pablo@example.com"), anyString(), anyString());
     }
 
     @Test

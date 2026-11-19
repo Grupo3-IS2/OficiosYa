@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../../../components/Button/Button'
-import { clock, dateKey, dayOfWeekOf, everyDay, rangeOn, suggestedRange } from '../scheduleEditor'
+import { clock, dateKey, dayOfWeekOf, everyDay, nextWeekFrom, rangeOn, suggestedRange } from '../scheduleEditor'
 import type { TimeRange } from '../scheduleEditor'
 import { Switch } from './ScheduleEditPanel'
 import './ScheduleEditPanel.css'
@@ -10,7 +10,7 @@ import './ScheduleEditPanel.css'
 export default function ScheduleAddPanel({ initial, now, busy, error, onSave, onClose }: Readonly<{
     /** The hours the form opens with: a selection on the calendar, or a suggestion. */
     initial: TimeRange
-    /** Moves every minute: what's before it can't be added. */
+    /** Moves every minute: a one-off block before it can't be added; a weekly one starts the next week. */
     now: number
     busy: boolean
     error: string
@@ -39,7 +39,8 @@ export default function ScheduleAddPanel({ initial, now, busy, error, onSave, on
     const [year, month, dayOfMonth] = date.split('-').map(Number)
     const chosenDay = date ? new Date(year, month - 1, dayOfMonth) : null
     const range = chosenDay ? rangeOn(chosenDay, startTime, endTime) : null
-    const past = range !== null && range.start.getTime() < now
+    // A weekly block on a day that already passed is fine: it starts from the next week
+    const past = range !== null && range.start.getTime() < now && !repeats
     const canSave = range !== null && !past && !busy
 
     /** On a day where the hours typed already passed (today), offers future ones instead. */
@@ -47,7 +48,7 @@ export default function ScheduleAddPanel({ initial, now, busy, error, onSave, on
         setDate(value)
         const [newYear, newMonth, newDay] = value.split('-').map(Number)
         const typed = value ? rangeOn(new Date(newYear, newMonth - 1, newDay), startTime, endTime) : null
-        if (!typed || typed.start.getTime() >= now) return
+        if (!typed || typed.start.getTime() >= now || repeats) return
         const next = suggestedRange(typed.start, new Date(now))
         setDate(dateKey(next.start))
         setStartTime(clock(next.start))
@@ -56,14 +57,14 @@ export default function ScheduleAddPanel({ initial, now, busy, error, onSave, on
 
     const hint = range === null
         ? 'La hora de fin tiene que ser posterior a la de inicio. 00:00 es medianoche.'
-        : past ? 'Ese horario ya pasó: elegí uno desde ahora.' : ''
+        : past ? 'Ese horario ya pasó: elegí uno desde ahora, o hacé que se repita cada semana.' : ''
 
     return createPortal(
         <dialog ref={dialog} className="schedule-edit" aria-labelledby="schedule-add-title" aria-busy={busy}
             onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
             <form className="schedule-edit__body" onSubmit={event => {
                 event.preventDefault()
-                if (canSave) onSave(range, repeats)
+                if (canSave) onSave(repeats ? nextWeekFrom(range, new Date(now)) : range, repeats)
             }}>
                 <header className="schedule-edit__header">
                     <h2 id="schedule-add-title">Agregar horario</h2>
@@ -72,7 +73,7 @@ export default function ScheduleAddPanel({ initial, now, busy, error, onSave, on
 
                 <fieldset className="schedule-edit__hours" disabled={busy}>
                     <legend>Día y horario</legend>
-                    <label className="schedule-edit__day">Día<input type="date" min={dateKey(new Date(now))} value={date} onChange={event => changeDate(event.target.value)} required /></label>
+                    <label className="schedule-edit__day">Día<input type="date" min={repeats ? undefined : dateKey(new Date(now))} value={date} onChange={event => changeDate(event.target.value)} required /></label>
                     <label>Desde<input type="time" step={900} value={startTime} onChange={event => setStartTime(event.target.value)} required /></label>
                     <span aria-hidden="true">–</span>
                     <label>Hasta<input type="time" step={900} value={endTime} onChange={event => setEndTime(event.target.value)} required /></label>

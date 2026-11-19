@@ -417,11 +417,13 @@ export default function ScheduleSection({ professionalId }: Readonly<{ professio
                 dayHeaderFormat={dayHeaderFormat}
                 selectable={!busy && !loading}
                 selectMirror
-                selectOverlap={false}
+                // The grey elapsed background doesn't count: a past day can be picked for a weekly block
+                selectOverlap={event => event.id === 'elapsed'}
                 eventOverlap={false}
                 selectLongPressDelay={300}
                 eventLongPressDelay={300}
-                selectAllow={span => span.start >= new Date()}
+                // A past day can be selected: the form only lets it be added as a weekly block, from the next week
+                selectAllow={span => span.start >= new Date() || withinOneDay(span)}
                 eventAllow={span => span.start >= new Date()}
                 events={events}
                 select={chooseHowToAdd}

@@ -31,6 +31,10 @@ public final class JobRequestEvents {
     public record RescheduleRequested(Long jobRequestId) {
     }
 
+    /** Too many wrong PINs locked the job's completion: the client is told, since only the professional types it. */
+    public record PinLocked(Long jobRequestId) {
+    }
+
     /** What waits for these users' answer may have grown or shrunk. */
     public record AwaitingAnswersChanged(Set<UUID> userIds) {
     }

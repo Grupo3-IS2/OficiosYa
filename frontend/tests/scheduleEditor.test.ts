@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { clock, dateKey, everyDay, movedSeries, planCreation, rangeOn, slotHours, suggestedRange, weeklySlotFor } from '../src/pages/EditProfile/scheduleEditor.ts'
+import { clock, dateKey, everyDay, movedSeries, nextWeekFrom, planCreation, rangeOn, slotHours, suggestedRange, weeklySlotFor } from '../src/pages/EditProfile/scheduleEditor.ts'
 import type { Schedule, ScheduleType } from '../src/types/Schedule.ts'
 
 function block(id: number, start: Date, end: Date, type: ScheduleType = 'URGENT_AVAILABLE'): Schedule {
@@ -98,4 +98,16 @@ test('hours typed in the edit panel become a range on that day, with 00:00 as mi
 test('dates and times are written in local time', () => {
     assert.equal(dateKey(at(6, 23)), '2030-05-06')
     assert.equal(clock(new Date(2030, 4, 6, 7, 5)), '07:05')
+})
+
+test('a weekly block on a day that passed starts on the same weekday next week', () => {
+    const now = new Date(2026, 10, 18, 12) // Wednesday
+    const monday = { start: new Date(2026, 10, 16, 9), end: new Date(2026, 10, 16, 13) }
+    assert.deepEqual(nextWeekFrom(monday, now), { start: new Date(2026, 10, 23, 9), end: new Date(2026, 10, 23, 13) })
+})
+
+test('a block that has not started stays where it is', () => {
+    const now = new Date(2026, 10, 18, 8)
+    const later = { start: new Date(2026, 10, 18, 9), end: new Date(2026, 10, 18, 13) }
+    assert.deepEqual(nextWeekFrom(later, now), later)
 })

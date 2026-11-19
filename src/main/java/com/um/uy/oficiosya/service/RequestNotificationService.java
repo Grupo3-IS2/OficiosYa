@@ -96,8 +96,30 @@ public class RequestNotificationService {
         emailSender.sendNotification(recipient.getEmail(), "Te pidieron cambiar el horario de un trabajo", body);
     }
 
+    /** Tells the client someone typed a wrong PIN too many times on their job: they never share it unless the work is done. */
+    @Transactional(readOnly = true)
+    public void notifyPinLocked(Long jobRequestId) {
+        JobRequest job = jobRequestRepository.findById(jobRequestId).orElse(null);
+        if (job == null) return;
+
+        Client recipient = job.getClient();
+        if (!recipient.isEmailNotifications()) return;
+
+        String body = """
+                Hola %s,
+
+                %s ingresó un PIN incorrecto demasiadas veces para completar "%s" (%s), así que lo bloqueamos por 15 minutos.
+
+                Compartí el PIN solo cuando el trabajo esté terminado. Si no lo reconocés, revisá la solicitud en Mis solicitudes:
+                %s/mis-solicitudes
+                """.formatted(recipient.getName(), job.getProfessional().getName(), service(job), job.getLocation(),
+                siteUrl) + SIGNATURE;
+
+        emailSender.sendNotification(recipient.getEmail(), "Se bloqueó el PIN de un trabajo", body);
+    }
+
     /**
-     * Tells both sides what happened to the job, who did it and its timeframe; {@code change} null
+     * Tells the other side what happened to the job (both sides when nobody did it), who did it and its timeframe; {@code change} null
      * means it was just proposed. Never the PIN. A reschedule asked for is left to
      * {@link #notifyRescheduleRequested}, which already tells the side that has to answer it.
      */
@@ -119,10 +141,12 @@ public class RequestNotificationService {
             case RESCHEDULE_REQUESTED, PAYMENT_EXPIRED, REFUNDED -> null;
         };
         // Nobody did these: the job wasn't paid in time, or its payment went back to the client
+        Client actor = change == JobRequestEvents.Change.PAYMENT_EXPIRED || change == JobRequestEvents.Change.REFUNDED
+                ? null : actorOf(job, change, actorId);
         String event = switch (change) {
             case PAYMENT_EXPIRED -> "Se canceló por falta de pago el trabajo";
             case REFUNDED -> "Se le devolvió el pago al cliente y se canceló el trabajo";
-            case null, default -> actorOf(job, change, actorId).getName() + " " + what;
+            case null, default -> actor.getName() + " " + what;
         };
 
         // The scheduled block once accepted, otherwise the timeframe the professional offered
@@ -134,7 +158,8 @@ public class RequestNotificationService {
                         ? timeframe(job.getProposedStart(), job.getProposedEnd()) : "a confirmar");
 
         for (Client recipient : List.of(job.getClient(), job.getProfessional())) {
-            if (!recipient.isEmailNotifications()) continue;
+            // Whoever made the change already knows it
+            if (!recipient.isEmailNotifications() || recipient == actor) continue;
             String body = """
                     Hola %s,
 

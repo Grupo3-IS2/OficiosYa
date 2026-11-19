@@ -87,6 +87,19 @@ export function suggestedRange(day: Date, now: Date): TimeRange {
     return { start, end: end < midnight ? end : midnight }
 }
 
+/**
+ * The first week the range hasn't started yet, same weekday and hours: a weekly block picked on a day that
+ * already passed starts from the next one. Moves by calendar days so the hours survive a DST change.
+ */
+export function nextWeekFrom(range: TimeRange, now: Date): TimeRange {
+    let { start, end } = range
+    while (start < now) {
+        start = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7, start.getHours(), start.getMinutes())
+        end = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 7, end.getHours(), end.getMinutes())
+    }
+    return { start, end }
+}
+
 /** "YYYY-MM-DD" in local time. */
 export function dateKey(date: Date): string {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`

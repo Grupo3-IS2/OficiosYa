@@ -16,7 +16,7 @@
 
 	<groupId>com.um.uy</groupId>
 	<artifactId>oficiosya</artifactId>
-	<version>0.4.0-alpha</version>
+	<version>1.0.0</version>
 	<name>oficiosYa</name>
 	<description>
 		Digital platform that connects customers with tradespeople and home-service professionals (locksmithing, gardening, air conditioning, plumbing, etc.),
@@ -28,6 +28,17 @@
 		<mapstruct.version>1.6.3</mapstruct.version>
 		<lombok.version>1.18.48</lombok.version>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<!-- CVE-2026-102554: guava transitiva de google-api-client viene en 33.1.0 -->
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<version>33.8.0-jre</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<dependencies>
 
